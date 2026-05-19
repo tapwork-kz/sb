@@ -32,6 +32,7 @@ function fmtSum(val) {
 
 // Универсальная рисовалка карточек плана
 // Универсальная рисовалка карточек плана
+// Универсальная рисовалка карточек плана
 function renderPlanUI(pData) {
     let area = document.getElementById("plan-render-area");
     if (!area) return;
@@ -40,34 +41,75 @@ function renderPlanUI(pData) {
     let getColor = (pct) => { let p = parseFloat(String(pct).replace(/\s/g, '').replace(',', '.')) || 0; return p >= 100 ? "#27ae60" : (p >= 80 ? "#f39c12" : "#e74c3c"); };
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
+    // Считаем ИТОГО ФАКТ (ТО + АКС + УСЛ)
+    let totalFact = parse(pData.to.total.fact) + parse(pData.aks.total.fact) + parse(pData.usl.total.fact);
+    let totalFactEd = parse(pData.to.total.factEd) + parse(pData.aks.total.factEd) + parse(pData.usl.total.factEd);
+
     let html = "";
     
     // 1. Сводка ОБЩАЯ
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px;">
         <div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-align:center;">Общая сводка</div>
-        <div style="display:flex; gap:8px; margin-bottom:12px;">
+        
+        <!-- ИТОГИ -->
+        <div style="display:flex; gap:8px; margin-bottom:14px;">
            <div style="flex:1; background:var(--inner-bg); padding:10px; border-radius:12px; text-align:center; border:1px solid var(--border-color);">
-               <div style="color:gray; font-size:10px; text-transform:uppercase; margin-bottom:4px;">План ТО</div>
-               <div style="font-size:16px; font-weight:bold; color:var(--text-color);">${fmtSum(pData.to.total.plan)}</div>
+               <div style="color:gray; font-size:10px; text-transform:uppercase; margin-bottom:4px;">Итоговый План</div>
+               <div style="font-size:16px; font-weight:bold; color:var(--text-color);">${fmtSum(pData.totalPlan || 0)}</div>
            </div>
            <div style="flex:1; background:rgba(39, 174, 96, 0.05); padding:10px; border-radius:12px; text-align:center; border:1px solid rgba(39, 174, 96, 0.3);">
-               <div style="color:var(--text-color); font-size:10px; text-transform:uppercase; margin-bottom:4px; opacity:0.8;">Факт ТО (с ЭД)</div>
-               <div style="font-size:16px; font-weight:bold; color:#27ae60;">${fmtSum(pData.to.total.fact)} <span style="font-size:11px; color:gray; font-weight:normal;">/ ${fmtSum(pData.to.total.factEd)}</span></div>
+               <div style="color:var(--text-color); font-size:10px; text-transform:uppercase; margin-bottom:4px; opacity:0.8;">Итого Факт (с ЭД)</div>
+               <div style="font-size:16px; font-weight:bold; color:#27ae60;">${fmtSum(totalFact)} <span style="font-size:11px; color:gray; font-weight:normal;">/ ${fmtSum(totalFactEd)}</span></div>
            </div>
         </div>
-        <div style="background:var(--inner-bg); border-radius:12px; padding:8px 12px; margin-bottom:6px; display:flex; justify-content:space-between; align-items:center;">
-            <b style="color:gray; font-size:12px; width:50px;">АКС</b>
-            <div style="flex:1; text-align:center; font-size:13px;"><span style="color:gray;">${fmtSum(pData.aks.total.plan)}</span> <b style="color:var(--text-color); margin:0 4px;">|</b> <b style="color:var(--btn-color);">${fmtSum(pData.aks.total.fact)}</b></div>
-            <div style="background:var(--card-bg); color:${getColor(pData.aks.total.pct)}; padding:4px 8px; border-radius:8px; font-weight:bold; font-size:12px; min-width:40px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.05);">${pData.aks.total.pct}</div>
+
+        <!-- ТО -->
+        <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:4px;">
+                <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Товарооборот</b>
+                <span style="background:var(--card-bg); color:${getColor(pData.to.total.pct)}; padding:2px 6px; border-radius:6px; font-weight:bold; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">${pData.to.total.pct}</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center;">
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><b style="color:var(--text-color); font-size:12px;">${fmtSum(pData.to.total.plan)}</b></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><b style="color:var(--btn-color); font-size:12px;">${fmtSum(pData.to.total.fact)}</b></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><b style="color:#27ae60; font-size:12px;">${fmtSum(pData.to.total.factEd)}</b></div>
+            </div>
         </div>
-        <div style="background:var(--inner-bg); border-radius:12px; padding:8px 12px; display:flex; justify-content:space-between; align-items:center;">
-            <b style="color:gray; font-size:12px; width:50px;">УСЛУГИ</b>
-            <div style="flex:1; text-align:center; font-size:13px;"><span style="color:gray;">${fmtSum(pData.usl.total.plan)}</span> <b style="color:var(--text-color); margin:0 4px;">|</b> <b style="color:var(--btn-color);">${fmtSum(pData.usl.total.fact)}</b></div>
-            <div style="background:var(--card-bg); color:${getColor(pData.usl.total.pct)}; padding:4px 8px; border-radius:8px; font-weight:bold; font-size:12px; min-width:40px; text-align:center; box-shadow:0 2px 4px rgba(0,0,0,0.05);">${pData.usl.total.pct}</div>
+
+        <!-- АКС -->
+        <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:4px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Аксессуары</b>
+                    <span style="color:gray; font-size:10px;">(Цель: ${pData.aks.planPct || '-'})</span>
+                </div>
+                <span style="background:var(--card-bg); color:${getColor(pData.aks.total.pct)}; padding:2px 6px; border-radius:6px; font-weight:bold; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">${pData.aks.total.pct}</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center;">
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><b style="color:var(--text-color); font-size:12px;">${fmtSum(pData.aks.total.plan)}</b></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><b style="color:var(--btn-color); font-size:12px;">${fmtSum(pData.aks.total.fact)}</b></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><b style="color:#27ae60; font-size:12px;">${fmtSum(pData.aks.total.factEd)}</b></div>
+            </div>
+        </div>
+
+        <!-- УСЛУГИ -->
+        <div style="background:var(--inner-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:4px;">
+                <div style="display:flex; align-items:center; gap:6px;">
+                    <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
+                    <span style="color:gray; font-size:10px;">(Цель: ${pData.usl.planPct || '-'})</span>
+                </div>
+                <span style="background:var(--card-bg); color:${getColor(pData.usl.total.pct)}; padding:2px 6px; border-radius:6px; font-weight:bold; font-size:11px; box-shadow:0 1px 3px rgba(0,0,0,0.05);">${pData.usl.total.pct}</span>
+            </div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center;">
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><b style="color:var(--text-color); font-size:12px;">${fmtSum(pData.usl.total.plan)}</b></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><b style="color:var(--btn-color); font-size:12px;">${fmtSum(pData.usl.total.fact)}</b></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><b style="color:#27ae60; font-size:12px;">${fmtSum(pData.usl.total.factEd)}</b></div>
+            </div>
         </div>
     </div>`;
 
-    // 2. Номенклатурные группы (С ИНТЕЛЛЕКТУАЛЬНЫМ ПОДСЧЕТОМ %)
+    // 2. Номенклатурные группы (РАСКРЫВАЮЩИЙСЯ СПИСОК)
     if (pData.groups && pData.groups.length > 0) {
         html += `
         <div class="inner-block card" style="margin-bottom:12px; padding:0; overflow:hidden; border:1px solid var(--btn-color);">
@@ -97,7 +139,7 @@ function renderPlanUI(pData) {
         </div>`;
     }
 
-    // 3. Отделы
+    // 3. Отделы (Карточки вместо таблиц)
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px;">
         <div style="font-size:14px; font-weight:bold; color:var(--text-color); text-align:center; margin-bottom:12px;">Выполнение по отделам</div>`;
     for (let i = 0; i < 3; i++) {
@@ -148,13 +190,12 @@ function renderPlanUI(pData) {
     area.innerHTML = html;
 }
 
-// Загрузка плана из базы (для выбранного периода)
+// Загрузка плана из базы
 async function loadPlanHistory() {
     let startD = document.getElementById("plan-filter-start").value;
     let endD = document.getElementById("plan-filter-end").value;
     let todayStr = new Date().toISOString().split('T')[0];
 
-    // Если запрошен только сегодняшний день - показываем живые данные
     if (startD === todayStr && endD === todayStr && window.currentPlanDataObj) {
         return renderPlanUI(window.currentPlanDataObj);
     }
@@ -181,17 +222,17 @@ async function loadPlanHistory() {
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
     if (plansData.length > 1) {
-        // Обнуляем факты основы (включая группы)
         let clearFacts = (obj) => { obj.fact = 0; obj.factEd = 0; if(obj.plan) obj.plan = 0; };
+        
+        aggregated.totalPlan = 0;
         clearFacts(aggregated.to.total); clearFacts(aggregated.aks.total); clearFacts(aggregated.usl.total);
         aggregated.to.depts.forEach(clearFacts); aggregated.aks.depts.forEach(clearFacts); aggregated.usl.depts.forEach(clearFacts);
-        
         if (aggregated.groups) aggregated.groups.forEach(clearFacts);
 
         plansData.forEach(day => {
             let pd = day.plan_data;
             
-            // Суммируем общие ТО, АКС, УСЛ
+            aggregated.totalPlan += parse(pd.totalPlan);
             aggregated.to.total.fact += parse(pd.to.total.fact); aggregated.to.total.plan += parse(pd.to.total.plan); aggregated.to.total.factEd += parse(pd.to.total.factEd);
             aggregated.aks.total.fact += parse(pd.aks.total.fact); aggregated.aks.total.plan += parse(pd.aks.total.plan);
             aggregated.usl.total.fact += parse(pd.usl.total.fact); aggregated.usl.total.plan += parse(pd.usl.total.plan);
@@ -202,7 +243,6 @@ async function loadPlanHistory() {
                 aggregated.usl.depts[i].fact += parse(pd.usl.depts[i].fact); aggregated.usl.depts[i].plan += parse(pd.usl.depts[i].plan);
             }
 
-            // Суммируем номенклатурные группы
             if (pd.groups && aggregated.groups) {
                 pd.groups.forEach((g, idx) => {
                     if (aggregated.groups[idx]) {
