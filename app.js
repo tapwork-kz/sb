@@ -1,5 +1,4 @@
 window.onerror = function(message, source, lineno, colno, error) {
-    // Игнорируем системные ошибки браузера и пустые ссылки
     if (lineno === 0 || !source) return true; 
     alert("ОШИБКА: " + message + " в строке " + lineno);
 };
@@ -145,13 +144,11 @@ function renderPlanUI(pData) {
 // Быстрое переключение дат в фильтре
 function setPlanDates(type) {
     let d = new Date();
-    if (type === 'yesterday') d.setDate(d.getDate() - 1); // Отнимаем 1 день
+    if (type === 'yesterday') d.setDate(d.getDate() - 1);
     
     let dStr = d.toISOString().split('T')[0];
     document.getElementById('plan-filter-start').value = dStr;
     document.getElementById('plan-filter-end').value = dStr;
-    
-    // Сразу загружаем данные
     loadPlanHistory();
 }
 
@@ -160,24 +157,17 @@ async function loadPlanHistory() {
     let endD = document.getElementById("plan-filter-end").value;
     let todayStr = new Date().toISOString().split('T')[0];
 
-    // Если запрошен только сегодняшний день - показываем живые данные из Google Таблиц
     if (startD === todayStr && endD === todayStr && window.currentPlanDataObj) {
         return renderPlanUI(window.currentPlanDataObj);
     }
 
     showToast("Загрузка периода...", false, 9999);
-    
-    const { data: plansData, error } = await supabaseClient
-        .from('store_plans')
-        .select('*')
-        .gte('date', startD)
-        .lte('date', endD)
-        .order('date', { ascending: false });
+    const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
 
     if (error) { showToast("Ошибка базы: " + error.message, true); return; }
     if (!plansData || plansData.length === 0) { 
         showToast("За этот период данных нет", true); 
-        document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; 
+        document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе</p>"; 
         return; 
     }
 
@@ -199,47 +189,6 @@ async function loadPlanHistory() {
                 aggregated.aks.depts[i].fact += parse(pd.aks.depts[i].fact); 
                 aggregated.usl.depts[i].fact += parse(pd.usl.depts[i].fact); 
             }
-            aggregated.aks.total.fact += parse(pd.aks.total.fact); 
-            aggregated.usl.total.fact += parse(pd.usl.total.fact);
-        });
-
-        let calcPct = (f, p) => (p > 0) ? Math.round((f / p) * 100) + "%" : "0%";
-        aggregated.to.total.pct = calcPct(aggregated.to.total.fact, aggregated.to.total.plan);
-        aggregated.aks.total.pct = calcPct(aggregated.aks.total.fact, parse(aggregated.aks.total.plan));
-        aggregated.usl.total.pct = calcPct(aggregated.usl.total.fact, parse(aggregated.usl.total.plan));
-        
-        for(let i=0; i<3; i++) {
-            aggregated.to.depts[i].pct = calcPct(aggregated.to.depts[i].fact, parse(aggregated.to.depts[i].plan));
-            aggregated.aks.depts[i].pct = calcPct(aggregated.aks.depts[i].fact, parse(aggregated.aks.depts[i].plan));
-            aggregated.usl.depts[i].pct = calcPct(aggregated.usl.depts[i].fact, parse(aggregated.usl.depts[i].plan));
-        }
-
-        let fmt = (val) => fmtSum(val);
-        aggregated.to.total.fact = fmt(aggregated.to.total.fact); aggregated.to.total.plan = fmt(aggregated.to.total.plan);
-    }
-    renderPlanUI(aggregated);
-}
-
-    showToast("Загрузка периода...", false, 9999);
-    const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
-
-    if (error) { showToast("Ошибка базы: " + error.message, true); return; }
-    if (!plansData || plansData.length === 0) { showToast("За этот период данных нет", true); document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:12px; margin-top:20px;'>Нет записей в базе</p>"; return; }
-
-    document.getElementById("toast").classList.remove("show");
-
-    let aggregated = JSON.parse(JSON.stringify(plansData[0].plan_data));
-    let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
-
-    if (plansData.length > 1) {
-        let clearFacts = (obj) => { obj.fact = 0; obj.factEd = 0; if(obj.plan) obj.plan = 0; };
-        clearFacts(aggregated.to.total); clearFacts(aggregated.aks.total); clearFacts(aggregated.usl.total);
-        aggregated.to.depts.forEach(clearFacts); aggregated.aks.depts.forEach(clearFacts); aggregated.usl.depts.forEach(clearFacts);
-
-        plansData.forEach(day => {
-            let pd = day.plan_data;
-            aggregated.to.total.fact += parse(pd.to.total.fact); aggregated.to.total.plan += parse(pd.to.total.plan); aggregated.to.total.factEd += parse(pd.to.total.factEd);
-            for(let i=0; i<3; i++) { aggregated.to.depts[i].fact += parse(pd.to.depts[i].fact); aggregated.aks.depts[i].fact += parse(pd.aks.depts[i].fact); aggregated.usl.depts[i].fact += parse(pd.usl.depts[i].fact); }
             aggregated.aks.total.fact += parse(pd.aks.total.fact); aggregated.usl.total.fact += parse(pd.usl.total.fact);
         });
 
