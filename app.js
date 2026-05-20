@@ -27,7 +27,7 @@ function fmtSum(val) {
     return String(Math.round(val)).replace(/\s/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " "); 
 }
 
-// Фикс часового пояса для дат
+// Надежный фикс местного часового пояса для дат
 function formatDateLocal(d) {
     if (!d) d = new Date();
     let y = d.getFullYear(); let m = ("0" + (d.getMonth() + 1)).slice(-2); let day = ("0" + d.getDate()).slice(-2);
@@ -110,23 +110,29 @@ function calcPlanEngine(rawPlanData) {
 
     setPcts(r.to, true); setPcts(r.aks, false); setPcts(r.usl, false);
 
-    // Строгий подсчет живых продавцов из массива сотрудников
+    // СТРОГИЙ ПОДСЧЕТ ПРОДАВЦОВ (Только Продавец-консультант)
     let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
             let d = String(e.dept).toLowerCase().trim();
-            if (d === 'цифра' || d === 'чт' || d === 'цифра/чт') sCount.cifra++;
-            else if (d === 'мбт') sCount.mbt++;
-            else if (d === 'кбт') sCount.kbt++;
+            let role = String(e.role || "").toLowerCase().trim();
+            
+            if (role.includes('продавец-консультант') || role.includes('продавец консультант')) {
+                if (d === 'цифра' || d === 'чт' || d === 'цифра/чт') sCount.cifra++;
+                else if (d === 'мбт') sCount.mbt++;
+                else if (d === 'кбт') sCount.kbt++;
+            }
         });
     }
     
-    // Делим план на количество продавцов
+    // План на продавца
     let sPlan = (cat, dept, count) => count > 0 ? Math.round(r[cat][dept].plan / count) : r[cat][dept].plan;
+    let getRatio = (cat, dept) => r.to[dept].plan > 0 ? ((r[cat][dept].plan / r.to[dept].plan) * 100).toFixed(2).replace('.', ',') : "0,00";
+    
     r.sellers = [
-        { name: "Цифра/ЧТ", to: sPlan('to','cifra',sCount.cifra), aks: sPlan('aks','cifra',sCount.cifra), usl: sPlan('usl','cifra',sCount.cifra) },
-        { name: "МБТ", to: sPlan('to','mbt',sCount.mbt), aks: sPlan('aks','mbt',sCount.mbt), usl: sPlan('usl','mbt',sCount.mbt) },
-        { name: "КБТ", to: sPlan('to','kbt',sCount.kbt), aks: sPlan('aks','kbt',sCount.kbt), usl: sPlan('usl','kbt',sCount.kbt) }
+        { name: "Цифра/ЧТ", to: sPlan('to','cifra',sCount.cifra), aks: sPlan('aks','cifra',sCount.cifra), usl: sPlan('usl','cifra',sCount.cifra), aksPct: getRatio('aks','cifra'), uslPct: getRatio('usl','cifra') },
+        { name: "МБТ", to: sPlan('to','mbt',sCount.mbt), aks: sPlan('aks','mbt',sCount.mbt), usl: sPlan('usl','mbt',sCount.mbt), aksPct: getRatio('aks','mbt'), uslPct: getRatio('usl','mbt') },
+        { name: "КБТ", to: sPlan('to','kbt',sCount.kbt), aks: sPlan('aks','kbt',sCount.kbt), usl: sPlan('usl','kbt',sCount.kbt), aksPct: getRatio('aks','kbt'), uslPct: getRatio('usl','kbt') }
     ];
 
     return r;
@@ -138,7 +144,7 @@ function renderPlanUI(pData) {
     if (!area) return;
     if (!pData || !pData.to) { area.innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет данных за этот период</p>"; return; }
 
-    // Динамический цвет в зависимости от цели
+    // Динамический цвет (определяется от ЦЕЛИ, а не от 100%)
     let getDynColor = (valStr, targetStr = "100") => {
         let val = parseFloat(String(valStr).replace(/\s/g, '').replace(',', '.')) || 0;
         let target = parseFloat(String(targetStr).replace(/\s/g, '').replace(',', '.')) || 100;
@@ -160,11 +166,11 @@ function renderPlanUI(pData) {
 
     // 1. Сводка ОБЩАЯ
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px;">
-        <div style="text-align:center; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:uppercase;">Общая сводка</div>
+        <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:none;">Общая сводка</div>
         
         <!-- ИТОГИ -->
         <div style="background:var(--inner-bg); padding:10px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:12px;">
-            <div style="color:var(--text-color); font-size:12px; text-transform:uppercase; margin-bottom:8px; font-weight:bold; text-align:center; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">Итоговый показатель</div>
+            <div style="color:#7f8c8d; font-size:12px; text-transform:uppercase; margin-bottom:8px; font-weight:bold; text-align:center; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">Итоговый показатель</div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
                 <div>
                     <div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div>
@@ -188,7 +194,7 @@ function renderPlanUI(pData) {
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Основной товарооборот</b>
-                <span style="color:var(--btn-color); font-size:11px; font-weight:bold;">+ЭД ${fmtSum(pData.to.total.ed)}</span>
+                <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.to.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.to.total.plan)}</div></div>
@@ -201,10 +207,10 @@ function renderPlanUI(pData) {
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
-                <span style="color:var(--btn-color); font-size:11px; font-weight:bold;">+ЭД ${fmtSum(pData.aks.total.ed)}</span>
+                <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.aks.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:4px;">Цель: ${pData.aks.total.targetPct}%</div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:gray; font-size:9px; margin-top:4px;">Цель: <span style="color:var(--text-color); font-weight:bold;">${pData.aks.total.targetPct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pct, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pctEd, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div>
             </div>
@@ -214,10 +220,9 @@ function renderPlanUI(pData) {
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
-                <span style="color:var(--btn-color); font-size:11px; font-weight:bold;">+ЭД ${fmtSum(pData.usl.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:4px;">Цель: ${pData.usl.total.targetPct}%</div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:gray; font-size:9px; margin-top:4px;">Цель: <span style="color:var(--text-color); font-weight:bold;">${pData.usl.total.targetPct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pct, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pctEd, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div>
             </div>
@@ -235,9 +240,14 @@ function renderPlanUI(pData) {
             </div>
             <div id="nom-list" class="${window.nomListOpen ? '' : 'hidden'}" style="padding:4px 14px; background:var(--card-bg);">
                 ${pData.groups.map(g => {
-                    let p = parse(g.plan); let f = parse(g.fact); let e = parse(g.factEd || g.ed);
+                    let n = g.name.toLowerCase();
+                    let p = parse(g.plan); let f = parse(g.fact); let e = parse(g.factEd || g.ed); let fEd = f + e;
                     let pct = (p > 0) ? ((f / p) * 100).toFixed(2).replace('.', ',') : "0,00";
-                    let pctEd = (p > 0) ? ((e / p) * 100).toFixed(2).replace('.', ',') : "0,00";
+                    let pctEd = (p > 0) ? ((fEd / p) * 100).toFixed(2).replace('.', ',') : "0,00";
+                    
+                    // Скрываем ЭД для Фишек, Сертификатов и Услуг
+                    let hideEd = n.includes('сертификат') || n.includes('фишк') || n.includes('услуг');
+                    let edContent = hideEd ? '' : (e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(fEd)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(51, 144, 236, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>');
                     
                     return `
                     <div style="padding:10px 0; border-bottom:1px solid var(--border-color);">
@@ -245,7 +255,7 @@ function renderPlanUI(pData) {
                             <span style="color:gray; font-weight:bold; font-size:13px;">${fmtSum(p)}</span>
                             <div style="display:flex; gap:12px; align-items:center;">
                                 <span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60; font-weight:bold;">${fmtSum(f)}</span> <span style="color:${getDynColor(pct)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>
-                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(e)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(51, 144, 236, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
+                                ${edContent}
                             </div>
                         </div>
                         <div style="color:var(--desc-color); font-size:11px; line-height:1.2;">${g.name}</div>
@@ -257,15 +267,16 @@ function renderPlanUI(pData) {
 
     // 3. Отделы
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px;">
-        <div style="text-align:center; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:uppercase;">Выполнение по отделам</div>`;
+        <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">Выполнение по отделам</div>`;
     let buildRow = (dTo, dAks, dUsl, isFact) => {
         let fTo = isFact ? dTo.fact : dTo.plan; let fAks = isFact ? dAks.fact : dAks.plan; let fUsl = isFact ? dUsl.fact : dUsl.plan;
         let cTo = isFact ? '#27ae60' : 'var(--text-color)'; let lbl = isFact ? 'Факт' : 'План';
+        let fw = isFact ? 'normal' : 'normal'; 
         return `
             <div style="color:gray; font-size:9px; text-align:left;">${lbl}</div>
-            <div style="color:${cTo}; font-size:12px;">${fmtSum(fTo)}</div>
-            <div style="color:${cTo}; font-size:12px;">${fmtSum(fAks)}</div>
-            <div style="color:${cTo}; font-size:12px;">${fmtSum(fUsl)}</div>`;
+            <div style="color:${cTo}; font-size:12px; font-weight:${fw};">${fmtSum(fTo)}</div>
+            <div style="color:${cTo}; font-size:12px; font-weight:${fw};">${fmtSum(fAks)}</div>
+            <div style="color:${cTo}; font-size:12px; font-weight:${fw};">${fmtSum(fUsl)}</div>`;
     };
     for (let i = 0; i < 3; i++) {
         let d = ['cifra', 'mbt', 'kbt'][i];
@@ -290,16 +301,27 @@ function renderPlanUI(pData) {
     // 4. План на продавца
     if (pData.sellers && pData.sellers.length > 0) {
         html += `<div class="inner-block card" style="padding:12px;">
-            <div style="text-align:center; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:uppercase;">План на продавца</div>`;
+            <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">План на продавца</div>`;
         pData.sellers.forEach((s, idx) => {
             let isLast = idx === pData.sellers.length - 1;
             html += `
             <div style="padding:10px 0; border-bottom:${isLast ? 'none' : '1px solid var(--border-color)'};">
                 <div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:bold;">${s.name}</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--inner-bg); padding:8px 12px; border-radius:8px;">
-                    <div style="text-align:center;"><div style="color:gray; font-size:9px;">ТО</div><div style="color:var(--text-color); font-size:13px; letter-spacing:-0.5px;">${fmtSum(s.to)}</div></div>
-                    <div style="text-align:center;"><div style="color:gray; font-size:9px;">АКС</div><div style="color:var(--text-color); font-size:13px; letter-spacing:-0.5px;">${fmtSum(s.aks)}</div></div>
-                    <div style="text-align:center;"><div style="color:gray; font-size:9px;">УСЛ</div><div style="color:var(--text-color); font-size:13px; letter-spacing:-0.5px;">${fmtSum(s.usl)}</div></div>
+                    <div style="text-align:center;">
+                        <div style="color:gray; font-size:9px;">ТО</div>
+                        <div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.to)}</div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="color:gray; font-size:9px;">АКС</div>
+                        <div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.aks)}</div>
+                        <div style="margin-top:2px;"><span style="background:rgba(150,150,150,0.1); color:gray; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:9px;">${s.aksPct}%</span></div>
+                    </div>
+                    <div style="text-align:center;">
+                        <div style="color:gray; font-size:9px;">УСЛ</div>
+                        <div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.usl)}</div>
+                        <div style="margin-top:2px;"><span style="background:rgba(150,150,150,0.1); color:gray; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:9px;">${s.uslPct}%</span></div>
+                    </div>
                 </div>
             </div>`;
         });
@@ -309,13 +331,10 @@ function renderPlanUI(pData) {
     area.innerHTML = html;
 }
 
-// === КНОПКИ ДАТ ===
 function setPlanDates(type, val = null) {
     let endD = new Date(); let startD = new Date();
-    if (type === 'single') { if (val) { startD = new Date(val); endD = new Date(val); } }
+    if (type === 'today') { } // По умолчанию даты и так сегодня
     else if (type === 'yesterday') { startD.setDate(startD.getDate() - 1); endD.setDate(endD.getDate() - 1); } 
-    else if (type === 'week') { startD.setDate(startD.getDate() - 6); } 
-    else if (type === 'decade') { startD.setDate(startD.getDate() - 9); } 
     else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } else { startD.setDate(1); } } 
     else if (type === 'all') { startD = new Date(2024, 0, 1); }
     
@@ -327,9 +346,8 @@ function setPlanDates(type, val = null) {
 async function loadPlanHistory() {
     let startD = document.getElementById("plan-filter-start").value;
     let endD = document.getElementById("plan-filter-end").value;
-    let todayStr = new Date().toISOString().split('T')[0];
+    let todayStr = formatDateLocal(new Date());
 
-    // Если запрошен "Сегодня" и данные еще тепленькие из GAS
     if (startD === todayStr && endD === todayStr && window.currentRawGroups) {
         let pData = calcPlanEngine({groups: window.currentRawGroups, totalPlan: window.currentTotalPlan});
         return renderPlanUI(pData);
@@ -345,16 +363,15 @@ async function loadPlanHistory() {
     }
     document.getElementById("toast").classList.remove("show");
 
-    // Берем структуру групп за самую свежую дату в периоде
+    // Исходная структура за самую свежую дату
     let aggregatedGroups = JSON.parse(JSON.stringify(plansData[0].plan_data.groups || []));
     let aggTotalPlan = parseFloat(String(plansData[0].plan_data.totalPlan || "0").replace(/\s/g, '').replace(',', '.')) || 0;
     
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
     if (plansData.length > 1) {
-        // ОБНУЛЯЕМ ТОЛЬКО ФАКТЫ! План не трогаем, он остается константой
+        // Обнуляем факты (план остается константой за месяц/период)
         aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; });
-        
         plansData.forEach(day => {
             let groups = day.plan_data.groups;
             if (groups) {
@@ -499,7 +516,7 @@ async function callBackend(actionName, payloadData = {}) {
           allUsers.forEach(u => {
               userMap[u.iin] = u;
               if (!u.role.toLowerCase().includes("директор")) {
-                  let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', kpi: gasData.info?.baseKpi || 90, kpiDetails: [], pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: [], ptsHistory: [], remarks: [], tabelStr: "<span style='color:gray; font-size:11px;'>Нет данных</span>" };
+                  let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: u.role || 'Продавец', kpi: gasData.info?.baseKpi || 90, kpiDetails: [], pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: [], ptsHistory: [], remarks: [], tabelStr: "<span style='color:gray; font-size:11px;'>Нет данных</span>" };
                   adminEmployees.push(emp); empMap[u.iin] = emp;
               }
           });
@@ -826,8 +843,6 @@ function renderDashboardData(data, isSilent = false) {
                     <div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
-                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('week')">Неделя</button>
-                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('decade')">Декада</button>
                         <div style="position:relative; display:inline-block; min-width:max-content;">
                             <input type="month" id="plan-month-picker" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                             <button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none;">Месяц</button>
@@ -848,6 +863,17 @@ function renderDashboardData(data, isSilent = false) {
                 <div id="plan-render-area"></div>
               `;
               setTimeout(loadPlanHistory, 100);
+          } else {
+              // Если фильтры уже отрисованы, просто обновляем кэш и перерисовываем
+              window.currentPlanDataObj = data.adminPlan; 
+              window.currentRawGroups = data.adminPlan ? data.adminPlan.groups : [];
+              window.currentTotalPlan = data.adminPlan ? data.adminPlan.totalPlan : 0;
+              if (window.currentRawGroups && window.currentRawGroups.length > 0) {
+                  let pData = calcPlanEngine(data.adminPlan);
+                  renderPlanUI(pData);
+              } else {
+                  renderPlanUI(null);
+              }
           }
       } 
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
