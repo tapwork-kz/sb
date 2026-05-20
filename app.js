@@ -9,7 +9,6 @@ window.onunhandledrejection = function(event) {
 const SUPABASE_URL = 'https://qvkhfueivkwdqydnhlsr.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_mXpXBbeHRecrahRlDxkDAQ_Xe3zyb5G';
 const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxb2UW5ctVar9QhWmjI-IIFA1EOxDCovRDoNBcbN31x4L4-mCh1lGcF-ZdH-62pUrbR/exec";
 
 let tg = window.Telegram ? window.Telegram.WebApp : null; 
@@ -27,7 +26,7 @@ function showPushNotification(title, bodyText) { if ("Notification" in window &&
 
 function fmtSum(val) { 
     if(!val) return "0"; 
-    return String(val).replace(/\s/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " "); 
+    return String(Math.round(val)).replace(/\s/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " "); 
 }
 
 window.nomListOpen = false;
@@ -52,10 +51,15 @@ const NOM_DICT = {
 };
 
 // === КАЛЬКУЛЯТОР ДАННЫХ ИЗ СЫРОГО МАССИВА ===
-function calcPlanEngine(rawGroups) {
+function calcPlanEngine(rawPlanData) {
+    if (!rawPlanData) return null;
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
     
+    let rawGroups = rawPlanData.groups || [];
+    let totalStorePlan = parse(rawPlanData.totalPlan || "0");
+
     let r = {
+        totalPlan: totalStorePlan,
         to: { total: { plan: 0, fact: 0, ed: 0 }, cifra: { plan: 0, fact: 0, ed: 0 }, mbt: { plan: 0, fact: 0, ed: 0 }, kbt: { plan: 0, fact: 0, ed: 0 } },
         aks: { total: { plan: 0, fact: 0, ed: 0 }, cifra: { plan: 0, fact: 0, ed: 0 }, mbt: { plan: 0, fact: 0, ed: 0 }, kbt: { plan: 0, fact: 0, ed: 0 } },
         usl: { total: { plan: 0, fact: 0, ed: 0 }, cifra: { plan: 0, fact: 0, ed: 0 }, mbt: { plan: 0, fact: 0, ed: 0 }, kbt: { plan: 0, fact: 0, ed: 0 } },
@@ -63,7 +67,7 @@ function calcPlanEngine(rawGroups) {
     };
 
     rawGroups.forEach(g => {
-        let p = parse(g.plan), f = parse(g.fact), e = parse(g.ed);
+        let p = parse(g.plan), f = parse(g.fact), e = parse(g.factEd || g.ed);
         for (let cat of ['to', 'aks', 'usl']) {
             for (let dept of ['cifra', 'mbt', 'kbt']) {
                 if (NOM_DICT[cat][dept].includes(g.name)) {
@@ -74,38 +78,46 @@ function calcPlanEngine(rawGroups) {
         }
     });
 
-    let calcPct = (f, p) => (p > 0) ? Math.round((f / p) * 100) : 0;
-    let setPcts = (catObj, toObj, isTo) => {
-        for (let k of ['total', 'cifra', 'mbt', 'kbt']) {
-            let baseFact = isTo ? catObj[k].plan : toObj[k].fact; 
-            let basePlan = isTo ? catObj[k].plan : toObj[k].plan; 
-            let fEd = catObj[k].fact + catObj[k].ed;
+    let safePct = (num, den) => den > 0 ? Math.round((num / den) * 100) : 0;
 
-            catObj[k].pct = calcPct(catObj[k].fact, baseFact);
-            catObj[k].pctEd = calcPct(fEd, baseFact);
-            catObj[k].targetPct = calcPct(catObj[k].plan, basePlan);
+    let setPcts = (catObj, isTo) => {
+        for (let k of ['total', 'cifra', 'mbt', 'kbt']) {
+            let toObj = r.to[k]; 
+            let fEd = catObj[k].fact + catObj[k].ed;
+            let toFEd = toObj.fact + toObj.ed;
+
+            if (isTo) {
+                catObj[k].targetPct = 100; 
+                catObj[k].pct = safePct(catObj[k].fact, catObj[k].plan);
+                catObj[k].pctEd = safePct(fEd, catObj[k].plan);
+            } else {
+                catObj[k].targetPct = safePct(catObj[k].plan, toObj.plan);
+                catObj[k].pct = safePct(catObj[k].fact, toObj.fact);
+                catObj[k].pctEd = safePct(fEd, toFEd);
+            }
         }
     };
 
-    setPcts(r.to, r.to, true);
-    setPcts(r.aks, r.to, false);
-    setPcts(r.usl, r.to, false);
+    setPcts(r.to, true);
+    setPcts(r.aks, false);
+    setPcts(r.usl, false);
 
-    let sellersCount = { cifra: 0, mbt: 0, kbt: 0 };
+    let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
             let d = e.dept.toLowerCase();
-            if (d.includes('цифра')) sellersCount.cifra++;
-            if (d.includes('мбт')) sellersCount.mbt++;
-            if (d.includes('кбт')) sellersCount.kbt++;
+            if (d.includes('цифра')) sCount.cifra++;
+            if (d.includes('мбт')) sCount.mbt++;
+            if (d.includes('кбт')) sCount.kbt++;
         });
     }
     
-    let sPlan = (cat, dept, count) => Math.round(r[cat][dept].plan / (count || 1));
+    let sPlan = (cat, dept, count) => count > 0 ? Math.round(r[cat][dept].plan / count) : r[cat][dept].plan;
+    
     r.sellers = [
-        { name: "Цифра/ЧТ", to: sPlan('to', 'cifra', sellersCount.cifra), aks: sPlan('aks', 'cifra', sellersCount.cifra), usl: sPlan('usl', 'cifra', sellersCount.cifra) },
-        { name: "МБТ", to: sPlan('to', 'mbt', sellersCount.mbt), aks: sPlan('aks', 'mbt', sellersCount.mbt), usl: sPlan('usl', 'mbt', sellersCount.mbt) },
-        { name: "КБТ", to: sPlan('to', 'kbt', sellersCount.kbt), aks: sPlan('aks', 'kbt', sellersCount.kbt), usl: sPlan('usl', 'kbt', sellersCount.kbt) }
+        { name: "Цифра/ЧТ", to: sPlan('to','cifra',sCount.cifra), aks: sPlan('aks','cifra',sCount.cifra), usl: sPlan('usl','cifra',sCount.cifra) },
+        { name: "МБТ", to: sPlan('to','mbt',sCount.mbt), aks: sPlan('aks','mbt',sCount.mbt), usl: sPlan('usl','mbt',sCount.mbt) },
+        { name: "КБТ", to: sPlan('to','kbt',sCount.kbt), aks: sPlan('aks','kbt',sCount.kbt), usl: sPlan('usl','kbt',sCount.kbt) }
     ];
 
     return r;
@@ -120,7 +132,7 @@ function renderPlanUI(pData) {
     let getColor = (pct) => pct >= 100 ? "#27ae60" : (pct >= 80 ? "#f39c12" : "#e74c3c");
     let html = "";
     
-    let totalPlan = pData.to.total.plan;
+    let totalPlan = pData.totalPlan || pData.to.total.plan;
     let totalFact = pData.to.total.fact + pData.aks.total.fact + pData.usl.total.fact;
     let totalFactEd = pData.to.total.fact + pData.to.total.ed + pData.aks.total.fact + pData.aks.total.ed + pData.usl.total.fact + pData.usl.total.ed;
     let remPlan = Math.max(0, totalPlan - totalFactEd);
@@ -180,6 +192,7 @@ function renderPlanUI(pData) {
 
     // 2. Номенклатурные группы
     if (pData.groups && pData.groups.length > 0) {
+        let parseNum = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
         html += `
         <div class="inner-block card" style="margin-bottom:12px; padding:0; overflow:hidden; border:1px solid var(--btn-color);">
             <div onclick="window.nomListOpen = !window.nomListOpen; document.getElementById('nom-list').classList.toggle('hidden'); document.getElementById('nom-icon').innerText = window.nomListOpen ? '▲' : '▼';" 
@@ -189,7 +202,7 @@ function renderPlanUI(pData) {
             </div>
             <div id="nom-list" class="${window.nomListOpen ? '' : 'hidden'}" style="padding:4px 14px; background:var(--card-bg);">
                 ${pData.groups.map(g => {
-                    let p = g.plan; let f = g.fact; let e = g.ed; let fEd = f + e;
+                    let p = parseNum(g.plan); let f = parseNum(g.fact); let e = parseNum(g.factEd || g.ed); let fEd = f + e;
                     let pct = (p > 0) ? Math.round((f / p) * 100) : 0;
                     let pctEd = (p > 0) ? Math.round((fEd / p) * 100) : 0;
                     
@@ -198,8 +211,8 @@ function renderPlanUI(pData) {
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:12px;">
                             <span style="color:gray; font-weight:bold; font-size:13px;">${fmtSum(p)}</span>
                             <div style="display:flex; gap:12px; align-items:center;">
-                                <span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60;">${fmtSum(f)}</span> <span style="color:${getColor(pct)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>
-                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:#3390ec;">${fmtSum(fEd)}</span> <span style="color:${getColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(51, 144, 236, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
+                                <span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--text-color);">${fmtSum(f)}</span> <span style="color:${getColor(pct)}; font-size:10px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>
+                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60;">${fmtSum(fEd)}</span> <span style="color:${getColor(pctEd)}; font-size:10px; font-weight:bold; background:rgba(39, 174, 96, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
                             </div>
                         </div>
                         <div style="color:var(--desc-color); font-size:11px; line-height:1.2;">${g.name}</div>
@@ -280,9 +293,8 @@ async function loadPlanHistory() {
     let endD = document.getElementById("plan-filter-end").value;
     let todayStr = new Date().toISOString().split('T')[0];
 
-    // Если "Сегодня" и данные уже получены из GAS - просто рендерим их
     if (startD === todayStr && endD === todayStr && window.currentRawGroups) {
-        let pData = calcPlanEngine(window.currentRawGroups);
+        let pData = calcPlanEngine({groups: window.currentRawGroups, totalPlan: window.currentTotalPlan});
         return renderPlanUI(pData);
     }
 
@@ -296,26 +308,31 @@ async function loadPlanHistory() {
     }
     document.getElementById("toast").classList.remove("show");
 
-    // Суммируем только сырые группы
     let aggregatedGroups = JSON.parse(JSON.stringify(plansData[0].plan_data.groups));
+    let aggTotalPlan = 0;
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
     if (plansData.length > 1) {
-        aggregatedGroups.forEach(g => { g.fact = 0; g.ed = 0; });
+        aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; });
         plansData.forEach(day => {
             let groups = day.plan_data.groups;
+            aggTotalPlan += parse(day.plan_data.totalPlan || 0);
             if (groups) {
                 groups.forEach((g, idx) => {
                     if (aggregatedGroups[idx]) {
                         aggregatedGroups[idx].fact += parse(g.fact);
-                        aggregatedGroups[idx].ed += parse(g.ed);
+                        let e = parse(g.factEd || g.ed);
+                        aggregatedGroups[idx].factEd = (aggregatedGroups[idx].factEd || 0) + e;
+                        aggregatedGroups[idx].ed = aggregatedGroups[idx].factEd;
                     }
                 });
             }
         });
+    } else {
+        aggTotalPlan = parse(plansData[0].plan_data.totalPlan || 0);
     }
 
-    let pData = calcPlanEngine(aggregatedGroups);
+    let pData = calcPlanEngine({ groups: aggregatedGroups, totalPlan: aggTotalPlan });
     renderPlanUI(pData);
 }
 
@@ -579,8 +596,12 @@ document.addEventListener("DOMContentLoaded", async () => {
 
 function initSwipe() {
     let startX = 0, startY = 0; const scrollArea = document.getElementById('scrollable-body'); if (!scrollArea) return;
-    scrollArea.addEventListener('touchstart', e => { startX = e.changedTouches[0].screenX; startY = e.changedTouches[0].screenY; }, {passive: true});
+    scrollArea.addEventListener('touchstart', e => { 
+        if (e.target.closest('.no-swipe')) return;
+        startX = e.changedTouches[0].screenX; startY = e.changedTouches[0].screenY; 
+    }, {passive: true});
     scrollArea.addEventListener('touchend', e => {
+        if (e.target.closest('.no-swipe')) return;
         let endX = e.changedTouches[0].screenX; let endY = e.changedTouches[0].screenY; let diffX = endX - startX; let diffY = Math.abs(endY - startY);
         if (diffY < 60 && Math.abs(diffX) > 80) { 
             let roleStr = String(appState.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); let isZavSklad = roleStr.includes("заведующий складом");
@@ -757,12 +778,13 @@ function renderDashboardData(data, isSilent = false) {
       if (adminPlanList) {
           window.currentPlanDataObj = data.adminPlan; 
           window.currentRawGroups = data.adminPlan ? data.adminPlan.groups : [];
+          window.currentTotalPlan = data.adminPlan ? data.adminPlan.totalPlan : 0;
           let todayStr = new Date().toISOString().split('T')[0];
           
           adminPlanList.innerHTML = `
             <style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style>
             <div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg);">
-                <div class="hide-scrollbar" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
+                <div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;">
                     <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
                     <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
                     <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('week')">Неделя</button>
@@ -773,7 +795,7 @@ function renderDashboardData(data, isSilent = false) {
                     </div>
                     <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">Весь период</button>
                 </div>
-                <div style="display:flex; gap:6px; align-items:center;">
+                <div class="no-swipe" style="display:flex; gap:6px; align-items:center;">
                     <input type="date" id="plan-filter-start" value="${todayStr}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
                     <span style="color:gray; font-weight:bold;">-</span>
                     <input type="date" id="plan-filter-end" value="${todayStr}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
@@ -783,7 +805,7 @@ function renderDashboardData(data, isSilent = false) {
             <div id="plan-render-area"></div>
           `;
           if (window.currentRawGroups && window.currentRawGroups.length > 0) {
-              let pData = calcPlanEngine(window.currentRawGroups);
+              let pData = calcPlanEngine(data.adminPlan);
               renderPlanUI(pData);
           } else {
               renderPlanUI(null);
@@ -1131,11 +1153,3 @@ document.addEventListener('keydown', function(e) {
     document.activeElement.blur();
   }
 });
-
-А теперь задача: мы ранее переделали на то чтобы факты выявлять из сырых строк номенклатурных групп, все хорошо работает НО не учитывает планы, там почему то планы берутся из ячеек старых, пересмотри этот момент и сделай чтобы все планы выявлялись по тому же методу как и факты, только из ячейки plan. А затем перепроверь почему не отображаются проценты по выполнению Сопутствующих товаров и Услуг, там также стоит значение ПЛАН: NaN% а выполнение: NaN% 
-А также в общей сводке под Основной товарооборот где написано ФАКТ ЭД нужно чтобы ты переделал: нужно чтобы там цифры отображали ФАКТ ВЫПОЛНЕНИЕ + ФАКТ ЭД = ФАКТ С ЭД, и по этому факту с ЭД нужно выявлять процент выполнение.
-
-Например Основной товарооборот ПЛАН: 100 000 000тг. (100%), ФАКТ: 5 000 000 (5%), ФАКТ ЭД (это экспресс доставка): 2 000 000тг. а теперь нам нужно чтобы в строке "ФАКТ с ЭД" мы получали сумму 7 000 000тг (и в процентах 7%)
-И соответственно в разделе "Итого: План | Факт | с ЭД" тоже так должно учитываться, а по остальным по фактам все верно (кроме тех ошибок которые я упомянул с NaN%)
-
-Внимательно пересмотри код! И перепиши все по моей задаче! И сделай сразу чтобы код работал и не ломался белый экран, а то уже достал) Сделай все как профи! Удачи!
