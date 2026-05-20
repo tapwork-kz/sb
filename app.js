@@ -78,7 +78,8 @@ function calcPlanEngine(rawPlanData) {
         }
     });
 
-    let safePct = (num, den) => den > 0 ? Math.round((num / den) * 100) : 0;
+    // Функция вычисления процентов с 2 цифрами после запятой (например 5,04)
+    let safePct = (num, den) => den > 0 ? ((num / den) * 100).toFixed(2).replace('.', ',') : "0,00";
 
     let setPcts = (catObj, isTo) => {
         for (let k of ['total', 'cifra', 'mbt', 'kbt']) {
@@ -87,7 +88,7 @@ function calcPlanEngine(rawPlanData) {
             let toFEd = toObj.fact + toObj.ed;
 
             if (isTo) {
-                catObj[k].targetPct = 100; 
+                catObj[k].targetPct = "100,00"; 
                 catObj[k].pct = safePct(catObj[k].fact, catObj[k].plan);
                 catObj[k].pctEd = safePct(fEd, catObj[k].plan);
             } else {
@@ -102,16 +103,18 @@ function calcPlanEngine(rawPlanData) {
     setPcts(r.aks, false);
     setPcts(r.usl, false);
 
+    // Подсчет живых продавцов из базы (без директоров и админов)
     let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
-            let d = e.dept.toLowerCase();
-            if (d.includes('цифра')) sCount.cifra++;
-            if (d.includes('мбт')) sCount.mbt++;
-            if (d.includes('кбт')) sCount.kbt++;
+            let d = String(e.dept).toLowerCase();
+            if (d.includes('цифра') || d === 'чт') sCount.cifra++;
+            else if (d.includes('мбт')) sCount.mbt++;
+            else if (d.includes('кбт')) sCount.kbt++;
         });
     }
     
+    // Делим план отдела на количество продавцов
     let sPlan = (cat, dept, count) => count > 0 ? Math.round(r[cat][dept].plan / count) : r[cat][dept].plan;
     
     r.sellers = [
@@ -123,16 +126,17 @@ function calcPlanEngine(rawPlanData) {
     return r;
 }
 
-// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ===
+// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ПЛАНА ===
 function renderPlanUI(pData) {
     let area = document.getElementById("plan-render-area");
     if (!area) return;
     if (!pData || !pData.to) { area.innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет данных за этот период</p>"; return; }
 
-    let getColor = (pct) => pct >= 100 ? "#27ae60" : (pct >= 80 ? "#f39c12" : "#e74c3c");
+    let getColor = (pctStr) => { let p = parseFloat(String(pctStr).replace(/\s/g, '').replace(',', '.')) || 0; return p >= 100 ? "#27ae60" : (p >= 80 ? "#f39c12" : "#e74c3c"); };
+    
     let html = "";
     
-    let totalPlan = pData.totalPlan || pData.to.total.plan;
+    let totalPlan = pData.totalPlan;
     let totalFact = pData.to.total.fact + pData.aks.total.fact + pData.usl.total.fact;
     let totalFactEd = pData.to.total.fact + pData.to.total.ed + pData.aks.total.fact + pData.aks.total.ed + pData.usl.total.fact + pData.usl.total.ed;
     let remPlan = Math.max(0, totalPlan - totalFactEd);
@@ -160,8 +164,8 @@ function renderPlanUI(pData) {
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.to.total.plan)}</div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact)}</div><div><span style="background:var(--card-bg); color:${getColor(pData.to.total.pct)}; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:10px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${pData.to.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact + pData.to.total.ed)}</div><div><span style="background:var(--card-bg); color:${getColor(pData.to.total.pctEd)}; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:10px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${pData.to.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact)}</div><div><span style="color:${getColor(pData.to.total.pct)}; font-weight:bold; font-size:10px;">${pData.to.total.pct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact + pData.to.total.ed)}</div><div><span style="color:${getColor(pData.to.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.to.total.pctEd}%</span></div></div>
             </div>
         </div>
 
@@ -171,9 +175,9 @@ function renderPlanUI(pData) {
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:4px;">${pData.aks.total.targetPct}%</div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="background:var(--card-bg); color:${getColor(pData.aks.total.pct)}; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:10px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${pData.aks.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="background:var(--card-bg); color:${getColor(pData.aks.total.pctEd)}; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:10px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${pData.aks.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:2px;">Цель: ${pData.aks.total.targetPct}%</div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="color:${getColor(pData.aks.total.pct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getColor(pData.aks.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div>
             </div>
         </div>
 
@@ -183,16 +187,15 @@ function renderPlanUI(pData) {
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:4px;">${pData.usl.total.targetPct}%</div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="background:var(--card-bg); color:${getColor(pData.usl.total.pct)}; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:10px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${pData.usl.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="background:var(--card-bg); color:${getColor(pData.usl.total.pctEd)}; padding:2px 6px; border-radius:4px; font-weight:bold; font-size:10px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${pData.usl.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:2px;">Цель: ${pData.usl.total.targetPct}%</div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="color:${getColor(pData.usl.total.pct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getColor(pData.usl.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div>
             </div>
         </div>
     </div>`;
 
     // 2. Номенклатурные группы
     if (pData.groups && pData.groups.length > 0) {
-        let parseNum = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
         html += `
         <div class="inner-block card" style="margin-bottom:12px; padding:0; overflow:hidden; border:1px solid var(--btn-color);">
             <div onclick="window.nomListOpen = !window.nomListOpen; document.getElementById('nom-list').classList.toggle('hidden'); document.getElementById('nom-icon').innerText = window.nomListOpen ? '▲' : '▼';" 
@@ -202,17 +205,17 @@ function renderPlanUI(pData) {
             </div>
             <div id="nom-list" class="${window.nomListOpen ? '' : 'hidden'}" style="padding:4px 14px; background:var(--card-bg);">
                 ${pData.groups.map(g => {
-                    let p = parseNum(g.plan); let f = parseNum(g.fact); let e = parseNum(g.factEd || g.ed); let fEd = f + e;
-                    let pct = (p > 0) ? Math.round((f / p) * 100) : 0;
-                    let pctEd = (p > 0) ? Math.round((fEd / p) * 100) : 0;
+                    let p = g.plan; let f = g.fact; let e = g.ed; let fEd = f + e;
+                    let pct = (p > 0) ? ((f / p) * 100).toFixed(2).replace('.', ',') : "0,00";
+                    let pctEd = (p > 0) ? ((fEd / p) * 100).toFixed(2).replace('.', ',') : "0,00";
                     
                     return `
                     <div style="padding:10px 0; border-bottom:1px solid var(--border-color);">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:12px;">
                             <span style="color:gray; font-weight:bold; font-size:13px;">${fmtSum(p)}</span>
                             <div style="display:flex; gap:12px; align-items:center;">
-                                <span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--text-color);">${fmtSum(f)}</span> <span style="color:${getColor(pct)}; font-size:10px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>
-                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60;">${fmtSum(fEd)}</span> <span style="color:${getColor(pctEd)}; font-size:10px; font-weight:bold; background:rgba(39, 174, 96, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
+                                <span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(f)}</span> <span style="color:${getColor(pct)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>
+                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60; font-weight:bold;">${fmtSum(fEd)}</span> <span style="color:${getColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(39, 174, 96, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
                             </div>
                         </div>
                         <div style="color:var(--desc-color); font-size:11px; line-height:1.2;">${g.name}</div>
@@ -227,7 +230,7 @@ function renderPlanUI(pData) {
         <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">Выполнение по отделам</div>`;
     let buildRow = (dTo, dAks, dUsl, isFact) => {
         let fTo = isFact ? dTo.fact : dTo.plan; let fAks = isFact ? dAks.fact : dAks.plan; let fUsl = isFact ? dUsl.fact : dUsl.plan;
-        let cTo = isFact ? 'var(--text-color)' : 'gray'; let lbl = isFact ? 'Факт' : 'План';
+        let cTo = isFact ? 'var(--btn-color)' : 'var(--text-color)'; let lbl = isFact ? 'Факт' : 'План';
         return `
             <div style="color:gray; font-size:9px; text-align:left;">${lbl}</div>
             <div style="color:${cTo}; font-size:12px;">${fmtSum(fTo)}</div>
@@ -246,9 +249,9 @@ function renderPlanUI(pData) {
                 ${buildRow(dTo, dAks, dUsl, false)}
                 ${buildRow(dTo, dAks, dUsl, true)}
                 <div></div>
-                <div><span style="color:${getColor(dTo.pct)}; font-size:10px; font-weight:bold; background:var(--card-bg); border-radius:4px; padding:2px 4px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${dTo.pct}%</span></div>
-                <div><span style="color:${getColor(dAks.pct)}; font-size:10px; font-weight:bold; background:var(--card-bg); border-radius:4px; padding:2px 4px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${dAks.pct}%</span></div>
-                <div><span style="color:${getColor(dUsl.pct)}; font-size:10px; font-weight:bold; background:var(--card-bg); border-radius:4px; padding:2px 4px; box-shadow:0 1px 2px rgba(0,0,0,0.05);">${dUsl.pct}%</span></div>
+                <div><span style="color:${getColor(dTo.pct)}; font-size:10px; font-weight:bold;">${dTo.pct}%</span></div>
+                <div><span style="color:${getColor(dAks.pct)}; font-size:10px; font-weight:bold;">${dAks.pct}%</span></div>
+                <div><span style="color:${getColor(dUsl.pct)}; font-size:10px; font-weight:bold;">${dUsl.pct}%</span></div>
             </div>
         </div>`;
     }
@@ -278,7 +281,8 @@ function renderPlanUI(pData) {
 
 function setPlanDates(type, val = null) {
     let endD = new Date(); let startD = new Date();
-    if (type === 'yesterday') { startD.setDate(startD.getDate() - 1); endD.setDate(endD.getDate() - 1); } 
+    if (type === 'single') { if (val) { startD = new Date(val); endD = new Date(val); } }
+    else if (type === 'yesterday') { startD.setDate(startD.getDate() - 1); endD.setDate(endD.getDate() - 1); } 
     else if (type === 'week') { startD.setDate(startD.getDate() - 6); } 
     else if (type === 'decade') { startD.setDate(startD.getDate() - 9); } 
     else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } else { startD.setDate(1); } } 
@@ -293,15 +297,17 @@ async function loadPlanHistory() {
     let endD = document.getElementById("plan-filter-end").value;
     let todayStr = new Date().toISOString().split('T')[0];
 
-    if (startD === todayStr && endD === todayStr && window.currentRawGroups) {
-        let pData = calcPlanEngine({groups: window.currentRawGroups, totalPlan: window.currentTotalPlan});
-        return renderPlanUI(pData);
-    }
-
     showToast("Загрузка периода...", false, 9999);
     const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
 
     if (error) { showToast("Ошибка базы: " + error.message, true); return; }
+    
+    // Если в базе пусто, но запросили сегодняшний день - показываем кэш из гугл таблицы
+    if ((!plansData || plansData.length === 0) && endD === todayStr && window.currentRawGroups) {
+        document.getElementById("toast").classList.remove("show");
+        return renderPlanUI(calcPlanEngine({groups: window.currentRawGroups, totalPlan: window.currentTotalPlan}));
+    }
+
     if (!plansData || plansData.length === 0) { 
         showToast("За этот период данных нет", true); 
         document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; return; 
@@ -309,30 +315,25 @@ async function loadPlanHistory() {
     document.getElementById("toast").classList.remove("show");
 
     let aggregatedGroups = JSON.parse(JSON.stringify(plansData[0].plan_data.groups));
-    let aggTotalPlan = 0;
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
     if (plansData.length > 1) {
-        aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; });
+        aggregatedGroups.forEach(g => { g.fact = 0; g.ed = 0; g.plan = 0; });
         plansData.forEach(day => {
             let groups = day.plan_data.groups;
-            aggTotalPlan += parse(day.plan_data.totalPlan || 0);
             if (groups) {
                 groups.forEach((g, idx) => {
                     if (aggregatedGroups[idx]) {
+                        aggregatedGroups[idx].plan += parse(g.plan); // Суммируем план для дней
                         aggregatedGroups[idx].fact += parse(g.fact);
-                        let e = parse(g.factEd || g.ed);
-                        aggregatedGroups[idx].factEd = (aggregatedGroups[idx].factEd || 0) + e;
-                        aggregatedGroups[idx].ed = aggregatedGroups[idx].factEd;
+                        aggregatedGroups[idx].ed += parse(g.factEd || g.ed);
                     }
                 });
             }
         });
-    } else {
-        aggTotalPlan = parse(plansData[0].plan_data.totalPlan || 0);
     }
 
-    let pData = calcPlanEngine({ groups: aggregatedGroups, totalPlan: aggTotalPlan });
+    let pData = calcPlanEngine({ groups: aggregatedGroups, totalPlan: plansData[0].plan_data.totalPlan });
     renderPlanUI(pData);
 }
 
@@ -779,38 +780,43 @@ function renderDashboardData(data, isSilent = false) {
           window.currentPlanDataObj = data.adminPlan; 
           window.currentRawGroups = data.adminPlan ? data.adminPlan.groups : [];
           window.currentTotalPlan = data.adminPlan ? data.adminPlan.totalPlan : 0;
-          let todayStr = new Date().toISOString().split('T')[0];
           
-          adminPlanList.innerHTML = `
-            <style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style>
-            <div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg);">
-                <div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;">
-                    <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
-                    <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
-                    <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('week')">Неделя</button>
-                    <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('decade')">Декада</button>
-                    <div style="position:relative; display:inline-block; min-width:max-content;">
-                        <input type="month" id="plan-month-picker" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
-                        <button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none;">Месяц</button>
+          let planFiltersExist = document.getElementById("plan-filter-start");
+          if (!planFiltersExist) {
+              let d = new Date();
+              let defStart = new Date(d.getFullYear(), d.getMonth(), 1).toISOString().split('T')[0];
+              let defEnd = new Date(d.getFullYear(), d.getMonth() + 1, 0).toISOString().split('T')[0];
+              
+              adminPlanList.innerHTML = `
+                <style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style>
+                <div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg);">
+                    <div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
+                        <div style="position:relative; display:inline-block; min-width:max-content;">
+                            <input type="date" id="plan-single-picker" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                            <button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none;">День</button>
+                        </div>
+                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
+                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
+                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('week')">Неделя</button>
+                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('decade')">Декада</button>
+                        <div style="position:relative; display:inline-block; min-width:max-content;">
+                            <input type="month" id="plan-month-picker" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                            <button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none;">Месяц</button>
+                        </div>
+                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">Весь период</button>
                     </div>
-                    <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">Весь период</button>
+                    <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
+                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+                        <span style="color:gray; font-weight:bold;">-</span>
+                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+                        <button class="btn-green" style="margin:0; border-radius:8px; width:44px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="loadPlanHistory()">🔍</button>
+                    </div>
                 </div>
-                <div class="no-swipe" style="display:flex; gap:6px; align-items:center;">
-                    <input type="date" id="plan-filter-start" value="${todayStr}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
-                    <span style="color:gray; font-weight:bold;">-</span>
-                    <input type="date" id="plan-filter-end" value="${todayStr}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
-                    <button class="btn-green" style="margin:0; border-radius:8px; width:44px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="loadPlanHistory()">🔍</button>
-                </div>
-            </div>
-            <div id="plan-render-area"></div>
-          `;
-          if (window.currentRawGroups && window.currentRawGroups.length > 0) {
-              let pData = calcPlanEngine(data.adminPlan);
-              renderPlanUI(pData);
-          } else {
-              renderPlanUI(null);
+                <div id="plan-render-area"></div>
+              `;
+              setTimeout(loadPlanHistory, 100);
           }
-      } 
+      }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
       if (isUserPromoter) { 
