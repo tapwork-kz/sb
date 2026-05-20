@@ -55,7 +55,7 @@ const NOM_DICT = {
     }
 };
 
-// === КАЛЬКУЛЯТОР ДАННЫХ ===
+// === КАЛЬКУЛЯТОР ДАННЫХ ИЗ СЫРОГО МАССИВА ===
 function calcPlanEngine(rawPlanData) {
     if (!rawPlanData) return null;
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
@@ -98,12 +98,10 @@ function calcPlanEngine(rawPlanData) {
                 catObj[k].sumPct = catObj[k].pct;
                 catObj[k].sumPctEd = catObj[k].pctEd;
             } else {
-                // Ratio (соотношение к ТО)
                 catObj[k].targetPct = safePctTo(catObj[k].plan, toObj.plan);
                 catObj[k].pct = safePctTo(catObj[k].fact, toObj.fact);
                 catObj[k].pctEd = safePctTo(fEd, toFEd);
                 
-                // Sum Execution (выполнение от своей суммы плана)
                 catObj[k].sumPct = safePctTo(catObj[k].fact, catObj[k].plan);
                 catObj[k].sumPctEd = safePctTo(fEd, catObj[k].plan);
             }
@@ -112,16 +110,18 @@ function calcPlanEngine(rawPlanData) {
 
     setPcts(r.to, true); setPcts(r.aks, false); setPcts(r.usl, false);
 
+    // Подсчет живых продавцов из массива сотрудников
     let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
             let d = String(e.dept).toLowerCase().trim();
-            if (d.includes('цифра') || d === 'чт') sCount.cifra++;
+            if (d.includes('цифра') || d.includes('чт')) sCount.cifra++;
             else if (d.includes('мбт')) sCount.mbt++;
             else if (d.includes('кбт')) sCount.kbt++;
         });
     }
     
+    // Делим план на количество продавцов
     let sPlan = (cat, dept, count) => count > 0 ? Math.round(r[cat][dept].plan / count) : r[cat][dept].plan;
     r.sellers = [
         { name: "Цифра/ЧТ", to: sPlan('to','cifra',sCount.cifra), aks: sPlan('aks','cifra',sCount.cifra), usl: sPlan('usl','cifra',sCount.cifra) },
@@ -319,6 +319,13 @@ function setPlanDates(type, val = null) {
 async function loadPlanHistory() {
     let startD = document.getElementById("plan-filter-start").value;
     let endD = document.getElementById("plan-filter-end").value;
+    let todayStr = new Date().toISOString().split('T')[0];
+
+    // Если запрошен "Сегодня" и данные еще тепленькие из GAS
+    if (startD === todayStr && endD === todayStr && window.currentRawGroups) {
+        let pData = calcPlanEngine({groups: window.currentRawGroups, totalPlan: window.currentTotalPlan});
+        return renderPlanUI(pData);
+    }
 
     showToast("Загрузка периода...", false, 9999);
     const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
@@ -330,19 +337,21 @@ async function loadPlanHistory() {
     }
     document.getElementById("toast").classList.remove("show");
 
+    // Берем структуру групп за самую свежую дату в периоде
     let aggregatedGroups = JSON.parse(JSON.stringify(plansData[0].plan_data.groups || []));
-    let aggTotalPlan = 0;
+    let aggTotalPlan = parseFloat(String(plansData[0].plan_data.totalPlan || "0").replace(/\s/g, '').replace(',', '.')) || 0;
+    
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
     if (plansData.length > 1) {
-        aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; g.plan = 0; });
+        // ОБНУЛЯЕМ ТОЛЬКО ФАКТЫ! План не трогаем, он остается константой
+        aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; });
+        
         plansData.forEach(day => {
             let groups = day.plan_data.groups;
-            aggTotalPlan += parse(day.plan_data.totalPlan || 0);
             if (groups) {
                 groups.forEach((g, idx) => {
                     if (aggregatedGroups[idx]) {
-                        aggregatedGroups[idx].plan += parse(g.plan);
                         aggregatedGroups[idx].fact += parse(g.fact);
                         let e = parse(g.factEd || g.ed);
                         aggregatedGroups[idx].factEd = (aggregatedGroups[idx].factEd || 0) + e;
@@ -351,8 +360,6 @@ async function loadPlanHistory() {
                 });
             }
         });
-    } else {
-        aggTotalPlan = parse(plansData[0].plan_data.totalPlan || 0);
     }
 
     let pData = calcPlanEngine({ groups: aggregatedGroups, totalPlan: aggTotalPlan });
