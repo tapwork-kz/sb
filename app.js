@@ -101,7 +101,6 @@ function calcPlanEngine(rawPlanData) {
                 catObj[k].targetPct = safePctTo(catObj[k].plan, toObj.plan);
                 catObj[k].pct = safePctTo(catObj[k].fact, toObj.fact);
                 catObj[k].pctEd = safePctTo(fEd, toFEd);
-                
                 catObj[k].sumPct = safePctTo(catObj[k].fact, catObj[k].plan);
                 catObj[k].sumPctEd = safePctTo(fEd, catObj[k].plan);
             }
@@ -110,13 +109,12 @@ function calcPlanEngine(rawPlanData) {
 
     setPcts(r.to, true); setPcts(r.aks, false); setPcts(r.usl, false);
 
-    // СТРОГИЙ ПОДСЧЕТ ПРОДАВЦОВ (Только Продавец-консультант)
+    // СТРОГИЙ ПОДСЧЕТ ПРОДАВЦОВ
     let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
             let d = String(e.dept).toLowerCase().trim();
             let role = String(e.role || "").toLowerCase().trim();
-            
             if (role.includes('продавец-консультант') || role.includes('продавец консультант')) {
                 if (d === 'цифра' || d === 'чт' || d === 'цифра/чт') sCount.cifra++;
                 else if (d === 'мбт') sCount.mbt++;
@@ -144,7 +142,7 @@ function renderPlanUI(pData) {
     if (!area) return;
     if (!pData || !pData.to) { area.innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет данных за этот период</p>"; return; }
 
-    // Динамический цвет (определяется от ЦЕЛИ, а не от 100%)
+    // Динамический цвет в зависимости от цели
     let getDynColor = (valStr, targetStr = "100") => {
         let val = parseFloat(String(valStr).replace(/\s/g, '').replace(',', '.')) || 0;
         let target = parseFloat(String(targetStr).replace(/\s/g, '').replace(',', '.')) || 100;
@@ -210,7 +208,7 @@ function renderPlanUI(pData) {
                 <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.aks.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:gray; font-size:9px; margin-top:4px;">Цель: <span style="color:var(--text-color); font-weight:bold;">${pData.aks.total.targetPct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.aks.total.targetPct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pct, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pctEd, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div>
             </div>
@@ -222,7 +220,7 @@ function renderPlanUI(pData) {
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:gray; font-size:9px; margin-top:4px;">Цель: <span style="color:var(--text-color); font-weight:bold;">${pData.usl.total.targetPct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.usl.total.targetPct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pct, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pctEd, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div>
             </div>
@@ -245,9 +243,8 @@ function renderPlanUI(pData) {
                     let pct = (p > 0) ? ((f / p) * 100).toFixed(2).replace('.', ',') : "0,00";
                     let pctEd = (p > 0) ? ((fEd / p) * 100).toFixed(2).replace('.', ',') : "0,00";
                     
-                    // Скрываем ЭД для Фишек, Сертификатов и Услуг
                     let hideEd = n.includes('сертификат') || n.includes('фишк') || n.includes('услуг');
-                    let edContent = hideEd ? '' : (e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(fEd)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(51, 144, 236, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>');
+                    let edContent = hideEd ? '' : (e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(e)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(51, 144, 236, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '');
                     
                     return `
                     <div style="padding:10px 0; border-bottom:1px solid var(--border-color);">
@@ -306,7 +303,7 @@ function renderPlanUI(pData) {
             let isLast = idx === pData.sellers.length - 1;
             html += `
             <div style="padding:10px 0; border-bottom:${isLast ? 'none' : '1px solid var(--border-color)'};">
-                <div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:bold;">${s.name}</div>
+                <div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:normal;">${s.name}</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--inner-bg); padding:8px 12px; border-radius:8px;">
                     <div style="text-align:center;">
                         <div style="color:gray; font-size:9px;">ТО</div>
@@ -314,13 +311,17 @@ function renderPlanUI(pData) {
                     </div>
                     <div style="text-align:center;">
                         <div style="color:gray; font-size:9px;">АКС</div>
-                        <div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.aks)}</div>
-                        <div style="margin-top:2px;"><span style="background:rgba(150,150,150,0.1); color:gray; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:9px;">${s.aksPct}%</span></div>
+                        <div style="display:flex; justify-content:center; align-items:center; gap:4px;">
+                            <span style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.aks)}</span>
+                            <span style="background:rgba(150,150,150,0.1); color:gray; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:9px;">${s.aksPct}%</span>
+                        </div>
                     </div>
                     <div style="text-align:center;">
                         <div style="color:gray; font-size:9px;">УСЛ</div>
-                        <div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.usl)}</div>
-                        <div style="margin-top:2px;"><span style="background:rgba(150,150,150,0.1); color:gray; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:9px;">${s.uslPct}%</span></div>
+                        <div style="display:flex; justify-content:center; align-items:center; gap:4px;">
+                            <span style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.usl)}</span>
+                            <span style="background:rgba(150,150,150,0.1); color:gray; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:9px;">${s.uslPct}%</span>
+                        </div>
                     </div>
                 </div>
             </div>`;
@@ -331,9 +332,11 @@ function renderPlanUI(pData) {
     area.innerHTML = html;
 }
 
+// === КНОПКИ ДАТ ===
 function setPlanDates(type, val = null) {
     let endD = new Date(); let startD = new Date();
-    if (type === 'today') { } // По умолчанию даты и так сегодня
+    if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
+    else if (type === 'today') { } // По умолчанию даты и так сегодня
     else if (type === 'yesterday') { startD.setDate(startD.getDate() - 1); endD.setDate(endD.getDate() - 1); } 
     else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } else { startD.setDate(1); } } 
     else if (type === 'all') { startD = new Date(2024, 0, 1); }
@@ -348,31 +351,45 @@ async function loadPlanHistory() {
     let endD = document.getElementById("plan-filter-end").value;
     let todayStr = formatDateLocal(new Date());
 
+    showToast("Загрузка периода...", false, 9999);
+
+    // Если запрошен ТОЛЬКО сегодняшний день и данные свежие (еще не в Supabase)
     if (startD === todayStr && endD === todayStr && window.currentRawGroups) {
+        document.getElementById("toast").classList.remove("show");
         let pData = calcPlanEngine({groups: window.currentRawGroups, totalPlan: window.currentTotalPlan});
         return renderPlanUI(pData);
     }
 
-    showToast("Загрузка периода...", false, 9999);
     const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
 
     if (error) { showToast("Ошибка базы: " + error.message, true); return; }
-    if (!plansData || plansData.length === 0) { 
+
+    let allPlans = plansData || [];
+
+    // Если в запрошенном периоде есть "Сегодня", но вечерняя выгрузка еще не прошла - подмешиваем живые данные!
+    let hasTodayInDb = allPlans.some(p => p.date === todayStr);
+    if (startD <= todayStr && endD >= todayStr && !hasTodayInDb && window.currentRawGroups) {
+        allPlans.unshift({
+            date: todayStr,
+            plan_data: { groups: window.currentRawGroups, totalPlan: window.currentTotalPlan }
+        });
+    }
+
+    if (allPlans.length === 0) { 
         showToast("За этот период данных нет", true); 
         document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; return; 
     }
+    
     document.getElementById("toast").classList.remove("show");
 
-    // Исходная структура за самую свежую дату
-    let aggregatedGroups = JSON.parse(JSON.stringify(plansData[0].plan_data.groups || []));
-    let aggTotalPlan = parseFloat(String(plansData[0].plan_data.totalPlan || "0").replace(/\s/g, '').replace(',', '.')) || 0;
+    let aggregatedGroups = JSON.parse(JSON.stringify(allPlans[0].plan_data.groups || []));
+    let aggTotalPlan = parseFloat(String(allPlans[0].plan_data.totalPlan || "0").replace(/\s/g, '').replace(',', '.')) || 0;
     
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
-    if (plansData.length > 1) {
-        // Обнуляем факты (план остается константой за месяц/период)
+    if (allPlans.length > 1) {
         aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; });
-        plansData.forEach(day => {
+        allPlans.forEach(day => {
             let groups = day.plan_data.groups;
             if (groups) {
                 groups.forEach((g, idx) => {
@@ -391,6 +408,7 @@ async function loadPlanHistory() {
     renderPlanUI(pData);
 }
 
+// === ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ ===
 async function callBackend(actionName, payloadData = {}) { 
   try { 
     const getRoleGroup = (roleText) => {
@@ -844,7 +862,7 @@ function renderDashboardData(data, isSilent = false) {
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
                         <div style="position:relative; display:inline-block; min-width:max-content;">
-                            <input type="month" id="plan-month-picker" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                            <input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                             <button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none;">Месяц</button>
                         </div>
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">Весь период</button>
@@ -864,16 +882,10 @@ function renderDashboardData(data, isSilent = false) {
               `;
               setTimeout(loadPlanHistory, 100);
           } else {
-              // Если фильтры уже отрисованы, просто обновляем кэш и перерисовываем
               window.currentPlanDataObj = data.adminPlan; 
               window.currentRawGroups = data.adminPlan ? data.adminPlan.groups : [];
               window.currentTotalPlan = data.adminPlan ? data.adminPlan.totalPlan : 0;
-              if (window.currentRawGroups && window.currentRawGroups.length > 0) {
-                  let pData = calcPlanEngine(data.adminPlan);
-                  renderPlanUI(pData);
-              } else {
-                  renderPlanUI(null);
-              }
+              loadPlanHistory();
           }
       } 
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
@@ -1186,35 +1198,23 @@ function openScDoc() { if (selectedScItem && selectedScItem.docUrl) { if (tg && 
 function showToast(msg, isError = false, duration = 3000) { const t = document.getElementById("toast"); t.innerText = msg; t.style.background = isError ? "#e74c3c" : "#34495e"; t.classList.add("show"); if (duration !== 9999) setTimeout(() => t.classList.remove("show"), duration); }
 
 async function executeSubmit(type, details, targetIin = null, meta = "", customMsg = null) { vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitRequest', { token: appState.token, type: type, details: details, targetIin: targetIin, metadata: meta }); if(res.success) { showToast(customMsg || "Запрос успешно отправлен!"); closeForm(); loadDashboard(true); } else showToast("Ошибка: " + res.error, true); }
-function getFormattedDate(dateStr) { const today = new Date().toISOString().split('T')[0]; if (!dateStr || dateStr === "Сегодня") { dateStr = today; } const d = new Date(dateStr); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); }
 
-function submitScForm() { if(!selectedScItem) return showToast("Выберите товар из списка", true); let scDateVal = document.getElementById("sc-date").dataset.realdate; selectedScItem.date = getFormattedDate(scDateVal); executeSubmit("Продажа СЦ/Фокус", selectedScItem.name, null, JSON.stringify(selectedScItem)); }
-function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let meta = JSON.stringify({ date: getFormattedDate(dateVal), text: selectedTradeInModel }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
-function submitPoints() { const act = document.getElementById("fp-action").value; const time = document.getElementById("fp-time").value; const dateVal = document.getElementById("fp-date").dataset.realdate; let meta = JSON.stringify({ date: getFormattedDate(dateVal) }); executeSubmit("Баллы мотивации", `${act} на ${time}`, null, meta); }
-function submitFixShift() { const shiftStr = document.getElementById("fs-fix-shift").value; if (!shiftStr) return showToast("Выберите новую смену", true); const dateVal = new Date().toISOString().split('T')[0]; executeSubmit("Исправление смены", shiftStr, null, getFormattedDate(dateVal), "Запрос на исправление отправлен"); }
-function submitSwap() { const select = document.getElementById("fs-target"); const targetIin = select.value; if(!targetIin) return showToast("Выберите сменщика", true); const dateVal = document.getElementById("fs-date").dataset.realdate; const shiftStr = document.getElementById("fs-shift").value; const targetName = select.options[select.selectedIndex].text; const details = `Дата: ${getFormattedDate(dateVal)}, Смена: ${shiftStr}`; executeSubmit("Обмен сменами", details, targetIin, "", "Запрос отправлен: " + targetName); }
+function submitScForm() { if(!selectedScItem) return showToast("Выберите товар из списка", true); let scDateVal = document.getElementById("sc-date").dataset.realdate; let dStr = scDateVal; if(dStr==="Сегодня") { dStr = formatDateLocal(new Date()); } else { let d = new Date(dStr); dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } selectedScItem.date = dStr; executeSubmit("Продажа СЦ/Фокус", selectedScItem.name, null, JSON.stringify(selectedScItem)); }
+function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
+function submitPoints() { const act = document.getElementById("fp-action").value; const time = document.getElementById("fp-time").value; const dateVal = document.getElementById("fp-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr }); executeSubmit("Баллы мотивации", `${act} на ${time}`, null, meta); }
+function submitFixShift() { const shiftStr = document.getElementById("fs-fix-shift").value; if (!shiftStr) return showToast("Выберите новую смену", true); const dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); executeSubmit("Исправление смены", shiftStr, null, dStr, "Запрос на исправление отправлен"); }
+function submitSwap() { const select = document.getElementById("fs-target"); const targetIin = select.value; if(!targetIin) return showToast("Выберите сменщика", true); const dateVal = document.getElementById("fs-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); const shiftStr = document.getElementById("fs-shift").value; const targetName = select.options[select.selectedIndex].text; const details = `Дата: ${dStr}, Смена: ${shiftStr}`; executeSubmit("Обмен сменами", details, targetIin, "", "Запрос отправлен: " + targetName); }
 
 function submitHotCheck(typeText, valText, ptsText) { 
     let promptMsg = `Вы подтверждаете продажу: ${typeText}?`; 
-    let dateVal = new Date().toISOString().split('T')[0]; 
-    let metaStr = JSON.stringify({ date: getFormattedDate(dateVal), bonus: valText, pts: ptsText }); 
+    let dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})();
+    let metaStr = JSON.stringify({ date: dStr, bonus: valText, pts: ptsText }); 
     if (typeof tg !== 'undefined' && tg && tg.showPopup) { 
-        try { 
-            tg.showPopup({ title: 'Горячий чек', message: promptMsg, buttons: [{id: 'yes', type: 'ok', text: 'Да'}, {type: 'cancel', text: 'Отмена'}] }, function(btnId) { 
-                if (btnId === 'yes') executeSubmit("Горячий чек", typeText, null, metaStr); 
-            }); 
-        } catch(e) { 
-            if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); 
-        } 
-    } else { 
-        if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); 
-    } 
+        try { tg.showPopup({ title: 'Горячий чек', message: promptMsg, buttons: [{id: 'yes', type: 'ok', text: 'Да'}, {type: 'cancel', text: 'Отмена'}] }, function(btnId) { if (btnId === 'yes') executeSubmit("Горячий чек", typeText, null, metaStr); }); } 
+        catch(e) { if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); } 
+    } else { if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); } 
 }
 
 async function processReq(id, action, replyText = "") { vibrate(50); showToast("Обработка...", false, 9999); processedReqIds.add(String(id)); let el = document.getElementById("req-" + id); if (el) { el.style.display = 'none'; } let res = await callBackend('processRequest', { token: appState.token, reqId: id, reqAction: action, replyText: replyText }); if(res.success) { showToast(res.msg); loadDashboard(true); } else { showToast(res.error, true); loadDashboard(true); } }
 
-document.addEventListener('keydown', function(e) {
-  if (e.key === 'Enter' && document.activeElement && document.activeElement.tagName === 'INPUT') {
-    document.activeElement.blur();
-  }
-});
+document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && document.activeElement && document.activeElement.tagName === 'INPUT') { document.activeElement.blur(); } });
