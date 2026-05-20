@@ -55,7 +55,7 @@ const NOM_DICT = {
     }
 };
 
-// === КАЛЬКУЛЯТОР ДАННЫХ ИЗ СЫРОГО МАССИВА ===
+// === КАЛЬКУЛЯТОР ДАННЫХ ===
 function calcPlanEngine(rawPlanData) {
     if (!rawPlanData) return null;
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
@@ -110,14 +110,14 @@ function calcPlanEngine(rawPlanData) {
 
     setPcts(r.to, true); setPcts(r.aks, false); setPcts(r.usl, false);
 
-    // Подсчет живых продавцов из массива сотрудников
+    // Строгий подсчет живых продавцов из массива сотрудников
     let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
             let d = String(e.dept).toLowerCase().trim();
-            if (d.includes('цифра') || d.includes('чт')) sCount.cifra++;
-            else if (d.includes('мбт')) sCount.mbt++;
-            else if (d.includes('кбт')) sCount.kbt++;
+            if (d === 'цифра' || d === 'чт' || d === 'цифра/чт') sCount.cifra++;
+            else if (d === 'мбт') sCount.mbt++;
+            else if (d === 'кбт') sCount.kbt++;
         });
     }
     
@@ -138,7 +138,7 @@ function renderPlanUI(pData) {
     if (!area) return;
     if (!pData || !pData.to) { area.innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет данных за этот период</p>"; return; }
 
-    // Динамический цвет в зависимости от ЦЕЛИ!
+    // Динамический цвет в зависимости от цели
     let getDynColor = (valStr, targetStr = "100") => {
         let val = parseFloat(String(valStr).replace(/\s/g, '').replace(',', '.')) || 0;
         let target = parseFloat(String(targetStr).replace(/\s/g, '').replace(',', '.')) || 100;
@@ -160,28 +160,35 @@ function renderPlanUI(pData) {
 
     // 1. Сводка ОБЩАЯ
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px;">
-        <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">Общая сводка</div>
+        <div style="text-align:center; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:uppercase;">Общая сводка</div>
         
-        <div style="background:var(--inner-bg); padding:10px; border-radius:12px; text-align:center; border:1px solid var(--border-color); margin-bottom:12px;">
-            <div style="color:gray; font-size:10px; text-transform:uppercase; margin-bottom:6px;">Итого: План | Факт | с ЭД</div>
-            <div style="font-size:14px; display:flex; justify-content:center; align-items:center; gap:6px;">
-                <span style="color:var(--text-color); font-weight:bold;">${fmtSum(totalPlan)}</span> <span style="color:gray;">|</span>
-                <span style="color:#27ae60; font-weight:bold;">${fmtSum(totalFact)}</span> <span style="color:gray;">|</span>
-                <span style="color:var(--btn-color); font-weight:bold;">${fmtSum(totalFactEd)}</span>
-            </div>
-            <div style="display:flex; justify-content:center; align-items:center; gap:12px; margin-top:6px;">
-                <span style="color:${getDynColor(totalPct)}; font-size:11px; font-weight:bold;">${totalPct}%</span>
-                <span style="color:${getDynColor(totalPctEd)}; font-size:11px; font-weight:bold;">${totalPctEd}%</span>
-            </div>
-            <div style="margin-top:8px; font-size:11px; color:${remPlan <= 0 ? '#27ae60' : '#e74c3c'};">
-                Осталось: <b style="font-size:13px;">${fmtSum(remPlan)}</b>
+        <!-- ИТОГИ -->
+        <div style="background:var(--inner-bg); padding:10px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:12px;">
+            <div style="color:var(--text-color); font-size:12px; text-transform:uppercase; margin-bottom:8px; font-weight:bold; text-align:center; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">Итоговый показатель</div>
+            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
+                <div>
+                    <div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div>
+                    <div style="color:var(--text-color); font-size:13px; font-weight:bold;">${fmtSum(totalPlan)}</div>
+                    <div style="margin-top:4px; font-size:10px; color:${remPlan <= 0 ? '#27ae60' : '#e74c3c'};">Ост: <b>${fmtSum(remPlan)}</b></div>
+                </div>
+                <div>
+                    <div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div>
+                    <div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px;">${fmtSum(totalFact)}</div>
+                    <div><span style="color:${getDynColor(totalPct)}; font-weight:bold; font-size:10px;">${totalPct}%</span></div>
+                </div>
+                <div>
+                    <div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div>
+                    <div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px;">${fmtSum(totalFactEd)}</div>
+                    <div><span style="color:${getDynColor(totalPctEd)}; font-weight:bold; font-size:10px;">${totalPctEd}%</span></div>
+                </div>
             </div>
         </div>
 
         <!-- ТО -->
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
-            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Основной товарооборот</b>
+                <span style="color:var(--btn-color); font-size:11px; font-weight:bold;">+ЭД ${fmtSum(pData.to.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.to.total.plan)}</div></div>
@@ -192,11 +199,12 @@ function renderPlanUI(pData) {
 
         <!-- АКС -->
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
-            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
+                <span style="color:var(--btn-color); font-size:11px; font-weight:bold;">+ЭД ${fmtSum(pData.aks.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--btn-color);">${pData.aks.total.targetPct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:4px;">Цель: ${pData.aks.total.targetPct}%</div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pct, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pctEd, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div>
             </div>
@@ -204,11 +212,12 @@ function renderPlanUI(pData) {
 
         <!-- УСЛУГИ -->
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
-            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
+                <span style="color:var(--btn-color); font-size:11px; font-weight:bold;">+ЭД ${fmtSum(pData.usl.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--btn-color);">${pData.usl.total.targetPct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:4px;">Цель: ${pData.usl.total.targetPct}%</div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pct, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pct}%</span></div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pctEd, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div>
             </div>
@@ -226,9 +235,9 @@ function renderPlanUI(pData) {
             </div>
             <div id="nom-list" class="${window.nomListOpen ? '' : 'hidden'}" style="padding:4px 14px; background:var(--card-bg);">
                 ${pData.groups.map(g => {
-                    let p = parse(g.plan); let f = parse(g.fact); let e = parse(g.factEd || g.ed); let fEd = f + e;
+                    let p = parse(g.plan); let f = parse(g.fact); let e = parse(g.factEd || g.ed);
                     let pct = (p > 0) ? ((f / p) * 100).toFixed(2).replace('.', ',') : "0,00";
-                    let pctEd = (p > 0) ? ((fEd / p) * 100).toFixed(2).replace('.', ',') : "0,00";
+                    let pctEd = (p > 0) ? ((e / p) * 100).toFixed(2).replace('.', ',') : "0,00";
                     
                     return `
                     <div style="padding:10px 0; border-bottom:1px solid var(--border-color);">
@@ -236,7 +245,7 @@ function renderPlanUI(pData) {
                             <span style="color:gray; font-weight:bold; font-size:13px;">${fmtSum(p)}</span>
                             <div style="display:flex; gap:12px; align-items:center;">
                                 <span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60; font-weight:bold;">${fmtSum(f)}</span> <span style="color:${getDynColor(pct)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>
-                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(fEd)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
+                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(e)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(51, 144, 236, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
                             </div>
                         </div>
                         <div style="color:var(--desc-color); font-size:11px; line-height:1.2;">${g.name}</div>
@@ -248,16 +257,15 @@ function renderPlanUI(pData) {
 
     // 3. Отделы
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px;">
-        <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">Выполнение по отделам</div>`;
+        <div style="text-align:center; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:uppercase;">Выполнение по отделам</div>`;
     let buildRow = (dTo, dAks, dUsl, isFact) => {
         let fTo = isFact ? dTo.fact : dTo.plan; let fAks = isFact ? dAks.fact : dAks.plan; let fUsl = isFact ? dUsl.fact : dUsl.plan;
         let cTo = isFact ? '#27ae60' : 'var(--text-color)'; let lbl = isFact ? 'Факт' : 'План';
-        let weight = isFact ? 'bold' : 'normal';
         return `
             <div style="color:gray; font-size:9px; text-align:left;">${lbl}</div>
-            <div style="color:${cTo}; font-size:12px; font-weight:${weight};">${fmtSum(fTo)}</div>
-            <div style="color:${cTo}; font-size:12px; font-weight:${weight};">${fmtSum(fAks)}</div>
-            <div style="color:${cTo}; font-size:12px; font-weight:${weight};">${fmtSum(fUsl)}</div>`;
+            <div style="color:${cTo}; font-size:12px;">${fmtSum(fTo)}</div>
+            <div style="color:${cTo}; font-size:12px;">${fmtSum(fAks)}</div>
+            <div style="color:${cTo}; font-size:12px;">${fmtSum(fUsl)}</div>`;
     };
     for (let i = 0; i < 3; i++) {
         let d = ['cifra', 'mbt', 'kbt'][i];
@@ -282,12 +290,12 @@ function renderPlanUI(pData) {
     // 4. План на продавца
     if (pData.sellers && pData.sellers.length > 0) {
         html += `<div class="inner-block card" style="padding:12px;">
-            <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">План на продавца</div>`;
+            <div style="text-align:center; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:uppercase;">План на продавца</div>`;
         pData.sellers.forEach((s, idx) => {
             let isLast = idx === pData.sellers.length - 1;
             html += `
             <div style="padding:10px 0; border-bottom:${isLast ? 'none' : '1px solid var(--border-color)'};">
-                <div style="font-size:13px; margin-bottom:8px; color:var(--text-color);">${s.name}</div>
+                <div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:bold;">${s.name}</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--inner-bg); padding:8px 12px; border-radius:8px;">
                     <div style="text-align:center;"><div style="color:gray; font-size:9px;">ТО</div><div style="color:var(--text-color); font-size:13px; letter-spacing:-0.5px;">${fmtSum(s.to)}</div></div>
                     <div style="text-align:center;"><div style="color:gray; font-size:9px;">АКС</div><div style="color:var(--text-color); font-size:13px; letter-spacing:-0.5px;">${fmtSum(s.aks)}</div></div>
