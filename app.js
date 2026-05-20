@@ -50,16 +50,13 @@ const NOM_DICT = {
     }
 };
 
-// === КАЛЬКУЛЯТОР ДАННЫХ ИЗ СЫРОГО МАССИВА ===
-function calcPlanEngine(rawPlanData) {
-    if (!rawPlanData) return null;
+// === КАЛЬКУЛЯТОР ДАННЫХ ===
+function calcPlanEngine(rawGroups) {
+    if (!rawGroups || !rawGroups.length) return null;
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
     
-    let rawGroups = rawPlanData.groups || [];
-    let totalStorePlan = parse(rawPlanData.totalPlan || "0");
-
     let r = {
-        totalPlan: totalStorePlan,
+        totalPlan: 0,
         to: { total: { plan: 0, fact: 0, ed: 0 }, cifra: { plan: 0, fact: 0, ed: 0 }, mbt: { plan: 0, fact: 0, ed: 0 }, kbt: { plan: 0, fact: 0, ed: 0 } },
         aks: { total: { plan: 0, fact: 0, ed: 0 }, cifra: { plan: 0, fact: 0, ed: 0 }, mbt: { plan: 0, fact: 0, ed: 0 }, kbt: { plan: 0, fact: 0, ed: 0 } },
         usl: { total: { plan: 0, fact: 0, ed: 0 }, cifra: { plan: 0, fact: 0, ed: 0 }, mbt: { plan: 0, fact: 0, ed: 0 }, kbt: { plan: 0, fact: 0, ed: 0 } },
@@ -68,18 +65,20 @@ function calcPlanEngine(rawPlanData) {
 
     rawGroups.forEach(g => {
         let p = parse(g.plan), f = parse(g.fact), e = parse(g.factEd || g.ed);
+        let found = false;
         for (let cat of ['to', 'aks', 'usl']) {
             for (let dept of ['cifra', 'mbt', 'kbt']) {
-                if (NOM_DICT[cat][dept].includes(g.name)) {
+                if (NOM_DICT[cat][dept].includes(g.name.trim())) {
                     r[cat][dept].plan += p; r[cat][dept].fact += f; r[cat][dept].ed += e;
                     r[cat].total.plan += p; r[cat].total.fact += f; r[cat].total.ed += e;
+                    found = true;
                 }
             }
         }
+        r.totalPlan += p; // Общий план магазина
     });
 
-    // Функция вычисления процентов с 2 цифрами после запятой (например 5,04)
-    let safePct = (num, den) => den > 0 ? ((num / den) * 100).toFixed(2).replace('.', ',') : "0,00";
+    let safePctTo = (num, den) => den > 0 ? ((num / den) * 100).toFixed(2).replace('.', ',') : "0,00";
 
     let setPcts = (catObj, isTo) => {
         for (let k of ['total', 'cifra', 'mbt', 'kbt']) {
@@ -89,21 +88,18 @@ function calcPlanEngine(rawPlanData) {
 
             if (isTo) {
                 catObj[k].targetPct = "100,00"; 
-                catObj[k].pct = safePct(catObj[k].fact, catObj[k].plan);
-                catObj[k].pctEd = safePct(fEd, catObj[k].plan);
+                catObj[k].pct = safePctTo(catObj[k].fact, catObj[k].plan);
+                catObj[k].pctEd = safePctTo(fEd, catObj[k].plan);
             } else {
-                catObj[k].targetPct = safePct(catObj[k].plan, toObj.plan);
-                catObj[k].pct = safePct(catObj[k].fact, toObj.fact);
-                catObj[k].pctEd = safePct(fEd, toFEd);
+                catObj[k].targetPct = safePctTo(catObj[k].plan, toObj.plan);
+                catObj[k].pct = safePctTo(catObj[k].fact, toObj.fact);
+                catObj[k].pctEd = safePctTo(fEd, toFEd);
             }
         }
     };
 
-    setPcts(r.to, true);
-    setPcts(r.aks, false);
-    setPcts(r.usl, false);
+    setPcts(r.to, true); setPcts(r.aks, false); setPcts(r.usl, false);
 
-    // Подсчет живых продавцов из базы (без директоров и админов)
     let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
@@ -114,9 +110,7 @@ function calcPlanEngine(rawPlanData) {
         });
     }
     
-    // Делим план отдела на количество продавцов
     let sPlan = (cat, dept, count) => count > 0 ? Math.round(r[cat][dept].plan / count) : r[cat][dept].plan;
-    
     r.sellers = [
         { name: "Цифра/ЧТ", to: sPlan('to','cifra',sCount.cifra), aks: sPlan('aks','cifra',sCount.cifra), usl: sPlan('usl','cifra',sCount.cifra) },
         { name: "МБТ", to: sPlan('to','mbt',sCount.mbt), aks: sPlan('aks','mbt',sCount.mbt), usl: sPlan('usl','mbt',sCount.mbt) },
@@ -126,16 +120,16 @@ function calcPlanEngine(rawPlanData) {
     return r;
 }
 
-// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ПЛАНА ===
+// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ===
 function renderPlanUI(pData) {
     let area = document.getElementById("plan-render-area");
     if (!area) return;
     if (!pData || !pData.to) { area.innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет данных за этот период</p>"; return; }
 
     let getColor = (pctStr) => { let p = parseFloat(String(pctStr).replace(/\s/g, '').replace(',', '.')) || 0; return p >= 100 ? "#27ae60" : (p >= 80 ? "#f39c12" : "#e74c3c"); };
-    
+    let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
+
     let html = "";
-    
     let totalPlan = pData.totalPlan;
     let totalFact = pData.to.total.fact + pData.aks.total.fact + pData.usl.total.fact;
     let totalFactEd = pData.to.total.fact + pData.to.total.ed + pData.aks.total.fact + pData.aks.total.ed + pData.usl.total.fact + pData.usl.total.ed;
@@ -152,44 +146,33 @@ function renderPlanUI(pData) {
                 <span style="color:var(--btn-color); font-weight:bold;">${fmtSum(totalFact)}</span> <span style="color:gray;">|</span>
                 <span style="color:#27ae60; font-weight:bold;">${fmtSum(totalFactEd)}</span>
             </div>
-            <div style="margin-top:8px; font-size:11px; color:${remPlan <= 0 ? '#27ae60' : '#e74c3c'};">
-                Осталось: <b style="font-size:13px;">${fmtSum(remPlan)}</b>
-            </div>
+            <div style="margin-top:8px; font-size:11px; color:${remPlan <= 0 ? '#27ae60' : '#e74c3c'};">Осталось: <b style="font-size:13px;">${fmtSum(remPlan)}</b></div>
         </div>
 
-        <!-- ТО -->
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
-            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
-                <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Основной товарооборот</b>
-            </div>
+            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;"><b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Основной товарооборот</b></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.to.total.plan)}</div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact)}</div><div><span style="color:${getColor(pData.to.total.pct)}; font-weight:bold; font-size:10px;">${pData.to.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact + pData.to.total.ed)}</div><div><span style="color:${getColor(pData.to.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.to.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact + pData.to.total.ed)}</div><div><span style="color:${getColor(pData.to.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.to.total.pctEd}%</span></div></div>
             </div>
         </div>
 
-        <!-- АКС -->
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
-            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
-                <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
-            </div>
+            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;"><b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:2px;">Цель: ${pData.aks.total.targetPct}%</div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:4px;">Цель: ${pData.aks.total.targetPct}%</div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="color:${getColor(pData.aks.total.pct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getColor(pData.aks.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getColor(pData.aks.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div>
             </div>
         </div>
 
-        <!-- УСЛУГИ -->
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
-            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
-                <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
-            </div>
+            <div style="text-align:left; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;"><b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b></div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:2px;">Цель: ${pData.usl.total.targetPct}%</div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:var(--btn-color); font-size:9px; font-weight:bold; margin-top:4px;">Цель: ${pData.usl.total.targetPct}%</div></div>
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="color:${getColor(pData.usl.total.pct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getColor(pData.usl.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getColor(pData.usl.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div>
             </div>
         </div>
     </div>`;
@@ -205,7 +188,7 @@ function renderPlanUI(pData) {
             </div>
             <div id="nom-list" class="${window.nomListOpen ? '' : 'hidden'}" style="padding:4px 14px; background:var(--card-bg);">
                 ${pData.groups.map(g => {
-                    let p = g.plan; let f = g.fact; let e = g.ed; let fEd = f + e;
+                    let p = parse(g.plan); let f = parse(g.fact); let e = parse(g.factEd || g.ed); let fEd = f + e;
                     let pct = (p > 0) ? ((f / p) * 100).toFixed(2).replace('.', ',') : "0,00";
                     let pctEd = (p > 0) ? ((fEd / p) * 100).toFixed(2).replace('.', ',') : "0,00";
                     
@@ -214,8 +197,8 @@ function renderPlanUI(pData) {
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:12px;">
                             <span style="color:gray; font-weight:bold; font-size:13px;">${fmtSum(p)}</span>
                             <div style="display:flex; gap:12px; align-items:center;">
-                                <span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(f)}</span> <span style="color:${getColor(pct)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>
-                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60; font-weight:bold;">${fmtSum(fEd)}</span> <span style="color:${getColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(39, 174, 96, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
+                                <span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--text-color);">${fmtSum(f)}</span> <span style="color:${getColor(pct)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>
+                                ${e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60;">${fmtSum(fEd)}</span> <span style="color:${getColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(39, 174, 96, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '<span style="color:gray; font-size:10px;">-</span>'}
                             </div>
                         </div>
                         <div style="color:var(--desc-color); font-size:11px; line-height:1.2;">${g.name}</div>
@@ -230,22 +213,17 @@ function renderPlanUI(pData) {
         <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">Выполнение по отделам</div>`;
     let buildRow = (dTo, dAks, dUsl, isFact) => {
         let fTo = isFact ? dTo.fact : dTo.plan; let fAks = isFact ? dAks.fact : dAks.plan; let fUsl = isFact ? dUsl.fact : dUsl.plan;
-        let cTo = isFact ? 'var(--btn-color)' : 'var(--text-color)'; let lbl = isFact ? 'Факт' : 'План';
-        return `
-            <div style="color:gray; font-size:9px; text-align:left;">${lbl}</div>
-            <div style="color:${cTo}; font-size:12px;">${fmtSum(fTo)}</div>
-            <div style="color:${cTo}; font-size:12px;">${fmtSum(fAks)}</div>
-            <div style="color:${cTo}; font-size:12px;">${fmtSum(fUsl)}</div>`;
+        let cTo = isFact ? 'var(--text-color)' : 'gray'; let lbl = isFact ? 'Факт' : 'План';
+        return `<div style="color:gray; font-size:9px; text-align:left;">${lbl}</div><div style="color:${cTo}; font-size:12px;">${fmtSum(fTo)}</div><div style="color:${cTo}; font-size:12px;">${fmtSum(fAks)}</div><div style="color:${cTo}; font-size:12px;">${fmtSum(fUsl)}</div>`;
     };
     for (let i = 0; i < 3; i++) {
-        let d = ['cifra', 'mbt', 'kbt'][i];
-        let dTo = pData.to[d]; let dAks = pData.aks[d]; let dUsl = pData.usl[d];
+        let d = ['cifra', 'mbt', 'kbt'][i]; let dTo = pData.to[d]; let dAks = pData.aks[d]; let dUsl = pData.usl[d];
         let title = d === 'cifra' ? 'Цифра / ЧТ' : (d === 'mbt' ? 'МБТ' : 'КБТ');
         html += `
         <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="font-weight:bold; font-size:12px; margin-bottom:8px; color:var(--text-color); text-align:left;">${title}</div>
             <div style="display:grid; grid-template-columns: 35px 1fr 1fr 1fr; gap:6px; font-size:11px; text-align:center; align-items:center;">
-                <div></div> <div style="color:gray; font-size:9px; text-transform:uppercase;">ТО</div> <div style="color:gray; font-size:9px; text-transform:uppercase;">АКС</div> <div style="color:gray; font-size:9px; text-transform:uppercase;">УСЛ</div>
+                <div></div><div style="color:gray; font-size:9px; text-transform:uppercase;">ТО</div><div style="color:gray; font-size:9px; text-transform:uppercase;">АКС</div><div style="color:gray; font-size:9px; text-transform:uppercase;">УСЛ</div>
                 ${buildRow(dTo, dAks, dUsl, false)}
                 ${buildRow(dTo, dAks, dUsl, true)}
                 <div></div>
@@ -279,6 +257,7 @@ function renderPlanUI(pData) {
     area.innerHTML = html;
 }
 
+// Быстрое переключение дат в фильтре
 function setPlanDates(type, val = null) {
     let endD = new Date(); let startD = new Date();
     if (type === 'single') { if (val) { startD = new Date(val); endD = new Date(val); } }
@@ -295,19 +274,11 @@ function setPlanDates(type, val = null) {
 async function loadPlanHistory() {
     let startD = document.getElementById("plan-filter-start").value;
     let endD = document.getElementById("plan-filter-end").value;
-    let todayStr = new Date().toISOString().split('T')[0];
 
     showToast("Загрузка периода...", false, 9999);
     const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
 
     if (error) { showToast("Ошибка базы: " + error.message, true); return; }
-    
-    // Если в базе пусто, но запросили сегодняшний день - показываем кэш из гугл таблицы
-    if ((!plansData || plansData.length === 0) && endD === todayStr && window.currentRawGroups) {
-        document.getElementById("toast").classList.remove("show");
-        return renderPlanUI(calcPlanEngine({groups: window.currentRawGroups, totalPlan: window.currentTotalPlan}));
-    }
-
     if (!plansData || plansData.length === 0) { 
         showToast("За этот период данных нет", true); 
         document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; return; 
@@ -318,25 +289,32 @@ async function loadPlanHistory() {
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
     if (plansData.length > 1) {
-        aggregatedGroups.forEach(g => { g.fact = 0; g.ed = 0; g.plan = 0; });
+        aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; g.plan = 0; });
         plansData.forEach(day => {
             let groups = day.plan_data.groups;
             if (groups) {
                 groups.forEach((g, idx) => {
                     if (aggregatedGroups[idx]) {
-                        aggregatedGroups[idx].plan += parse(g.plan); // Суммируем план для дней
                         aggregatedGroups[idx].fact += parse(g.fact);
                         aggregatedGroups[idx].ed += parse(g.factEd || g.ed);
                     }
                 });
             }
         });
+        
+        let latestGroups = plansData[0].plan_data.groups;
+        if(latestGroups) {
+            latestGroups.forEach((g, idx) => {
+                if (aggregatedGroups[idx]) aggregatedGroups[idx].plan = parse(g.plan);
+            });
+        }
     }
 
-    let pData = calcPlanEngine({ groups: aggregatedGroups, totalPlan: plansData[0].plan_data.totalPlan });
+    let pData = calcPlanEngine(aggregatedGroups);
     renderPlanUI(pData);
 }
 
+// === ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ ===
 async function callBackend(actionName, payloadData = {}) { 
   try { 
     const getRoleGroup = (roleText) => {
@@ -778,8 +756,6 @@ function renderDashboardData(data, isSilent = false) {
       let adminPlanList = document.getElementById("admin-plan-list");
       if (adminPlanList) {
           window.currentPlanDataObj = data.adminPlan; 
-          window.currentRawGroups = data.adminPlan ? data.adminPlan.groups : [];
-          window.currentTotalPlan = data.adminPlan ? data.adminPlan.totalPlan : 0;
           
           let planFiltersExist = document.getElementById("plan-filter-start");
           if (!planFiltersExist) {
@@ -809,6 +785,10 @@ function renderDashboardData(data, isSilent = false) {
                         <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
                         <span style="color:gray; font-weight:bold;">-</span>
                         <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+                        <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
+                            <input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                            <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--inner-bg); color:var(--text-color);">📅</button>
+                        </div>
                         <button class="btn-green" style="margin:0; border-radius:8px; width:44px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="loadPlanHistory()">🔍</button>
                     </div>
                 </div>
@@ -816,7 +796,7 @@ function renderDashboardData(data, isSilent = false) {
               `;
               setTimeout(loadPlanHistory, 100);
           }
-      }
+      } 
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
       if (isUserPromoter) { 
