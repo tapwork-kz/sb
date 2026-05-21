@@ -515,6 +515,64 @@ async function callBackend(actionName, payloadData = {}) {
       const { data: allUsers } = await supabaseClient.from('users').select('iin, full_name, role, dept');
       const { data: allReqs } = await supabaseClient.from('requests').select('*').order('created_at', { ascending: false });
       const { data: allUserDetails } = await supabaseClient.from('user_details').select('*').order('created_at', { ascending: false });
+      
+      // === НОВЫЙ БЛОК: ЧИТАЕМ ПАРАМЕТРЫ КФ И ГОРЯЧИЕ ЧЕКИ ИЗ SUPABASE ===
+      const { data: kpiDataRaw } = await supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1);
+      
+      let freshHotChecks = [];
+      let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 };
+
+      if (kpiDataRaw && kpiDataRaw.length > 0) {
+          let rows = kpiDataRaw[0].data || [];
+          
+          // 1. Парсим настройки КФ и штрафы
+          rows.forEach(r => {
+              let pVal = parseFloat(String(r.col_d_penalty_val).replace(',', '.'));
+              if (r.col_a_kpi_name === 'Базовы') kpiCfg.base = parseFloat(String(r.col_b_kpi_val).replace(',', '.')) || 80;
+              if (r.col_c_penalty_name === 'Отзыв') kpiCfg.rev = pVal || -5;
+              if (r.col_c_penalty_name === 'Ревизия') kpiCfg.revsn = pVal || -5;
+              if (r.col_c_penalty_name === 'Проверка ценников') kpiCfg.price = pVal || -4;
+              if (r.col_c_penalty_name === 'Ген. уборка') kpiCfg.ub = pVal || -7;
+              if (r.col_c_penalty_name && r.col_c_penalty_name.includes('БЛ')) kpiCfg.bl = pVal || -1;
+              if (r.col_c_penalty_name && r.col_c_penalty_name.includes('ПР')) kpiCfg.pr = pVal || -10;
+          });
+
+          // 2. Парсим Горячие чеки в зависимости от отдела пользователя
+          let d = String(userData.dept).toLowerCase();
+          let nameCol, kpiCol, ptsCol;
+          if (d.includes("цифра") || d.includes("чт")) { nameCol = 'col_e_cifra_name'; kpiCol = 'col_f_cifra_kpi'; ptsCol = 'col_g_cifra_pts'; }
+          else if (d.includes("мбт")) { nameCol = 'col_h_mbt_name'; kpiCol = 'col_i_mbt_kpi'; ptsCol = 'col_j_mbt_pts'; }
+          else if (d.includes("кбт")) { nameCol = 'col_k_kbt_name'; kpiCol = 'col_l_kbt_kpi'; ptsCol = 'col_m_kbt_pts'; }
+          
+          if (nameCol) {
+              let currentSub = "";
+              rows.forEach(r => {
+                  let btnName = String(r[nameCol] || "").trim();
+                  if (!btnName) return;
+                  
+                  let btnVal = String(r[kpiCol] || "0").replace('%', '').replace(',', '.').trim();
+                  let btnPts = String(r[ptsCol] || "0").replace('%', '').replace(',', '.').trim();
+                  
+                  // Если название начинается со звездочки - это кнопка
+                  if (btnName.includes("*")) {
+                      freshHotChecks.push({
+                          sub: currentSub,
+                          name: btnName.replace(/\*/g, '').trim(),
+                          val: btnVal,
+                          pts: btnPts
+                      });
+                  } else {
+                      // Иначе это заголовок подгруппы (например "Услуги" или "Аксессуары")
+                      currentSub = btnName;
+                  }
+              });
+          }
+      }
+      
+      // Подменяем медленные данные из GAS на мгновенные из Supabase
+      if (freshHotChecks.length > 0) gasData.hotChecks = freshHotChecks;
+      if (gasData && gasData.info) gasData.info.baseKpi = kpiCfg.base;
+      // ===================================================================
 
       let userMap = {}; let adminEmployees = []; let empMap = {};
 
