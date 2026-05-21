@@ -136,13 +136,12 @@ function calcPlanEngine(rawPlanData) {
     return r;
 }
 
-// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ===
+// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ПЛАНА ===
 function renderPlanUI(pData) {
     let area = document.getElementById("plan-render-area");
     if (!area) return;
     if (!pData || !pData.to) { area.innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет данных за этот период</p>"; return; }
 
-    // Динамический цвет в зависимости от цели
     let getDynColor = (valStr, targetStr = "100") => {
         let val = parseFloat(String(valStr).replace(/\s/g, '').replace(',', '.')) || 0;
         let target = parseFloat(String(targetStr).replace(/\s/g, '').replace(',', '.')) || 100;
@@ -162,12 +161,12 @@ function renderPlanUI(pData) {
     let totalPct = totalPlan > 0 ? ((totalFact / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00";
     let totalPctEd = totalPlan > 0 ? ((totalFactEd / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00";
 
-    // 1. Сводка ОБЩАЯ
-    html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px;">
+    // 1. Сводка ОБЩАЯ (Белые фоны, серые рамки)
+    html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:none;">Общая сводка</div>
         
         <!-- ИТОГИ -->
-        <div style="background:var(--inner-bg); padding:10px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:12px;">
+        <div style="background:var(--card-bg); padding:10px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:12px;">
             <div style="color:#7f8c8d; font-size:12px; text-transform:uppercase; margin-bottom:8px; font-weight:bold; text-align:center; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">Итоговый показатель</div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
                 <div>
@@ -189,7 +188,7 @@ function renderPlanUI(pData) {
         </div>
 
         <!-- ТО -->
-        <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
+        <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Основной товарооборот</b>
                 <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.to.total.ed)}</span>
@@ -202,7 +201,7 @@ function renderPlanUI(pData) {
         </div>
 
         <!-- АКС -->
-        <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
+        <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
                 <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.aks.total.ed)}</span>
@@ -215,7 +214,7 @@ function renderPlanUI(pData) {
         </div>
 
         <!-- УСЛУГИ -->
-        <div style="background:var(--inner-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
+        <div style="background:var(--card-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
             </div>
@@ -230,9 +229,9 @@ function renderPlanUI(pData) {
     // 2. Номенклатурные группы
     if (pData.groups && pData.groups.length > 0) {
         html += `
-        <div class="inner-block card" style="margin-bottom:12px; padding:0; overflow:hidden; border:1px solid var(--border-color);">
+        <div class="inner-block card" style="margin-bottom:12px; padding:0; overflow:hidden; border:1px solid var(--border-color); background:var(--card-bg);">
             <div onclick="window.nomListOpen = !window.nomListOpen; document.getElementById('nom-list').classList.toggle('hidden'); document.getElementById('nom-icon').innerText = window.nomListOpen ? '▲' : '▼';" 
-                 style="padding:14px; display:flex; justify-content:space-between; align-items:center; background:rgba(150, 150, 150, 0.1); cursor:pointer; transition:0.3s;">
+                 style="padding:14px; display:flex; justify-content:space-between; align-items:center; background:rgba(150, 150, 150, 0.05); cursor:pointer; transition:0.3s;">
                 <span style="font-weight:bold; font-size:13px; color:var(--text-color);">Номенклатурные группы</span>
                 <span id="nom-icon" style="color:var(--text-color); font-size:12px; font-weight:bold;">${window.nomListOpen ? '▲' : '▼'}</span>
             </div>
@@ -244,7 +243,7 @@ function renderPlanUI(pData) {
                     let pctEd = (p > 0) ? ((fEd / p) * 100).toFixed(2).replace('.', ',') : "0,00";
                     
                     let hideEd = n.includes('сертификат') || n.includes('фишк') || n.includes('услуг');
-                    let edContent = hideEd ? '' : (e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(e)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:rgba(51, 144, 236, 0.1); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '');
+                    let edContent = hideEd ? '' : (e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(e)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '');
                     
                     return `
                     <div style="padding:10px 0; border-bottom:1px solid var(--border-color);">
@@ -263,7 +262,7 @@ function renderPlanUI(pData) {
     }
 
     // 3. Отделы
-    html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px;">
+    html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">Выполнение по отделам</div>`;
     let buildRow = (dTo, dAks, dUsl, isFact) => {
         let fTo = isFact ? dTo.fact : dTo.plan; let fAks = isFact ? dAks.fact : dAks.plan; let fUsl = isFact ? dUsl.fact : dUsl.plan;
@@ -280,7 +279,7 @@ function renderPlanUI(pData) {
         let dTo = pData.to[d]; let dAks = pData.aks[d]; let dUsl = pData.usl[d];
         let title = d === 'cifra' ? 'Цифра / ЧТ' : (d === 'mbt' ? 'МБТ' : 'КБТ');
         html += `
-        <div style="background:var(--inner-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
+        <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="font-weight:bold; font-size:12px; margin-bottom:8px; color:var(--text-color); text-align:left; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">${title}</div>
             <div style="display:grid; grid-template-columns: 35px 1fr 1fr 1fr; gap:6px; font-size:11px; text-align:center; align-items:center;">
                 <div></div> <div style="color:gray; font-size:9px; text-transform:uppercase;">ТО</div> <div style="color:gray; font-size:9px; text-transform:uppercase;">АКС</div> <div style="color:gray; font-size:9px; text-transform:uppercase;">УСЛ</div>
@@ -297,14 +296,14 @@ function renderPlanUI(pData) {
 
     // 4. План на продавца
     if (pData.sellers && pData.sellers.length > 0) {
-        html += `<div class="inner-block card" style="padding:12px;">
+        html += `<div class="inner-block card" style="padding:12px; background:var(--card-bg); border:1px solid var(--border-color);">
             <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">План на продавца</div>`;
         pData.sellers.forEach((s, idx) => {
             let isLast = idx === pData.sellers.length - 1;
             html += `
             <div style="padding:10px 0; border-bottom:${isLast ? 'none' : '1px solid var(--border-color)'};">
-                <div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:normal;">${s.name}</div>
-                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--inner-bg); padding:8px 12px; border-radius:8px;">
+                <div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:bold;">${s.name}</div>
+                <div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-bg); padding:8px 12px; border-radius:8px; border:1px solid var(--border-color);">
                     <div style="text-align:center;">
                         <div style="color:gray; font-size:9px;">ТО</div>
                         <div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.to)}</div>
@@ -313,14 +312,14 @@ function renderPlanUI(pData) {
                         <div style="color:gray; font-size:9px;">АКС</div>
                         <div style="display:flex; justify-content:center; align-items:center; gap:4px;">
                             <span style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.aks)}</span>
-                            <span style="background:rgba(150,150,150,0.1); color:gray; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:9px;">${s.aksPct}%</span>
+                            <span style="color:gray; font-weight:bold; font-size:9px;">${s.aksPct}%</span>
                         </div>
                     </div>
                     <div style="text-align:center;">
                         <div style="color:gray; font-size:9px;">УСЛ</div>
                         <div style="display:flex; justify-content:center; align-items:center; gap:4px;">
                             <span style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.usl)}</span>
-                            <span style="background:rgba(150,150,150,0.1); color:gray; padding:2px 4px; border-radius:4px; font-weight:bold; font-size:9px;">${s.uslPct}%</span>
+                            <span style="color:gray; font-weight:bold; font-size:9px;">${s.uslPct}%</span>
                         </div>
                     </div>
                 </div>
@@ -346,50 +345,39 @@ function setPlanDates(type, val = null) {
     loadPlanHistory();
 }
 
-async function loadPlanHistory() {
+// Загрузка плана СТРОГО из Supabase. 
+// isSilent отключает всплывающее окно при фоновом обновлении каждые 30 сек.
+async function loadPlanHistory(isSilent = false) {
     let startD = document.getElementById("plan-filter-start").value;
     let endD = document.getElementById("plan-filter-end").value;
-    let todayStr = formatDateLocal(new Date());
 
-    showToast("Загрузка периода...", false, 9999);
+    if (!isSilent) showToast("Загрузка периода...", false, 9999);
+    
+    // Идем ТОЛЬКО в Supabase, никаких резервных копий из Google
+    const { data: plansData, error } = await supabaseClient
+        .from('store_plans')
+        .select('*')
+        .gte('date', startD)
+        .lte('date', endD)
+        .order('date', { ascending: false });
 
-    // Если запрошен ТОЛЬКО сегодняшний день и данные свежие (еще не в Supabase)
-    if (startD === todayStr && endD === todayStr && window.currentRawGroups) {
-        document.getElementById("toast").classList.remove("show");
-        let pData = calcPlanEngine({groups: window.currentRawGroups, totalPlan: window.currentTotalPlan});
-        return renderPlanUI(pData);
-    }
-
-    const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
-
-    if (error) { showToast("Ошибка базы: " + error.message, true); return; }
-
-    let allPlans = plansData || [];
-
-    // Если в запрошенном периоде есть "Сегодня", но вечерняя выгрузка еще не прошла - подмешиваем живые данные!
-    let hasTodayInDb = allPlans.some(p => p.date === todayStr);
-    if (startD <= todayStr && endD >= todayStr && !hasTodayInDb && window.currentRawGroups) {
-        allPlans.unshift({
-            date: todayStr,
-            plan_data: { groups: window.currentRawGroups, totalPlan: window.currentTotalPlan }
-        });
-    }
-
-    if (allPlans.length === 0) { 
-        showToast("За этот период данных нет", true); 
-        document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; return; 
+    if (error) { if (!isSilent) showToast("Ошибка базы: " + error.message, true); return; }
+    if (!plansData || plansData.length === 0) { 
+        if (!isSilent) showToast("За этот период данных нет", true); 
+        document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; 
+        return; 
     }
     
     document.getElementById("toast").classList.remove("show");
 
-    let aggregatedGroups = JSON.parse(JSON.stringify(allPlans[0].plan_data.groups || []));
-    let aggTotalPlan = parseFloat(String(allPlans[0].plan_data.totalPlan || "0").replace(/\s/g, '').replace(',', '.')) || 0;
+    let aggregatedGroups = JSON.parse(JSON.stringify(plansData[0].plan_data.groups || []));
+    let aggTotalPlan = parseFloat(String(plansData[0].plan_data.totalPlan || "0").replace(/\s/g, '').replace(',', '.')) || 0;
     
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
 
-    if (allPlans.length > 1) {
+    if (plansData.length > 1) {
         aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; });
-        allPlans.forEach(day => {
+        plansData.forEach(day => {
             let groups = day.plan_data.groups;
             if (groups) {
                 groups.forEach((g, idx) => {
@@ -857,7 +845,8 @@ function renderDashboardData(data, isSilent = false) {
               
               adminPlanList.innerHTML = `
                 <style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style>
-                <div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg);">
+                <div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
+                    <!-- Отключаем свайп вкладок внутри этой ленты -->
                     <div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
@@ -867,27 +856,31 @@ function renderDashboardData(data, isSilent = false) {
                         </div>
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">Весь период</button>
                     </div>
+                    
                     <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
+                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+                        <span style="color:gray; font-weight:bold;">-</span>
+                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+                        
+                        <!-- Кнопка ДЕНЬ (календарик) перед лупой -->
                         <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
                             <input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
-                            <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--inner-bg); color:var(--text-color); font-size:16px;">📅</button>
+                            <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button>
                         </div>
-                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
-                        <span style="color:gray; font-weight:bold;">-</span>
-                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--inner-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
-                        <button class="btn-green" style="margin:0; border-radius:8px; width:44px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="loadPlanHistory()">🔍</button>
+                        
+                        <button class="btn-green" style="margin:0; border-radius:8px; width:44px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="loadPlanHistory(false)">🔍</button>
                     </div>
                 </div>
                 <div id="plan-render-area"></div>
               `;
-              setTimeout(loadPlanHistory, 100);
+              setTimeout(() => loadPlanHistory(true), 100);
           } else {
-              window.currentPlanDataObj = data.adminPlan; 
-              window.currentRawGroups = data.adminPlan ? data.adminPlan.groups : [];
-              window.currentTotalPlan = data.adminPlan ? data.adminPlan.totalPlan : 0;
-              loadPlanHistory();
+              // Если фильтры уже отрисованы, просто загружаем план без всплывающего окна
+              if (!isSensitiveState()) {
+                  loadPlanHistory(true);
+              }
           }
-      } 
+      }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
       if (isUserPromoter) { 
