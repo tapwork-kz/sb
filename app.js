@@ -497,6 +497,7 @@ async function callBackend(actionName, payloadData = {}) {
       const { data: userData, error: userErr } = await supabaseClient.from('users').select('*').eq('iin', appState.iin).single();
       if (userErr || !userData) return { authorized: false };
 
+      // Мы оставили запрос к GAS только для СЦ Товаров, всё остальное тянем из Supabase
       let gasData = null;
       try {
         const gasResponse = await fetch(GAS_URL, { 
@@ -505,27 +506,30 @@ async function callBackend(actionName, payloadData = {}) {
         });
         gasData = await gasResponse.json();
       } catch (e) { console.error("Ошибка GAS:", e); }
-
-      if (!gasData || !gasData.info || gasData.info.isReal === false) {
-          try { let cached = JSON.parse(localStorage.getItem("dashData_" + appState.iin)); if (cached && cached.info) { gasData = { info: cached.info, scItems: cached.scItems, adminPlan: cached.adminPlan, tradeInModels: cached.tradeInModels, hotChecks: cached.hotChecks }; } } catch(e){}
-      }
+      
       gasData = gasData || {};
-      if (!gasData.info) gasData.info = { kpiValue: "-", ptsLeft: 0, ptsAccrued: 0, ptsUsed: 0, ptsFine: 0, tabel: {bs:0, bl:0, pr:0, ot:0, rd:0}, kpiDetails: [], reports: [], myPtsHistory: [], remarks: [] };
 
-      const { data: allUsers } = await supabaseClient.from('users').select('iin, full_name, role, dept');
-      const { data: allReqs } = await supabaseClient.from('requests').select('*').order('created_at', { ascending: false });
-      const { data: allUserDetails } = await supabaseClient.from('user_details').select('*').order('created_at', { ascending: false });
-      
-      // === НОВЫЙ БЛОК: ЧИТАЕМ ПАРАМЕТРЫ КФ И ГОРЯЧИЕ ЧЕКИ ИЗ SUPABASE ===
-      const { data: kpiDataRaw } = await supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1);
-      
-      let freshHotChecks = [];
+      // Загружаем всё из Supabase мгновенно!
+      const [
+          { data: allUsers },
+          { data: allReqs },
+          { data: allUserDetails },
+          { data: kpiDataRaw },
+          { data: allSheetInfo }
+      ] = await Promise.all([
+          supabaseClient.from('users').select('iin, full_name, role, dept'),
+          supabaseClient.from('requests').select('*').order('created_at', { ascending: false }),
+          supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }),
+          supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1),
+          supabaseClient.from('user_sheet_info').select('*')
+      ]);
+
+      // Парсим KPI
       let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 };
+      let freshHotChecks = [];
 
       if (kpiDataRaw && kpiDataRaw.length > 0) {
           let rows = kpiDataRaw[0].data || [];
-          
-          // 1. Парсим настройки КФ и штрафы
           rows.forEach(r => {
               let pVal = parseFloat(String(r.col_d_penalty_val).replace(',', '.'));
               if (r.col_a_kpi_name === 'Базовы') kpiCfg.base = parseFloat(String(r.col_b_kpi_val).replace(',', '.')) || 80;
@@ -537,7 +541,6 @@ async function callBackend(actionName, payloadData = {}) {
               if (r.col_c_penalty_name && r.col_c_penalty_name.includes('ПР')) kpiCfg.pr = pVal || -10;
           });
 
-          // 2. Парсим Горячие чеки в зависимости от отдела пользователя
           let d = String(userData.dept).toLowerCase();
           let nameCol, kpiCol, ptsCol;
           if (d.includes("цифра") || d.includes("чт")) { nameCol = 'col_e_cifra_name'; kpiCol = 'col_f_cifra_kpi'; ptsCol = 'col_g_cifra_pts'; }
@@ -549,43 +552,79 @@ async function callBackend(actionName, payloadData = {}) {
               rows.forEach(r => {
                   let btnName = String(r[nameCol] || "").trim();
                   if (!btnName) return;
-                  
                   let btnVal = String(r[kpiCol] || "0").replace('%', '').replace(',', '.').trim();
                   let btnPts = String(r[ptsCol] || "0").replace('%', '').replace(',', '.').trim();
-                  
-                  // Если название начинается со звездочки - это кнопка
-                  if (btnName.includes("*")) {
-                      freshHotChecks.push({
-                          sub: currentSub,
-                          name: btnName.replace(/\*/g, '').trim(),
-                          val: btnVal,
-                          pts: btnPts
-                      });
-                  } else {
-                      // Иначе это заголовок подгруппы (например "Услуги" или "Аксессуары")
-                      currentSub = btnName;
-                  }
+                  if (btnName.includes("*")) { freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); } 
+                  else { currentSub = btnName; }
               });
           }
       }
       
-      // Подменяем медленные данные из GAS на мгновенные из Supabase
       if (freshHotChecks.length > 0) gasData.hotChecks = freshHotChecks;
-      if (gasData && gasData.info) gasData.info.baseKpi = kpiCfg.base;
-      // ===================================================================
 
+      // === ПОДГОТОВКА СОТРУДНИКОВ НА БАЗЕ SUPABASE "ИНФО" ===
       let userMap = {}; let adminEmployees = []; let empMap = {};
 
       if (allUsers) {
           allUsers.forEach(u => {
               userMap[u.iin] = u;
+              let sInfo = (allSheetInfo || []).find(s => String(s.iin) === String(u.iin)) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
+              
+              let kpiVal = kpiCfg.base;
+              let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }];
+              let repErrors = 0;
+              let directPenaltyPoints = 0;
+              
+              sInfo.reports_data.forEach(rep => {
+                  repErrors += rep.errors;
+                  directPenaltyPoints += (rep.penaltySum || 0); // Собираем суммы из Q, W, AC...
+                  
+                  let penalty = 0;
+                  if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) penalty = rep.errors * kpiCfg.price;
+                  else if (rep.title.includes("Ревизия")) penalty = rep.errors * kpiCfg.revsn;
+                  else if (rep.title.includes("уборка")) penalty = rep.errors * kpiCfg.ub;
+                  else if (rep.title.includes("Отзыв")) penalty = rep.errors * kpiCfg.rev;
+                  
+                  if (penalty !== 0) {
+                      kpiVal += penalty;
+                      kDetails.push({ name: "Ошибки", source: rep.title, val: penalty, date: "" });
+                  }
+              });
+              
+              let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0;
+              let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0;
+              let blPen = bBl * kpiCfg.bl;
+              let prPen = bPr * kpiCfg.pr;
+              kpiVal += blPen + prPen;
+              if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" });
+              if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
+
               if (!u.role.toLowerCase().includes("директор")) {
-                  let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: u.role || 'Продавец', kpi: gasData.info?.baseKpi || 90, kpiDetails: [], pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: [], ptsHistory: [], remarks: [], tabelStr: "<span style='color:gray; font-size:11px;'>Нет данных</span>" };
-                  adminEmployees.push(emp); empMap[u.iin] = emp;
+                  let emp = { 
+                      iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: u.role || 'Продавец', 
+                      kpi: kpiVal, kpiDetails: kDetails, 
+                      pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, 
+                      reportErrors: repErrors, reports: sInfo.reports_data, 
+                      ptsHistory: [], remarks: [], 
+                      tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`,
+                      rawTabel: sInfo.tabel_data,
+                      directPenaltyPoints: directPenaltyPoints
+                  };
+                  adminEmployees.push(emp); 
+                  empMap[u.iin] = emp;
               }
           });
       }
       window.adminEmployeesGlobal = adminEmployees;
+
+      // Устанавливаем инфо для текущего пользователя
+      let myEmp = empMap[appState.iin];
+      if (!myEmp) {
+          let mySheet = (allSheetInfo || []).find(s => String(s.iin) === String(appState.iin)) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
+          gasData.info = { tabel: mySheet.tabel_data, reports: mySheet.reports_data, kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] };
+      } else {
+          gasData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] };
+      }
 
       let myPtsHistory = []; let myKpiChanges = 0;
 
@@ -609,10 +648,16 @@ async function callBackend(actionName, payloadData = {}) {
           });
       }
 
-      adminEmployees.forEach(e => { e.pts.rem = e.pts.acc - e.pts.use - e.pts.fin; });
+      adminEmployees.forEach(e => { 
+          // Вычитаем из баллов сотрудника те штрафы, что пришли из листов (Q, W, AC...)
+          e.pts.rem = e.pts.acc - e.pts.use - e.pts.fin + e.directPenaltyPoints; 
+      });
       let myAcc=0, myUse=0, myFin=0;
       myPtsHistory.forEach(h => { let pts = parseFloat(String(h.val).replace('+','').replace(',','.')) || 0; if (h.type === "Начисление") myAcc += pts; if (h.type === "Использование") myUse += Math.abs(pts); if (h.type === "Штраф") myFin += Math.abs(pts); });
-      gasData.info.myPtsHistory = myPtsHistory; gasData.info.ptsAccrued = myAcc; gasData.info.ptsUsed = myUse; gasData.info.ptsFine = myFin; gasData.info.ptsLeft = myAcc - myUse - myFin;
+      gasData.info.myPtsHistory = myPtsHistory; gasData.info.ptsAccrued = myAcc; gasData.info.ptsUsed = myUse; 
+      gasData.info.ptsFine = myFin + Math.abs(gasData.info.directPenaltyPoints || 0); 
+      // Применяем штрафы листа (directPenaltyPoints отрицательные, поэтому просто плюсуем)
+      gasData.info.ptsLeft = myAcc - myUse - myFin + (gasData.info.directPenaltyPoints || 0);
       if (!isNaN(gasData.info.kpiValue)) gasData.info.kpiValue = parseFloat(gasData.info.kpiValue) + myKpiChanges;
 
       let userInbox = [], userHistory = [], adminInbox = [], adminHistory = [];
@@ -661,15 +706,6 @@ async function callBackend(actionName, payloadData = {}) {
 
       return { authorized: true, role: userData.role, name: userData.full_name, dept: userData.dept, isPromoter: userData.role.toLowerCase().includes("промоутер"), scItems: gasData.scItems || [], adminPlan: gasData.adminPlan || null, tradeInModels: gasData.tradeInModels || [], hotChecks: gasData.hotChecks || [], info: gasData.info, userHistory: userHistory, userInbox: userInbox, adminInbox: adminInbox, adminHistory: adminHistory, adminEmployees: adminEmployees };
     }
-
-    if (actionName === "submitRequest") {
-      const { type, details, targetIin, metadata } = payloadData; let finalStatus = "pending_admin"; if (type === "Обмен сменами") finalStatus = "pending_user";
-      const { error } = await supabaseClient.from('requests').insert([{ author_iin: appState.iin, type: type, details: details, target_iin: targetIin, metadata: metadata ? JSON.parse(metadata) : {}, status: finalStatus }]);
-      if (error) return { success: false, error: error.message }; return { success: true };
-    } 
-
-  } catch (error) { console.error("Критическая ошибка:", error); return { success: false, error: "Системная ошибка сети или базы данных" }; }
-}
 
 function vibrate(ms = 50) { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); else if (navigator.vibrate) navigator.vibrate(ms); }
 
