@@ -101,7 +101,6 @@ function calcPlanEngine(rawPlanData) {
                 catObj[k].targetPct = safePctTo(catObj[k].plan, toObj.plan);
                 catObj[k].pct = safePctTo(catObj[k].fact, toObj.fact);
                 catObj[k].pctEd = safePctTo(fEd, toFEd);
-                
                 catObj[k].sumPct = safePctTo(catObj[k].fact, catObj[k].plan);
                 catObj[k].sumPctEd = safePctTo(fEd, catObj[k].plan);
             }
@@ -110,13 +109,12 @@ function calcPlanEngine(rawPlanData) {
 
     setPcts(r.to, true); setPcts(r.aks, false); setPcts(r.usl, false);
 
-    // СТРОГИЙ ПОДСЧЕТ ПРОДАВЦОВ (Только Продавец-консультант)
+    // СТРОГИЙ ПОДСЧЕТ ПРОДАВЦОВ
     let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
             let d = String(e.dept).toLowerCase().trim();
             let role = String(e.role || "").toLowerCase().trim();
-            
             if (role.includes('продавец-консультант') || role.includes('продавец консультант')) {
                 if (d === 'цифра' || d === 'чт' || d === 'цифра/чт') sCount.cifra++;
                 else if (d === 'мбт') sCount.mbt++;
@@ -125,6 +123,7 @@ function calcPlanEngine(rawPlanData) {
         });
     }
     
+    // План на продавца
     let sPlan = (cat, dept, count) => count > 0 ? Math.round(r[cat][dept].plan / count) : r[cat][dept].plan;
     let getRatio = (cat, dept) => r.to[dept].plan > 0 ? ((r[cat][dept].plan / r.to[dept].plan) * 100).toFixed(2).replace('.', ',') : "0,00";
     
@@ -137,7 +136,7 @@ function calcPlanEngine(rawPlanData) {
     return r;
 }
 
-// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ===
+// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ПЛАНА ===
 function renderPlanUI(pData) {
     let area = document.getElementById("plan-render-area");
     if (!area) return;
@@ -166,6 +165,7 @@ function renderPlanUI(pData) {
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px; text-transform:none;">Общая сводка</div>
         
+        <!-- ИТОГИ -->
         <div style="background:var(--card-bg); padding:10px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:12px;">
             <div style="color:#7f8c8d; font-size:12px; text-transform:uppercase; margin-bottom:8px; font-weight:bold; text-align:center; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">Итоговый показатель</div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
@@ -187,6 +187,7 @@ function renderPlanUI(pData) {
             </div>
         </div>
 
+        <!-- ТО -->
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Основной товарооборот</b>
@@ -199,6 +200,7 @@ function renderPlanUI(pData) {
             </div>
         </div>
 
+        <!-- АКС -->
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
@@ -211,6 +213,7 @@ function renderPlanUI(pData) {
             </div>
         </div>
 
+        <!-- УСЛУГИ -->
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
@@ -299,7 +302,7 @@ function renderPlanUI(pData) {
             let isLast = idx === pData.sellers.length - 1;
             html += `
             <div style="padding:10px 0; border-bottom:${isLast ? 'none' : '1px solid var(--border-color)'};">
-                <div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:normal;">${s.name}</div>
+                <div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:bold;">${s.name}</div>
                 <div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-bg); padding:8px 12px; border-radius:8px; border:1px solid var(--border-color);">
                     <div style="text-align:center;">
                         <div style="color:gray; font-size:9px;">ТО</div>
@@ -332,7 +335,7 @@ function renderPlanUI(pData) {
 function setPlanDates(type, val = null) {
     let endD = new Date(); let startD = new Date();
     if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
-    else if (type === 'today') { } // По умолчанию даты и так сегодня
+    else if (type === 'today') { } 
     else if (type === 'yesterday') { startD.setDate(startD.getDate() - 1); endD.setDate(endD.getDate() - 1); } 
     else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } else { startD.setDate(1); } } 
     else if (type === 'all') { startD = new Date(2024, 0, 1); }
@@ -348,12 +351,18 @@ async function loadPlanHistory(isSilent = false) {
 
     if (!isSilent) showToast("Загрузка периода...", false, 9999);
     
-    const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
+    const { data: plansData, error } = await supabaseClient
+        .from('store_plans')
+        .select('*')
+        .gte('date', startD)
+        .lte('date', endD)
+        .order('date', { ascending: false });
 
     if (error) { if (!isSilent) showToast("Ошибка базы: " + error.message, true); return; }
     if (!plansData || plansData.length === 0) { 
         if (!isSilent) showToast("За этот период данных нет", true); 
-        document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; return; 
+        document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; 
+        return; 
     }
     
     document.getElementById("toast").classList.remove("show");
@@ -384,6 +393,7 @@ async function loadPlanHistory(isSilent = false) {
     renderPlanUI(pData);
 }
 
+// === ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ ===
 async function callBackend(actionName, payloadData = {}) { 
   try { 
     const getRoleGroup = (roleText) => {
@@ -480,6 +490,22 @@ async function callBackend(actionName, payloadData = {}) {
       return { success: true };
     }
 
+    // Добавленный блок, который отправляет заявки (был удален)
+    if (actionName === "submitRequest") {
+      const { type, details, targetIin, metadata } = payloadData;
+      let metaObj = {}; try { metaObj = metadata ? JSON.parse(metadata) : {}; } catch(e) {}
+      const { error } = await supabaseClient.from('requests').insert([{
+          author_iin: appState.iin,
+          type: type,
+          details: details,
+          target_iin: targetIin,
+          status: "pending",
+          metadata: metaObj
+      }]);
+      if (error) return { success: false, error: error.message };
+      return { success: true };
+    }
+
     if (actionName === "getDashboardData") {
       const { data: userData, error: userErr } = await supabaseClient.from('users').select('*').eq('iin', appState.iin).single();
       if (userErr || !userData) return { authorized: false };
@@ -492,12 +518,8 @@ async function callBackend(actionName, payloadData = {}) {
         });
         gasData = await gasResponse.json();
       } catch (e) { console.error("Ошибка GAS:", e); }
-
-      if (!gasData || !gasData.info || gasData.info.isReal === false) {
-          try { let cached = JSON.parse(localStorage.getItem("dashData_" + appState.iin)); if (cached && cached.info) { gasData = { info: cached.info, scItems: cached.scItems, adminPlan: cached.adminPlan, tradeInModels: cached.tradeInModels, hotChecks: cached.hotChecks }; } } catch(e){}
-      }
+      
       gasData = gasData || {};
-      if (!gasData.info) gasData.info = { kpiValue: "-", ptsLeft: 0, ptsAccrued: 0, ptsUsed: 0, ptsFine: 0, tabel: {bs:0, bl:0, pr:0, ot:0, rd:0}, kpiDetails: [], reports: [], myPtsHistory: [], remarks: [] };
 
       const [
           { data: allUsers },
@@ -564,7 +586,7 @@ async function callBackend(actionName, payloadData = {}) {
               
               sInfo.reports_data.forEach(rep => {
                   repErrors += rep.errors;
-                  directPenaltyPoints += (rep.penaltySum || 0); 
+                  directPenaltyPoints += (rep.penaltySum || 0);
                   
                   let penalty = 0;
                   if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) penalty = rep.errors * kpiCfg.price;
@@ -690,6 +712,11 @@ async function callBackend(actionName, payloadData = {}) {
 
       return { authorized: true, role: userData.role, name: userData.full_name, dept: userData.dept, isPromoter: userData.role.toLowerCase().includes("промоутер"), scItems: gasData.scItems || [], adminPlan: gasData.adminPlan || null, tradeInModels: gasData.tradeInModels || [], hotChecks: gasData.hotChecks || [], info: gasData.info, userHistory: userHistory, userInbox: userInbox, adminInbox: adminInbox, adminHistory: adminHistory, adminEmployees: adminEmployees };
     }
+  } catch (error) {
+    console.error("CallBackend Error:", error);
+    return { success: false, error: error.message };
+  }
+}
 
 function vibrate(ms = 50) { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); else if (navigator.vibrate) navigator.vibrate(ms); }
 
@@ -924,6 +951,7 @@ function renderDashboardData(data, isSilent = false) {
               adminPlanList.innerHTML = `
                 <style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style>
                 <div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
+                    <!-- Отключаем свайп вкладок внутри этой ленты -->
                     <div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
@@ -939,6 +967,7 @@ function renderDashboardData(data, isSilent = false) {
                         <span style="color:gray; font-weight:bold;">-</span>
                         <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
                         
+                        <!-- Кнопка ДЕНЬ (календарик) перед лупой -->
                         <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
                             <input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                             <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button>
@@ -955,7 +984,7 @@ function renderDashboardData(data, isSilent = false) {
                   loadPlanHistory(true);
               }
           }
-      } 
+      }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
       if (isUserPromoter) { 
