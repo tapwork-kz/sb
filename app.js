@@ -521,25 +521,22 @@ async function callBackend(actionName, payloadData = {}) {
       
       gasData = gasData || {};
 
-      // ... внутри getDashboardData
       const [
-      { data: allUsers },
-      { data: allReqs },
-      { data: allUserDetails },
-      { data: kpiDataRaw },
-      { data: allSheetInfo },
-      { data: scItemsRaw } // <--- ДОБАВЛЯЕМ СЮДА
+          { data: allUsers },
+          { data: allReqs },
+          { data: allUserDetails },
+          { data: kpiDataRaw },
+          { data: allSheetInfo }
       ] = await Promise.all([
-        supabaseClient.from('users').select('iin, full_name, role, dept'),
-        supabaseClient.from('requests').select('*').order('created_at', { ascending: false }),
-        supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }),
-        supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1),
-        supabaseClient.from('user_sheet_info').select('*'),
-        supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1) // <--- И СЮДА
+          supabaseClient.from('users').select('iin, full_name, role, dept'),
+          supabaseClient.from('requests').select('*').order('created_at', { ascending: false }),
+          supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }),
+          supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1),
+          supabaseClient.from('user_sheet_info').select('*')
       ]);
 
-      // И затем внизу, вместо того чтобы брать из gasData, берем прямо из массива
-      gasData.scItems = (scItemsRaw && scItemsRaw.length > 0) ? scItemsRaw[0].items_data : [];
+      let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 };
+      let freshHotChecks = [];
 
       if (kpiDataRaw && kpiDataRaw.length > 0) {
           let rows = kpiDataRaw[0].data || [];
