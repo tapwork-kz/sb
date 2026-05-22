@@ -545,7 +545,7 @@ async function callBackend(actionName, payloadData = {}) {
           supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1),
           supabaseClient.from('user_sheet_info').select('*'),
           supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1),
-          supabaseClient.from('trade_in_models').select('model_name').order('id', { ascending: true }) // <--- НОВОЕ
+          supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }) // <--- НОВОЕ
       ]);
 
       // БЕРЕМ СЦ ТОВАРЫ ИЗ БАЗЫ
