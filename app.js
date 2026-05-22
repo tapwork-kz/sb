@@ -575,7 +575,24 @@ async function callBackend(actionName, payloadData = {}) {
                   newDetails = req.details + "\n[" + currentUser.full_name + "]";
                   if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: req.author_iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0 }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
-                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In") { let isTradeIn = reqType === "Продажа Trade-In"; let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: 3 }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In") { 
+                  let isTradeIn = reqType === "Продажа Trade-In"; 
+                  let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); 
+                  let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); 
+                  await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: 3 }]); 
+                  newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
+
+                  if (reqType === "Продажа СЦ/Фокус" && metaObj.row && metaObj.dept) {
+                      const todayStr = formatDateLocal(new Date());
+                      const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle();
+                      if (scData && scData.items_data) {
+                          let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type));
+                          await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr);
+                      }
+                      // Пингуем GAS для мгновенного проставления галочки (если настроено на бэке)
+                      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{});
+                  }
+              }
                   else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
               }
@@ -759,8 +776,15 @@ async function callBackend(actionName, payloadData = {}) {
 
               if (kpiChange !== 0) {
                   let kpiItem = { name: ud.type === "Горячий чек" ? ud.action_text : (ud.type === "Продажа СЦ/Фокус" ? ud.action_text : ud.type), source: ud.type === "Продажа СЦ/Фокус" ? (ud.category || "СЦ") : ud.type, val: kpiChange, date: dateStr };
-                  // Убрали дублирующий push, теперь он записывается только 1 раз!
-                  if (empMap[ud.iin]) { empMap[ud.iin].kpi += kpiChange; empMap[ud.iin].kpiDetails.push(kpiItem); }
+                  if (ud.iin === appState.iin) { 
+                      if (!localData.info.kpiDetails) localData.info.kpiDetails = []; 
+                      localData.info.kpiDetails.push(kpiItem); 
+                      myKpiChanges += kpiChange; 
+                  }
+                  if (empMap[ud.iin]) { 
+                      empMap[ud.iin].kpi += kpiChange; 
+                      if (ud.iin !== appState.iin) empMap[ud.iin].kpiDetails.push(kpiItem); 
+                  }
               }
           });
       }
@@ -878,6 +902,7 @@ function groupAndRenderByMonth(itemsArray, renderItemFn) {
 document.addEventListener("DOMContentLoaded", async () => {
   try {
       requestNotificationPermission(); initAutoScroll(); initSmartDates(); initSwipe(); 
+      if(document.getElementById('password-input')) { document.getElementById('password-input').style.width = '100%'; document.getElementById('password-input').style.boxSizing = 'border-box'; }
       const urlParams = new URLSearchParams(window.location.search); const urlIin = urlParams.get('iin');
       if (appState.iin && appState.token) { 
           document.getElementById("auth-screen").classList.add("hidden"); document.getElementById("main-screen").classList.remove("hidden"); 
@@ -963,8 +988,8 @@ function startPolling() {
 
 document.addEventListener('touchstart', function(e) { 
     if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) { 
-        // Не закрываем клавиатуру, если мы кликнули на ДРУГОЕ поле ввода
-        if (!document.activeElement.contains(e.target) && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA') { 
+        let isButton = e.target.closest('button') || e.target.tagName === 'BUTTON';
+        if (!document.activeElement.contains(e.target) && e.target.tagName !== 'INPUT' && e.target.tagName !== 'TEXTAREA' && !isButton) { 
             document.activeElement.blur(); 
         } 
     } 
@@ -1282,7 +1307,20 @@ function renderDashboardData(data, isSilent = false) {
       for(let sub in groups) {
           if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
           let colsCount = Math.min(groups[sub].length, 4); hcHtml += `<div style="display: grid; grid-template-columns: repeat(${colsCount}, 1fr); gap: 6px; margin-bottom: 6px;">`;
-          groups[sub].forEach(btn => { let combinedName = sub ? `${sub} ${btn.name}` : btn.name; let badgeHtml = ""; let ptsVal = parseFloat(String(btn.pts || "0").replace(',', '.')); if (ptsVal > 0) { badgeHtml = `<span style="position:absolute; top:-8px; right:-6px; background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 5px; border-radius:10px; border: 2px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2); z-index: 5;">+${btn.pts}</span>`; } hcHtml += `<div style="position:relative; display:flex; flex:1;"><button class="btn-green" style="padding:10px 4px; font-size:12px; margin:0; width:100%;" onclick="submitHotCheck('${combinedName}', '${btn.val}', '${btn.pts || 0}')">${btn.name}</button>${badgeHtml}</div>`; }); hcHtml += `</div>`;
+          groups[sub].forEach(btn => { 
+              let combinedName = sub ? `${sub} ${btn.name}` : btn.name; 
+              let badgeHtml = ""; 
+              let ptsVal = parseFloat(String(btn.pts || "0").replace(',', '.')); 
+              let kpiBonus = parseFloat(String(btn.val || "0").replace(',', '.')); 
+              if (ptsVal > 0 || kpiBonus > 0) { 
+                  badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`;
+                  if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${btn.val}%</span>`;
+                  if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${btn.pts}</span>`;
+                  badgeHtml += `</div>`;
+              } 
+              hcHtml += `<div style="position:relative; display:flex; flex:1;"><button class="btn-green" style="padding:10px 4px; font-size:12px; margin:0; width:100%;" onclick="submitHotCheck('${combinedName}', '${btn.val}', '${btn.pts || 0}')">${btn.name}</button>${badgeHtml}</div>`; 
+          }); 
+          hcHtml += `</div>`;
       }
       hcCard.innerHTML = hcHtml; hcCard.classList.remove("hidden");
   } else if (hcCard) { hcCard.classList.add("hidden"); }
@@ -1606,17 +1644,7 @@ function renderScItems() {
   let scList = globalScItems.filter(i => i.dept === currentScTabDept && i.type === 'СЦ'); if (q) scList = scList.filter(i => i.name.toLowerCase().includes(q));
   let focusList = globalScItems.filter(i => i.dept === currentScTabDept && i.type === 'Фокус'); if (q) focusList = focusList.filter(i => i.name.toLowerCase().includes(q)); let sortedFiltered = [...scList, ...focusList];
   if (sortedFiltered.length === 0) { list.innerHTML = "<p style='padding:12px; color:gray; font-size:12px; text-align:center;'>Ничего не найдено</p>"; return; }
-  sortedFiltered.forEach(i => { 
-      let div = document.createElement("div"); 
-      let isSelected = (selectedScItem && selectedScItem.row === i.row && selectedScItem.type === i.type && selectedScItem.dept === i.dept); 
-      div.className = "sc-item" + (isSelected ? " selected" : ""); 
-      let typeCol = i.type === 'СЦ' ? '#e67e22' : '#e74c3c'; let ptNoun = formatPointsNoun(i.pts); let ptsText = i.type === 'СЦ' ? '2 балла' : `${String(i.pts).replace('.', ',')} ${ptNoun}`; let deptLabel = i.type === 'Фокус' ? `<span style="color:gray; font-weight:normal;"> (${i.dept})</span>` : ''; 
-      
-      let checkIcon = isSelected ? `<div style="color:white; background:#27ae60; border-radius:50%; width:20px; height:20px; display:flex; align-items:center; justify-content:center; font-size:11px; margin-left:12px; flex-shrink:0;">✔</div>` : ``;
-      div.innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><div style="flex:1;"><div style="margin-bottom:4px; font-size:13px;">${i.name}${deptLabel}</div><div style="display:flex; justify-content:space-between; align-items:center;"><div class="type-label" style="font-size:10px; color:${typeCol}; font-weight:bold;">${i.type} — ${ptsText}</div>${i.discount ? `<div style="font-weight:bold; color:#e74c3c; font-size:11px;">-${i.discount.replace(/%/g, '% ')}</div>` : ''}</div></div>${checkIcon}</div>`; 
-      div.onclick = () => { selectedScItem = i; let docBtn = document.getElementById("btn-act-doc"); if (i.docUrl) { docBtn.style.opacity = "1"; docBtn.style.pointerEvents = "auto"; } else { docBtn.style.opacity = "0.3"; docBtn.style.pointerEvents = "none"; } renderScItems(); }; 
-      list.appendChild(div); 
-  });
+  sortedFiltered.forEach(i => { let div = document.createElement("div"); let isSelected = (selectedScItem && selectedScItem.row === i.row && selectedScItem.type === i.type && selectedScItem.dept === i.dept); div.className = "sc-item" + (isSelected ? " selected" : ""); let typeCol = i.type === 'СЦ' ? '#e67e22' : '#e74c3c'; let ptNoun = formatPointsNoun(i.pts); let ptsText = i.type === 'СЦ' ? '2 балла' : `${String(i.pts).replace('.', ',')} ${ptNoun}`; let deptLabel = i.type === 'Фокус' ? `<span style="color:gray; font-weight:normal;"> (${i.dept})</span>` : ''; div.innerHTML = `<div><div style="margin-bottom:4px; font-size:13px;">${i.name}${deptLabel}</div><div style="display:flex; justify-content:space-between; align-items:center;"><div class="type-label" style="font-size:10px; color:${typeCol}; font-weight:bold;">${i.type} — ${ptsText}</div>${i.discount ? `<div style="font-weight:bold; color:#e74c3c; font-size:11px;">-${i.discount.replace(/%/g, '% ')}</div>` : ''}</div></div>`; div.onclick = () => { selectedScItem = i; let docBtn = document.getElementById("btn-act-doc"); if (i.docUrl) { docBtn.style.opacity = "1"; docBtn.style.pointerEvents = "auto"; } else { docBtn.style.opacity = "0.3"; docBtn.style.pointerEvents = "none"; } renderScItems(); }; list.appendChild(div); });
 }
 
 function openScDoc() { if (selectedScItem && selectedScItem.docUrl) { if (tg && tg.openLink) tg.openLink(selectedScItem.docUrl); else window.open(selectedScItem.docUrl, '_blank'); } }
