@@ -733,10 +733,16 @@ async function callBackend(actionName, payloadData = {}) {
           adminInbox: adminInbox, 
           adminHistory: adminHistory, 
           adminEmployees: adminEmployees 
+          adminEmployees: adminEmployees 
       };
     }
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
 
 function vibrate(ms = 50) { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); else if (navigator.vibrate) navigator.vibrate(ms); }
+
 
 let autoScrollAnimation = true; let activeOutsTimer = null; let globalActiveOuts = []; let isUserPromoter = false; let currentAdminScDept = 'Цифра'; let currentEmpDept = 'Цифра'; let currentScTabDept = 'Цифра'; let pollingTimer = null; let lastActiveTab = 'time'; let processedReqIds = new Set(); let tradeInModelsGlobal = []; let selectedTradeInModel = null;
 
