@@ -418,10 +418,18 @@ async function callBackend(actionName, payloadData = {}) {
       if (!isReturn) {
          const dayOfWeek = new Date().getDay() || 7; 
          const limitField = actionType === 'Обед' ? 'lunch_limit' : (actionType === 'Полдник' ? 'snack_limit' : 'break_limit');
-         const { data: limitData } = await supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).single();
-         const maxAllowed = limitData ? limitData[limitField] : 1; const totalAllowed = limitData ? limitData.total_limit : 2;
+         
+         // МГНОВЕННАЯ СКОРОСТЬ: Запускаем оба запроса параллельно и используем maybeSingle()
          const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-         const { data: todayLogs } = await supabaseClient.from('time_tracking').select('*').eq('role_group', roleGroup).gte('created_at', todayStart.toISOString());
+         const [
+            { data: limitData },
+            { data: todayLogs }
+         ] = await Promise.all([
+            supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(),
+            supabaseClient.from('time_tracking').select('*').eq('role_group', roleGroup).gte('created_at', todayStart.toISOString())
+         ]);
+
+         const maxAllowed = limitData ? limitData[limitField] : 1; const totalAllowed = limitData ? limitData.total_limit : 2;
          let userStates = {}; (todayLogs || []).forEach(log => { if (log.direction === 'Уход') userStates[log.iin] = log.action_type; if (log.direction === 'Возврат') delete userStates[log.iin]; });
          let activeCounts = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
          for (let key in userStates) { activeCounts[userStates[key]]++; totalOut++; }
@@ -434,9 +442,17 @@ async function callBackend(actionName, payloadData = {}) {
 
     if (actionName === "startupCheck") {
       const roleGroup = getRoleGroup(); const dayOfWeek = new Date().getDay() || 7;
-      const { data: limitData } = await supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).single();
       const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-      const { data: todayLogs } = await supabaseClient.from('time_tracking').select('*, users(full_name)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true });
+      
+      // МГНОВЕННАЯ СКОРОСТЬ: Запускаем оба запроса параллельно и используем maybeSingle()
+      const [
+         { data: limitData },
+         { data: todayLogs }
+      ] = await Promise.all([
+         supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(),
+         supabaseClient.from('time_tracking').select('*, users(full_name)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true })
+      ]);
+
       let activeOutsMap = {}; (todayLogs || []).forEach(log => { if (log.direction === 'Уход') { activeOutsMap[log.iin] = { action: log.action_type, leftAt: new Date(log.created_at).getTime(), name: log.users ? log.users.full_name : 'Сотрудник', role: log.role_group }; } else { delete activeOutsMap[log.iin]; } });
       let myActiveAction = activeOutsMap[payloadData.iin] ? activeOutsMap[payloadData.iin].action : null;
       let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
@@ -507,38 +523,28 @@ async function callBackend(actionName, payloadData = {}) {
     }
 
     if (actionName === "getDashboardData") {
-      const { data: userData, error: userErr } = await supabaseClient.from('users').select('*').eq('iin', appState.iin).single();
+      const { data: userData, error: userErr } = await supabaseClient.from('users').select('*').eq('iin', appState.iin).maybeSingle();
       if (userErr || !userData) return { authorized: false };
 
-      let gasData = null;
-      try {
-        const gasResponse = await fetch(GAS_URL, { 
-            method: "POST", headers: { "Content-Type": "text/plain;charset=utf-8" }, redirect: "follow", 
-            body: JSON.stringify({ action: "getHybridData", payload: { iin: appState.iin, dept: userData.dept, role: userData.role, name: userData.full_name } }) 
-        });
-        gasData = await gasResponse.json();
-      } catch (e) { console.error("Ошибка GAS:", e); }
-      
-      gasData = gasData || {};
+      // ПОЛНОСТЬЮ ОТКЛЮЧИЛИ ОБРАЩЕНИЯ К GOOGLE APPS SCRIPT
+      let localData = {}; 
 
-      // ДОБАВИЛИ scItemsRaw В ЗАПРОС К SUPABASE
       const [
           { data: allUsers },
           { data: allReqs },
           { data: allUserDetails },
           { data: kpiDataRaw },
           { data: allSheetInfo },
-          { data: scItemsRaw } // <--- НОВОЕ
+          { data: scItemsRaw } 
       ] = await Promise.all([
           supabaseClient.from('users').select('iin, full_name, role, dept'),
           supabaseClient.from('requests').select('*').order('created_at', { ascending: false }),
           supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }),
           supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1),
           supabaseClient.from('user_sheet_info').select('*'),
-          supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1) // <--- НОВОЕ
+          supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1) 
       ]);
 
-      // БЕРЕМ СЦ ТОВАРЫ ИЗ БАЗЫ
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : [];
 
       let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 };
@@ -576,7 +582,7 @@ async function callBackend(actionName, payloadData = {}) {
           }
       }
       
-      if (freshHotChecks.length > 0) gasData.hotChecks = freshHotChecks;
+      if (freshHotChecks.length > 0) localData.hotChecks = freshHotChecks;
 
       let userMap = {}; let adminEmployees = []; let empMap = {};
 
@@ -635,9 +641,9 @@ async function callBackend(actionName, payloadData = {}) {
       let myEmp = empMap[appState.iin];
       if (!myEmp) {
           let mySheet = (allSheetInfo || []).find(s => String(s.iin) === String(appState.iin)) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
-          gasData.info = { tabel: mySheet.tabel_data, reports: mySheet.reports_data, kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] };
+          localData.info = { tabel: mySheet.tabel_data, reports: mySheet.reports_data, kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] };
       } else {
-          gasData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] };
+          localData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] };
       }
 
       let myPtsHistory = []; let myKpiChanges = 0;
@@ -656,7 +662,7 @@ async function callBackend(actionName, payloadData = {}) {
 
               if (kpiChange !== 0) {
                   let kpiItem = { name: ud.type === "Горячий чек" ? ud.action_text : (ud.type === "Продажа СЦ/Фокус" ? ud.action_text : ud.type), source: ud.type === "Продажа СЦ/Фокус" ? (ud.category || "СЦ") : ud.type, val: kpiChange, date: dateStr };
-                  if (ud.iin === appState.iin) { if (!gasData.info.kpiDetails) gasData.info.kpiDetails = []; gasData.info.kpiDetails.push(kpiItem); myKpiChanges += kpiChange; }
+                  if (ud.iin === appState.iin) { if (!localData.info.kpiDetails) localData.info.kpiDetails = []; localData.info.kpiDetails.push(kpiItem); myKpiChanges += kpiChange; }
                   if (empMap[ud.iin]) { empMap[ud.iin].kpi += kpiChange; empMap[ud.iin].kpiDetails.push(kpiItem); }
               }
           });
@@ -667,10 +673,10 @@ async function callBackend(actionName, payloadData = {}) {
       });
       let myAcc=0, myUse=0, myFin=0;
       myPtsHistory.forEach(h => { let pts = parseFloat(String(h.val).replace('+','').replace(',','.')) || 0; if (h.type === "Начисление") myAcc += pts; if (h.type === "Использование") myUse += Math.abs(pts); if (h.type === "Штраф") myFin += Math.abs(pts); });
-      gasData.info.myPtsHistory = myPtsHistory; gasData.info.ptsAccrued = myAcc; gasData.info.ptsUsed = myUse; 
-      gasData.info.ptsFine = myFin + Math.abs(gasData.info.directPenaltyPoints || 0); 
-      gasData.info.ptsLeft = myAcc - myUse - myFin + (gasData.info.directPenaltyPoints || 0);
-      if (!isNaN(gasData.info.kpiValue)) gasData.info.kpiValue = parseFloat(gasData.info.kpiValue) + myKpiChanges;
+      localData.info.myPtsHistory = myPtsHistory; localData.info.ptsAccrued = myAcc; localData.info.ptsUsed = myUse; 
+      localData.info.ptsFine = myFin + Math.abs(localData.info.directPenaltyPoints || 0); 
+      localData.info.ptsLeft = myAcc - myUse - myFin + (localData.info.directPenaltyPoints || 0);
+      if (!isNaN(localData.info.kpiValue)) localData.info.kpiValue = parseFloat(localData.info.kpiValue) + myKpiChanges;
 
       let userInbox = [], userHistory = [], adminInbox = [], adminHistory = [];
       let isDir = userData.role.toLowerCase().includes("директор") || userData.role.toLowerCase().includes("управляющий") || userData.role.toLowerCase().includes("админ") || userData.role.toLowerCase().includes("супервайзер");
@@ -684,7 +690,7 @@ async function callBackend(actionName, payloadData = {}) {
 
               if (r.type === "Замечание" && (r.status === "approved" || r.status === "pending_user_reply" || r.status === "pending_admin_view_remark")) {
                   if (empMap[r.target_iin]) empMap[r.target_iin].remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr });
-                  if (r.target_iin === appState.iin) { if (!gasData.info.remarks) gasData.info.remarks = []; gasData.info.remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr }); }
+                  if (r.target_iin === appState.iin) { if (!localData.info.remarks) localData.info.remarks = []; localData.info.remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr }); }
               }
 
               if (isDir) {
@@ -716,7 +722,6 @@ async function callBackend(actionName, payloadData = {}) {
           });
       }
 
-      // ВОЗВРАЩАЕМ scItems ИЗ БАЗЫ: finalScItems
       return { 
           authorized: true, 
           role: userData.role, 
@@ -724,16 +729,16 @@ async function callBackend(actionName, payloadData = {}) {
           dept: userData.dept, 
           isPromoter: userData.role.toLowerCase().includes("промоутер"), 
           scItems: finalScItems, 
-          adminScItems: finalScItems, // <--- ДОБАВЛЕНА ЭТА СТРОКА ДЛЯ АДМИНА
-          adminPlan: gasData.adminPlan || null, 
-          tradeInModels: gasData.tradeInModels || [], 
-          hotChecks: gasData.hotChecks || [], 
-          info: gasData.info, 
+          adminScItems: finalScItems,
+          adminPlan: localData.adminPlan || null, 
+          tradeInModels: [], // Т.к. больше нет связи с GAS, массив пока пустой. Если понадобятся, добавим в БД.
+          hotChecks: localData.hotChecks || [], 
+          info: localData.info, 
           userHistory: userHistory, 
           userInbox: userInbox, 
           adminInbox: adminInbox, 
           adminHistory: adminHistory, 
-          adminEmployees: adminEmployees
+          adminEmployees: adminEmployees 
       };
     }
   } catch (error) {
