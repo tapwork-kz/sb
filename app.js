@@ -733,7 +733,6 @@ async function callBackend(actionName, payloadData = {}) {
           adminInbox: adminInbox, 
           adminHistory: adminHistory, 
           adminEmployees: adminEmployees 
-          adminEmployees: adminEmployees 
       };
     }
   } catch (error) {
