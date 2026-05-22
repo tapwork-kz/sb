@@ -415,9 +415,9 @@ async function callBackend(actionName, payloadData = {}) {
     if (actionName === "recordAction") {
       const { iin, actionType, isReturn, isAutoReturn } = payloadData;
       const roleGroup = getRoleGroup(); 
+      const exactRole = appState.role; // Полная роль 
       
       if (!isReturn) {
-         // ВРЕМЕННЫЕ ОКНА
          const currentHour = new Date().getHours();
          if (actionType === 'Обед' && (currentHour < 12 || currentHour >= 17)) return { success: false, error: "Обед доступен только с 12:00 до 17:00" };
          if (actionType === 'Полдник' && (currentHour < 16 || currentHour >= 20)) return { success: false, error: "Полдник доступен только с 16:00 до 20:00" };
@@ -431,25 +431,36 @@ async function callBackend(actionName, payloadData = {}) {
             { data: todayLogs }
          ] = await Promise.all([
             supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(),
-            supabaseClient.from('time_tracking').select('*').eq('role_group', roleGroup).gte('created_at', todayStart.toISOString())
+            // Вытягиваем роли для правильного подсчета лимитов
+            supabaseClient.from('time_tracking').select('*, users(role)').gte('created_at', todayStart.toISOString())
          ]);
 
-         // ЛИМИТ: 1 РАЗ В ДЕНЬ ДЛЯ ОБЕДА И ПОЛДНИКА
          if (actionType === 'Обед' || actionType === 'Полдник') {
              const hasTakenToday = (todayLogs || []).some(log => log.iin === iin && log.action_type === actionType && log.direction === 'Уход');
              if (hasTakenToday) return { success: false, error: `Вы уже ходили на ${actionType.toLowerCase()} сегодня` };
          }
 
          const maxAllowed = limitData ? limitData[limitField] : 1; const totalAllowed = limitData ? limitData.total_limit : 2;
-         let userStates = {}; (todayLogs || []).forEach(log => { if (log.direction === 'Уход') userStates[log.iin] = log.action_type; else delete userStates[log.iin]; });
+         let userStates = {}; 
+         (todayLogs || []).forEach(log => { 
+             let r = log.users ? log.users.role : log.role_group;
+             if (String(r).toLowerCase().includes(roleGroup.toLowerCase())) {
+                 if (log.direction === 'Уход') userStates[log.iin] = log.action_type; 
+                 else delete userStates[log.iin]; 
+             }
+         });
+         
          let activeCounts = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
          for (let key in userStates) { activeCounts[userStates[key]]++; totalOut++; }
          if (activeCounts[actionType] >= maxAllowed || totalOut >= totalAllowed) return { success: false, error: `Мест на ${actionType} нет` };
       }
       
-      // Если это автовозврат, ставим статус "Автовозврат", чтобы Telegram не спамил
       let direction = isReturn ? (isAutoReturn ? 'Автовозврат' : 'Возврат') : 'Уход';
-      const { error } = await supabaseClient.from('time_tracking').insert([{ iin: iin, action_type: actionType, direction: direction, role_group: roleGroup }]);
+      
+      // ИСПРАВЛЕНИЕ: Если это промоутер, пишем точную роль (exactRole), иначе пишем группу (roleGroup = "Продавец")
+      let roleToSave = roleGroup === 'Промоутер' ? exactRole : roleGroup;
+
+      const { error } = await supabaseClient.from('time_tracking').insert([{ iin: iin, action_type: actionType, direction: direction, role_group: roleToSave }]);
       if (error) return { success: false, error: "Ошибка записи в БД" };
       return { success: true, savedAction: isReturn ? null : actionType };
     }
@@ -961,6 +972,26 @@ function switchTab(tab, direction = null) {
 
 function applyLimits(state) { if (!appState.currentAction) { document.getElementById("btn-break").disabled = !state.canBreak; document.getElementById("btn-lunch").disabled = !state.canLunch; document.getElementById("btn-snack").disabled = !state.canSnack; document.getElementById("action-hint").innerText = (state.canBreak || state.canLunch || state.canSnack) ? "Выберите действие:" : "Очередь заполнена или лимит исчерпан"; } if (state.activeOuts) { globalActiveOuts = state.activeOuts; renderActiveOuts(); } }
 
+// --- УНИВЕРСАЛЬНЫЙ АВТОВОЗВРАТ ДЛЯ ВСЕХ ---
+async function triggerUniversalAutoReturn(iin, actionType, roleGroup) {
+    const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+    const { data } = await supabaseClient.from('time_tracking')
+        .select('*')
+        .eq('iin', iin)
+        .eq('action_type', actionType)
+        .in('direction', ['Возврат', 'Автовозврат'])
+        .gte('created_at', todayStart.toISOString());
+    
+    if (!data || data.length === 0) {
+        await supabaseClient.from('time_tracking').insert([{ 
+            iin: iin, 
+            action_type: actionType, 
+            direction: 'Автовозврат', 
+            role_group: roleGroup 
+        }]);
+    }
+}
+
 function renderActiveOuts() {
    const container = document.getElementById("active-outs-container"); const list = document.getElementById("active-outs-list"); 
    if (!globalActiveOuts || globalActiveOuts.length === 0) { container.classList.add("hidden"); if (activeOutsTimer) clearInterval(activeOutsTimer); return; } container.classList.remove("hidden");
@@ -972,20 +1003,31 @@ function renderActiveOuts() {
            let diffMin = out.limit - elapsedMin; 
            let timeClass = ""; let timeText = ""; 
            
-           // АВТОВОЗВРАТ ПРОДАВЦОВ (не промоутеров), когда таймер 0
-           if (out.iin === appState.iin && diffMin <= 0 && !isUserPromoter) {
-               if (appState.currentAction === out.action) setTimeout(() => triggerAutoReturn(out.action), 100);
-               return ""; // Мгновенно скрываем из UI
+           let rRole = String(out.role || "").toLowerCase(); 
+           let isProm = rRole.includes('промоутер');
+
+           // АВТОВОЗВРАТ ПРОДАВЦОВ (не промоутеров). Если время вышло, скрываем и закрываем в БД.
+           if (diffMin <= 0 && !isProm) {
+               triggerUniversalAutoReturn(out.iin, out.action, out.role);
+               if (out.iin === appState.iin && appState.currentAction === out.action) {
+                   appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI();
+                   document.getElementById("btn-break").disabled = false;
+                   document.getElementById("action-hint").innerText = "Выберите действие:";
+               }
+               return ""; // Мгновенно убираем из списка
            }
            
-           if (diffMin > 0) timeText = `${diffMin} мин`; else { timeClass = "late"; timeText = `${Math.abs(diffMin)} мин!`; } 
+           // ОФОРМЛЕНИЕ ТАЙМЕРА (Надпись "Опаздывает")
+           if (diffMin > 0) {
+               timeText = `${diffMin} мин`; 
+           } else { 
+               timeClass = "late"; 
+               timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; 
+           } 
+           
            let actionTitle = out.action; if(actionTitle.includes("Перерыв")) actionTitle = "Перерыв"; 
+           let roleLabel = isProm ? out.role : `Продавец — ${out.dept || 'Сотрудник'}`; 
            
-           // РОЛЬ И ОТДЕЛ
-           let rRole = String(out.role || "").toLowerCase(); 
-           let roleLabel = rRole.includes('промоутер') ? 'Промоутер' : `Продавец — ${out.dept || 'Сотрудник'}`; 
-           
-           // Идеальное выравнивание через Flexbox
            return `
            <div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);">
                <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
@@ -993,7 +1035,7 @@ function renderActiveOuts() {
                    <span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span>
                </div>
                <div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div>
-               <div class="active-out-time ${timeClass}" style="width: 60px; text-align: right; font-size: 12px; font-weight: bold;">${timeText}</div>
+               <div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div>
            </div>`; 
        }).join(""); 
    }
@@ -1407,11 +1449,25 @@ function renderAdminOuts() {
   document.getElementById('admin-outs-list').innerHTML = list.map(out => { 
       let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; 
       let timeClass = ""; let timeText = ""; 
-      if (diffMin > 0) timeText = `${diffMin} мин`; else { timeClass = "late"; timeText = `${Math.abs(diffMin)} мин!`; } 
+      
+      let rRole = String(out.role || "").toLowerCase(); 
+      let isProm = rRole.includes('промоутер');
+
+      // Универсальный автовозврат для админа (чтобы не видел "опаздывающих" продавцов)
+      if (diffMin <= 0 && !isProm) {
+          triggerUniversalAutoReturn(out.iin, out.action, out.role);
+          return ""; 
+      }
+
+      if (diffMin > 0) {
+          timeText = `${diffMin} мин`; 
+      } else { 
+          timeClass = "late"; 
+          timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; 
+      } 
       
       let actionTitle = out.action; if(actionTitle.includes("Перерыв")) actionTitle = "Перерыв"; 
-      let rRole = String(out.role || "").toLowerCase(); 
-      let roleLabel = rRole.includes('промоутер') ? 'Промоутер' : `Продавец — ${out.dept || 'Сотрудник'}`; 
+      let roleLabel = isProm ? out.role : `Продавец — ${out.dept || 'Сотрудник'}`; 
 
       return `
       <div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);">
@@ -1420,7 +1476,7 @@ function renderAdminOuts() {
               <span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span>
           </div>
           <div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div>
-          <div class="active-out-time ${timeClass}" style="width: 60px; text-align: right; font-size: 12px; font-weight: bold;">${timeText}</div>
+          <div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div>
       </div>`; 
   }).join("") || "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
 }
