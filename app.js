@@ -724,6 +724,7 @@ async function callBackend(actionName, payloadData = {}) {
           dept: userData.dept, 
           isPromoter: userData.role.toLowerCase().includes("промоутер"), 
           scItems: finalScItems, 
+          adminScItems: finalScItems, // <--- ДОБАВЛЕНА ЭТА СТРОКА ДЛЯ АДМИНА
           adminPlan: gasData.adminPlan || null, 
           tradeInModels: gasData.tradeInModels || [], 
           hotChecks: gasData.hotChecks || [], 
@@ -732,7 +733,7 @@ async function callBackend(actionName, payloadData = {}) {
           userInbox: userInbox, 
           adminInbox: adminInbox, 
           adminHistory: adminHistory, 
-          adminEmployees: adminEmployees 
+          adminEmployees: adminEmployees
       };
     }
   } catch (error) {
