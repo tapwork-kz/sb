@@ -413,18 +413,14 @@ async function callBackend(actionName, payloadData = {}) {
     }
     
     if (actionName === "recordAction") {
-      const { iin, actionType, isReturn } = payloadData;
+      const { iin, actionType, isReturn, isAutoReturn } = payloadData;
       const roleGroup = getRoleGroup(); 
       
       if (!isReturn) {
-         // --- ПРАВИЛО 1: ВРЕМЕННЫЕ ОКНА ---
+         // ВРЕМЕННЫЕ ОКНА
          const currentHour = new Date().getHours();
-         if (actionType === 'Обед' && (currentHour < 12 || currentHour >= 17)) {
-             return { success: false, error: "Обед доступен только с 12:00 до 17:00" };
-         }
-         if (actionType === 'Полдник' && (currentHour < 16 || currentHour >= 20)) {
-             return { success: false, error: "Полдник доступен только с 16:00 до 20:00" };
-         }
+         if (actionType === 'Обед' && (currentHour < 12 || currentHour >= 17)) return { success: false, error: "Обед доступен только с 12:00 до 17:00" };
+         if (actionType === 'Полдник' && (currentHour < 16 || currentHour >= 20)) return { success: false, error: "Полдник доступен только с 16:00 до 20:00" };
 
          const dayOfWeek = new Date().getDay() || 7; 
          const limitField = actionType === 'Обед' ? 'lunch_limit' : (actionType === 'Полдник' ? 'snack_limit' : 'break_limit');
@@ -438,62 +434,50 @@ async function callBackend(actionName, payloadData = {}) {
             supabaseClient.from('time_tracking').select('*').eq('role_group', roleGroup).gte('created_at', todayStart.toISOString())
          ]);
 
-         // --- ПРАВИЛО 2: ЛИМИТ "ОДИН РАЗ В ДЕНЬ" ---
+         // ЛИМИТ: 1 РАЗ В ДЕНЬ ДЛЯ ОБЕДА И ПОЛДНИКА
          if (actionType === 'Обед' || actionType === 'Полдник') {
              const hasTakenToday = (todayLogs || []).some(log => log.iin === iin && log.action_type === actionType && log.direction === 'Уход');
-             if (hasTakenToday) {
-                 return { success: false, error: `Вы уже ходили на ${actionType.toLowerCase()} сегодня` };
-             }
+             if (hasTakenToday) return { success: false, error: `Вы уже ходили на ${actionType.toLowerCase()} сегодня` };
          }
 
-         const maxAllowed = limitData ? limitData[limitField] : 1; 
-         const totalAllowed = limitData ? limitData.total_limit : 2;
-         
-         let userStates = {}; 
-         (todayLogs || []).forEach(log => { 
-             if (log.direction === 'Уход') userStates[log.iin] = log.action_type; 
-             if (log.direction === 'Возврат') delete userStates[log.iin]; 
-         });
-         
-         let activeCounts = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; 
-         let totalOut = 0;
+         const maxAllowed = limitData ? limitData[limitField] : 1; const totalAllowed = limitData ? limitData.total_limit : 2;
+         let userStates = {}; (todayLogs || []).forEach(log => { if (log.direction === 'Уход') userStates[log.iin] = log.action_type; else delete userStates[log.iin]; });
+         let activeCounts = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
          for (let key in userStates) { activeCounts[userStates[key]]++; totalOut++; }
-         
-         if (activeCounts[actionType] >= maxAllowed || totalOut >= totalAllowed) {
-             return { success: false, error: `Очередь заполнена. Мест на ${actionType} нет` };
-         }
+         if (activeCounts[actionType] >= maxAllowed || totalOut >= totalAllowed) return { success: false, error: `Мест на ${actionType} нет` };
       }
       
-      const { error } = await supabaseClient.from('time_tracking').insert([{ iin: iin, action_type: actionType, direction: isReturn ? 'Возврат' : 'Уход', role_group: roleGroup }]);
+      // Если это автовозврат, ставим статус "Автовозврат", чтобы Telegram не спамил
+      let direction = isReturn ? (isAutoReturn ? 'Автовозврат' : 'Возврат') : 'Уход';
+      const { error } = await supabaseClient.from('time_tracking').insert([{ iin: iin, action_type: actionType, direction: direction, role_group: roleGroup }]);
       if (error) return { success: false, error: "Ошибка записи в БД" };
       return { success: true, savedAction: isReturn ? null : actionType };
     }
 
     if (actionName === "startupCheck") {
-      const roleGroup = getRoleGroup(); 
-      const dayOfWeek = new Date().getDay() || 7;
-      const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-      const currentHour = new Date().getHours();
+      const roleGroup = getRoleGroup(); const dayOfWeek = new Date().getDay() || 7;
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0); const currentHour = new Date().getHours();
       
       const [
          { data: limitData },
          { data: todayLogs }
       ] = await Promise.all([
          supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(),
-         supabaseClient.from('time_tracking').select('*, users(full_name)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true })
+         // Забираем role и dept напрямую из join-таблицы users
+         supabaseClient.from('time_tracking').select('*, users(full_name, role, dept)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true })
       ]);
 
-      let activeOutsMap = {}; 
-      let myLogs = [];
-      
+      let activeOutsMap = {}; let myLogs = [];
       (todayLogs || []).forEach(log => { 
           if (log.iin === payloadData.iin) myLogs.push(log);
           if (log.direction === 'Уход') { 
               activeOutsMap[log.iin] = { 
+                  iin: log.iin,
                   action: log.action_type, 
                   leftAt: new Date(log.created_at).getTime(), 
                   name: log.users ? log.users.full_name : 'Сотрудник', 
-                  role: log.role_group 
+                  role: log.users ? log.users.role : log.role_group,
+                  dept: log.users ? log.users.dept : 'Цифра'
               }; 
           } else { 
               delete activeOutsMap[log.iin]; 
@@ -501,48 +485,33 @@ async function callBackend(actionName, payloadData = {}) {
       });
       
       let myActiveAction = activeOutsMap[payloadData.iin] ? activeOutsMap[payloadData.iin].action : null;
-      let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; 
-      let totalOut = 0;
-      
-      for (let key in activeOutsMap) { 
-          if (activeOutsMap[key].role === roleGroup) { 
-              outByAction[activeOutsMap[key].action]++; 
-              totalOut++; 
-          } 
-      }
+      let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
+      for (let key in activeOutsMap) { if (activeOutsMap[key].role.toLowerCase().includes(roleGroup.toLowerCase())) { outByAction[activeOutsMap[key].action]++; totalOut++; } }
 
-      // ПРОВЕРЯЕМ: брал ли текущий юзер уже Обед или Полдник сегодня?
       const tookLunch = myLogs.some(l => l.action_type === 'Обед' && l.direction === 'Уход');
       const tookSnack = myLogs.some(l => l.action_type === 'Полдник' && l.direction === 'Уход');
-
-      // ПРОВЕРЯЕМ ВРЕМЕННЫЕ ОКНА
       const isLunchTime = currentHour >= 12 && currentHour < 17;
       const isSnackTime = currentHour >= 16 && currentHour < 20;
-
-      // ПРОВЕРЯЕМ СВОБОДНЫЕ МЕСТА
+      
       const hasLunchSlot = (outByAction['Обед'] < (limitData?.lunch_limit || 1)) && (totalOut < (limitData?.total_limit || 2));
       const hasSnackSlot = (outByAction['Полдник'] < (limitData?.snack_limit || 1)) && (totalOut < (limitData?.total_limit || 2));
       const hasBreakSlot = (outByAction['Перерыв'] < (limitData?.break_limit || 1)) && (totalOut < (limitData?.total_limit || 2));
 
       return { 
           authorized: true, 
-          // --- ПРАВИЛО 3: ТАЙМЕРЫ ПРОМОУТЕРОВ ---
           activeOuts: Object.values(activeOutsMap).map(o => {
-              let timerLimit = 10; // по умолчанию (для перерыва продавца)
-              if (o.role === 'Промоутер') {
-                  if (o.action === 'Обед') timerLimit = 60;
-                  else if (o.action === 'Полдник') timerLimit = 30; 
-                  else timerLimit = 15;
-              } else { // Продавец
-                  if (o.action === 'Обед') timerLimit = 40;
-                  else if (o.action === 'Полдник') timerLimit = 30;
-                  else timerLimit = 10;
+              let timerLimit = 10;
+              let rRole = String(o.role || "").toLowerCase();
+              // ТАЙМЕРЫ: Разделяем промоутеров и продавцов
+              if (rRole.includes('промоутер')) {
+                  if (o.action === 'Обед') timerLimit = 60; else if (o.action === 'Полдник') timerLimit = 30; else timerLimit = 15;
+              } else {
+                  if (o.action === 'Обед') timerLimit = 40; else if (o.action === 'Полдник') timerLimit = 30; else timerLimit = 10;
               }
               return { ...o, limit: timerLimit };
           }), 
           myActiveAction: myActiveAction, 
           canBreak: hasBreakSlot, 
-          // Кнопка Обеда активна: если есть место + правильное время + еще не брал сегодня
           canLunch: hasLunchSlot && isLunchTime && !tookLunch, 
           canSnack: hasSnackSlot && isSnackTime && !tookSnack 
       };
@@ -929,8 +898,30 @@ function isSensitiveState() {
 
 function startPolling() {
     if(pollingTimer) clearInterval(pollingTimer);
-    supabaseClient.channel('public-changes').on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, payload => { if(appState.token && !document.hidden && !isSensitiveState() && lastActiveTab !== 'inbox') { loadDashboard(true); } }).on('postgres_changes', { event: '*', schema: 'public', table: 'time_tracking' }, async payload => { let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); if(state) { globalActiveOuts = state.activeOuts || []; if (appState.role.toLowerCase().includes("директор") || appState.role.toLowerCase().includes("заведующий")) { renderAdminOuts(); } else { applyLimits(state); } } }).subscribe();
-    pollingTimer = setInterval(async () => { if (lastActiveTab === 'inbox' || isSensitiveState()) return; if(appState.token && !document.hidden) { let data = await callBackend('getDashboardData', { token: appState.token }); if (data && data.authorized !== false && !isSensitiveState() && lastActiveTab !== 'inbox') { renderDashboardData(data, true); } } }, 30000);
+    supabaseClient.channel('public-changes')
+       .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, payload => { if(appState.token && !document.hidden && !isSensitiveState() && lastActiveTab !== 'inbox') { loadDashboard(true); } })
+       .on('postgres_changes', { event: '*', schema: 'public', table: 'time_tracking' }, async payload => { 
+           let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); 
+           if(state) { globalActiveOuts = state.activeOuts || []; if (appState.role.toLowerCase().includes("директор") || appState.role.toLowerCase().includes("заведующий")) { renderAdminOuts(); } else { applyLimits(state); } } 
+       }).subscribe();
+       
+    pollingTimer = setInterval(async () => { 
+        if (isSensitiveState()) return; 
+        if(appState.token && !document.hidden) { 
+            // Каждые 30 сек жестко проверяем очередь перерывов (Делает сайт "живым")
+            let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin });
+            if(state) { 
+                globalActiveOuts = state.activeOuts || []; 
+                if (appState.role.toLowerCase().includes("директор") || appState.role.toLowerCase().includes("заведующий")) renderAdminOuts(); 
+                else applyLimits(state); 
+            }
+            // Если не в инбоксе, обновляем и дашборд
+            if (lastActiveTab !== 'inbox') {
+                let data = await callBackend('getDashboardData', { token: appState.token }); 
+                if (data && data.authorized !== false) renderDashboardData(data, true);
+            }
+        } 
+    }, 30000);
 }
 
 document.addEventListener('touchstart', function(e) { if (document.activeElement && (document.activeElement.tagName === 'INPUT' || document.activeElement.tagName === 'TEXTAREA')) { if (!document.activeElement.contains(e.target)) { document.activeElement.blur(); } } }, {passive: true});
@@ -971,13 +962,76 @@ function switchTab(tab, direction = null) {
 function applyLimits(state) { if (!appState.currentAction) { document.getElementById("btn-break").disabled = !state.canBreak; document.getElementById("btn-lunch").disabled = !state.canLunch; document.getElementById("btn-snack").disabled = !state.canSnack; document.getElementById("action-hint").innerText = (state.canBreak || state.canLunch || state.canSnack) ? "Выберите действие:" : "Очередь заполнена или лимит исчерпан"; } if (state.activeOuts) { globalActiveOuts = state.activeOuts; renderActiveOuts(); } }
 
 function renderActiveOuts() {
-   const container = document.getElementById("active-outs-container"); const list = document.getElementById("active-outs-list"); if (!globalActiveOuts || globalActiveOuts.length === 0) { container.classList.add("hidden"); if (activeOutsTimer) clearInterval(activeOutsTimer); return; } container.classList.remove("hidden");
-   function updateTimers() { const now = Date.now(); list.innerHTML = globalActiveOuts.map(out => { let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; if (diffMin > 0) timeText = `Осталось ${diffMin} мин`; else { timeClass = "late"; timeText = `Опаздывает на ${Math.abs(diffMin)} мин!`; } let actionTitle = out.action; if(actionTitle.includes("Перерыв")) actionTitle = "Перерыв"; let rRole = out.role ? String(out.role) : ""; let roleLabel = rRole.toLowerCase().includes('промоутер') ? `<div style="font-size:11px; color:gray; font-weight:normal; margin-top:2px;">${rRole}</div>` : ''; return `<div class="active-out-item" style="align-items: center;"><div><span class="active-out-name">${out.name}</span> <span style="color:gray; font-weight:normal; font-size:11px; margin-left: 5px;">(${actionTitle})</span>${roleLabel}</div><span class="active-out-time ${timeClass}">${timeText}</span></div>`; }).join(""); }
+   const container = document.getElementById("active-outs-container"); const list = document.getElementById("active-outs-list"); 
+   if (!globalActiveOuts || globalActiveOuts.length === 0) { container.classList.add("hidden"); if (activeOutsTimer) clearInterval(activeOutsTimer); return; } container.classList.remove("hidden");
+   
+   function updateTimers() { 
+       const now = Date.now(); 
+       list.innerHTML = globalActiveOuts.map(out => { 
+           let elapsedMin = Math.floor((now - out.leftAt) / 60000); 
+           let diffMin = out.limit - elapsedMin; 
+           let timeClass = ""; let timeText = ""; 
+           
+           // АВТОВОЗВРАТ ПРОДАВЦОВ (не промоутеров), когда таймер 0
+           if (out.iin === appState.iin && diffMin <= 0 && !isUserPromoter) {
+               if (appState.currentAction === out.action) setTimeout(() => triggerAutoReturn(out.action), 100);
+               return ""; // Мгновенно скрываем из UI
+           }
+           
+           if (diffMin > 0) timeText = `${diffMin} мин`; else { timeClass = "late"; timeText = `${Math.abs(diffMin)} мин!`; } 
+           let actionTitle = out.action; if(actionTitle.includes("Перерыв")) actionTitle = "Перерыв"; 
+           
+           // РОЛЬ И ОТДЕЛ
+           let rRole = String(out.role || "").toLowerCase(); 
+           let roleLabel = rRole.includes('промоутер') ? 'Промоутер' : `Продавец — ${out.dept || 'Сотрудник'}`; 
+           
+           // Идеальное выравнивание через Flexbox
+           return `
+           <div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);">
+               <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+                   <span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span>
+                   <span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span>
+               </div>
+               <div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div>
+               <div class="active-out-time ${timeClass}" style="width: 60px; text-align: right; font-size: 12px; font-weight: bold;">${timeText}</div>
+           </div>`; 
+       }).join(""); 
+   }
    updateTimers(); if (activeOutsTimer) clearInterval(activeOutsTimer); activeOutsTimer = setInterval(updateTimers, 10000); 
 }
 
+async function triggerAutoReturn(actionToReturnFrom) {
+    if (!appState.currentAction) return; 
+    appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); 
+    document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); 
+    document.getElementById("btn-break").disabled = false; 
+    document.getElementById("action-hint").innerText = "Очередь заполнена или лимит исчерпан"; 
+    
+    await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isAutoReturn: true }); 
+    let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); 
+    applyLimits(state);
+}
+
 async function triggerAction(actionType) { vibrate(50); let prevAction = appState.currentAction; appState.currentAction = actionType; saveMemory("currentAction", actionType); renderTimeUI(); let res = await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionType, isReturn: false, isSilentAutoReturn: false }); if (res.success && res.savedAction) { appState.currentAction = res.savedAction; saveMemory("currentAction", res.savedAction); renderTimeUI(); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin, tgUserId: null }); applyLimits(state); } else { appState.currentAction = prevAction; saveMemory("currentAction", prevAction || ""); renderTimeUI(); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin, tgUserId: null }); applyLimits(state); showToast("Ошибка: " + res.error, true); } }
-async function triggerReturn() { vibrate(50); const actionToReturnFrom = appState.currentAction; appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Фиксируем возвращение..."; let res = await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isSilentAutoReturn: false }); if (res.success) { document.getElementById("action-hint").innerText = "Обновление лимитов..."; let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin, tgUserId: null }); document.getElementById("action-hint").innerText = "Выберите действие:"; applyLimits(state); } else { appState.currentAction = actionToReturnFrom; saveMemory("currentAction", actionToReturnFrom); renderTimeUI(); showToast("Ошибка возврата: " + res.error, true); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin, tgUserId: null }); applyLimits(state); } }
+async function triggerReturn() { 
+    vibrate(50); const actionToReturnFrom = appState.currentAction; 
+    appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); 
+    document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); 
+    document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Фиксируем возвращение..."; 
+    
+    // Ручной возврат (isAutoReturn: false) отправляет уведомление в ТГ
+    let res = await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isAutoReturn: false }); 
+    if (res.success) { 
+        document.getElementById("action-hint").innerText = "Обновление лимитов..."; 
+        let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); 
+        document.getElementById("action-hint").innerText = "Выберите действие:"; 
+        applyLimits(state); 
+    } else { 
+        appState.currentAction = actionToReturnFrom; saveMemory("currentAction", actionToReturnFrom); renderTimeUI(); 
+        showToast("Ошибка возврата: " + res.error, true); 
+        let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); applyLimits(state); 
+    } 
+}
 
 function getDeclension(action) { if (!action) return ""; if (action.startsWith("Перерыв")) return "Перерыва"; if (action === "Обед") return "Обеда"; if (action === "Полдник") return "Полдника"; return action.toLowerCase(); }
 function renderTimeUI() { const standardBtns = document.getElementById("standard-buttons"); const returnContainer = document.getElementById("return-button-container"); let actStr = String(appState.currentAction); if (appState.currentAction && actStr !== "null" && actStr !== "undefined" && actStr !== "") { document.getElementById("btn-return").disabled = false; standardBtns.classList.add("hidden"); returnContainer.classList.remove("hidden"); const declension = getDeclension(appState.currentAction); document.getElementById("return-text").innerText = "Вернуться с " + declension; document.getElementById("action-hint").innerText = "Ожидаем возвращения:"; } else { standardBtns.classList.remove("hidden"); returnContainer.classList.add("hidden"); } }
@@ -1350,7 +1404,25 @@ function renderAdminHistory(filterType) {
 
 function renderAdminOuts() {
   let list = globalActiveOuts || []; const now = Date.now();
-  document.getElementById('admin-outs-list').innerHTML = list.map(out => { let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; if (diffMin > 0) timeText = `Осталось ${diffMin} мин`; else { timeClass = "late"; timeText = `Опаздывает на ${Math.abs(diffMin)} мин!`; } let actionTitle = out.action; if(actionTitle.includes("Перерыв")) actionTitle = "Перерыв"; let rRole = out.role ? String(out.role) : ""; let roleLabel = rRole.toLowerCase().includes('промоутер') ? `<div style="font-size:11px; color:gray; font-weight:normal; margin-top:2px;">${rRole}</div>` : ''; return `<div class="active-out-item" style="align-items: center;"><div><span class="active-out-name">${out.name}</span> <span style="color:gray; font-weight:normal; font-size:11px; margin-left: 5px;">(${actionTitle})</span>${roleLabel}</div><span class="active-out-time ${timeClass}">${timeText}</span></div>`; }).join("") || "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
+  document.getElementById('admin-outs-list').innerHTML = list.map(out => { 
+      let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; 
+      let timeClass = ""; let timeText = ""; 
+      if (diffMin > 0) timeText = `${diffMin} мин`; else { timeClass = "late"; timeText = `${Math.abs(diffMin)} мин!`; } 
+      
+      let actionTitle = out.action; if(actionTitle.includes("Перерыв")) actionTitle = "Перерыв"; 
+      let rRole = String(out.role || "").toLowerCase(); 
+      let roleLabel = rRole.includes('промоутер') ? 'Промоутер' : `Продавец — ${out.dept || 'Сотрудник'}`; 
+
+      return `
+      <div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);">
+          <div style="flex: 1; min-width: 0; display: flex; flex-direction: column;">
+              <span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span>
+              <span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span>
+          </div>
+          <div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div>
+          <div class="active-out-time ${timeClass}" style="width: 60px; text-align: right; font-size: 12px; font-weight: bold;">${timeText}</div>
+      </div>`; 
+  }).join("") || "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
 }
 
 function renderAdminEmps(dept, btnElement) {
