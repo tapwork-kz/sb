@@ -183,7 +183,7 @@ function renderPlanUI(pData) {
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div style="font-size:14px; font-weight:bold; color:var(--text-color); text-transform:none;">Общая сводка</div>
-            <div style="font-size:12px; font-weight:bold; color:var(--btn-color);">СЦ: ${scCount} | BRZY: ${brzyCount}</div>
+            <div onclick="openAdminPlanScDetails()" style="font-size:11px; font-weight:bold; color:var(--btn-color); cursor:pointer; padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px;">СЦ: ${scCount} | BRZY: ${brzyCount}</div>
         </div>
         
         <!-- ИТОГИ -->
@@ -902,7 +902,17 @@ function groupAndRenderByMonth(itemsArray, renderItemFn) {
 document.addEventListener("DOMContentLoaded", async () => {
   try {
       requestNotificationPermission(); initAutoScroll(); initSmartDates(); initSwipe(); 
-      if(document.getElementById('password-input')) { document.getElementById('password-input').style.width = '100%'; document.getElementById('password-input').style.boxSizing = 'border-box'; }
+      if(document.getElementById('password-input')) { 
+    let pass = document.getElementById('password-input');
+    pass.style.width = '100%'; 
+    pass.style.boxSizing = 'border-box'; 
+    pass.style.height = '48px'; 
+    pass.style.padding = '0 16px';
+    pass.style.fontSize = '16px';
+    pass.style.borderRadius = '12px';
+    pass.style.border = '1px solid var(--border-color)';
+    pass.style.marginTop = '8px';
+}
       const urlParams = new URLSearchParams(window.location.search); const urlIin = urlParams.get('iin');
       if (appState.iin && appState.token) { 
           document.getElementById("auth-screen").classList.add("hidden"); document.getElementById("main-screen").classList.remove("hidden"); 
@@ -962,6 +972,7 @@ function startPolling() {
     if(pollingTimer) clearInterval(pollingTimer);
     supabaseClient.channel('public-changes')
        .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, payload => { if(appState.token && !document.hidden && !isSensitiveState() && lastActiveTab !== 'inbox') { loadDashboard(true); } })
+       .on('postgres_changes', { event: '*', schema: 'public', table: 'user_details' }, payload => { if(appState.token && !document.hidden && !isSensitiveState() && lastActiveTab !== 'inbox') { loadDashboard(true); } })
        .on('postgres_changes', { event: '*', schema: 'public', table: 'time_tracking' }, async payload => { 
            let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); 
            if(state) { globalActiveOuts = state.activeOuts || []; if (appState.role.toLowerCase().includes("директор") || appState.role.toLowerCase().includes("заведующий")) { renderAdminOuts(); } else { applyLimits(state); } } 
@@ -1314,8 +1325,14 @@ function renderDashboardData(data, isSilent = false) {
               let kpiBonus = parseFloat(String(btn.val || "0").replace(',', '.')); 
               if (ptsVal > 0 || kpiBonus > 0) { 
                   badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`;
-                  if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${btn.val}%</span>`;
-                  if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${btn.pts}</span>`;
+                  if (kpiBonus > 0) {
+                      let displayKpi = Number.isInteger(kpiBonus) ? kpiBonus : kpiBonus; 
+                      badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${displayKpi}%</span>`;
+                  }
+                  if (ptsVal > 0) {
+                      let displayPts = Number.isInteger(ptsVal) ? ptsVal : ptsVal;
+                      badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${displayPts}</span>`;
+                  }
                   badgeHtml += `</div>`;
               } 
               hcHtml += `<div style="position:relative; display:flex; flex:1;"><button class="btn-green" style="padding:10px 4px; font-size:12px; margin:0; width:100%;" onclick="submitHotCheck('${combinedName}', '${btn.val}', '${btn.pts || 0}')">${btn.name}</button>${badgeHtml}</div>`; 
@@ -1671,3 +1688,45 @@ function submitHotCheck(typeText, valText, ptsText) {
 async function processReq(id, action, replyText = "") { vibrate(50); showToast("Обработка...", false, 9999); processedReqIds.add(String(id)); let el = document.getElementById("req-" + id); if (el) { el.style.display = 'none'; } let res = await callBackend('processRequest', { token: appState.token, reqId: id, reqAction: action, replyText: replyText }); if(res.success) { showToast(res.msg); loadDashboard(true); } else { showToast(res.error, true); loadDashboard(true); } }
 
 document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && document.activeElement && document.activeElement.tagName === 'INPUT') { document.activeElement.blur(); } });
+
+function openAdminPlanScDetails() {
+    let prevTab = lastActiveTab; switchTab('details'); 
+    document.getElementById("btn-details-back").onclick = () => switchTab(prevTab);
+    document.getElementById("details-title").innerText = "СЦ | BRZY (План)";
+    document.getElementById("details-kpi-circle-container").innerHTML = ""; 
+    
+    let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01";
+    let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01";
+    let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000;
+    
+    let sales = [];
+    if (window.adminHistoryGlobal) {
+        sales = window.adminHistoryGlobal.filter(r => {
+            let rd = parseCustomDate(r.date);
+            return rd >= startTime && rd <= endTime && r.status === 'approved' && (r.type === 'Продажа СЦ/Фокус' || r.type === 'Продажа Trade-In');
+        });
+    }
+    
+    let listHtml = "<div class='card' style='padding:0;'>";
+    if (sales.length > 0) {
+        sales.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+        listHtml += sales.map((i, idx) => {
+            let srcColor = getSourceColor(i.type); 
+            let sourceText = i.type === 'Продажа Trade-In' ? 'Trade-In' : 'СЦ/Фокус';
+            try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; } catch(e){}
+            let sellerName = formatShortName(i.authorName);
+            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${i.details}</span><br>
+                            <b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${sourceText}</b> 
+                            <span style="color:gray;font-size:10px;"> • ${i.date}</span>
+                        </div>
+                        <div style="color:gray; font-size:11px; text-align:right;">${sellerName}</div>
+                    </div>`;
+        }).join("");
+    } else {
+        listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В этом периоде пусто</div>";
+    }
+    listHtml += "</div>";
+    document.getElementById("details-list").innerHTML = listHtml;
+}
