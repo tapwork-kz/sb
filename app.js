@@ -521,19 +521,25 @@ async function callBackend(actionName, payloadData = {}) {
       
       gasData = gasData || {};
 
+      // ДОБАВИЛИ scItemsRaw В ЗАПРОС К SUPABASE
       const [
           { data: allUsers },
           { data: allReqs },
           { data: allUserDetails },
           { data: kpiDataRaw },
-          { data: allSheetInfo }
+          { data: allSheetInfo },
+          { data: scItemsRaw } // <--- НОВОЕ
       ] = await Promise.all([
           supabaseClient.from('users').select('iin, full_name, role, dept'),
           supabaseClient.from('requests').select('*').order('created_at', { ascending: false }),
           supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }),
           supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1),
-          supabaseClient.from('user_sheet_info').select('*')
+          supabaseClient.from('user_sheet_info').select('*'),
+          supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1) // <--- НОВОЕ
       ]);
+
+      // БЕРЕМ СЦ ТОВАРЫ ИЗ БАЗЫ
+      let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : [];
 
       let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 };
       let freshHotChecks = [];
@@ -710,13 +716,25 @@ async function callBackend(actionName, payloadData = {}) {
           });
       }
 
-      return { authorized: true, role: userData.role, name: userData.full_name, dept: userData.dept, isPromoter: userData.role.toLowerCase().includes("промоутер"), scItems: gasData.scItems || [], adminPlan: gasData.adminPlan || null, tradeInModels: gasData.tradeInModels || [], hotChecks: gasData.hotChecks || [], info: gasData.info, userHistory: userHistory, userInbox: userInbox, adminInbox: adminInbox, adminHistory: adminHistory, adminEmployees: adminEmployees };
+      // ВОЗВРАЩАЕМ scItems ИЗ БАЗЫ: finalScItems
+      return { 
+          authorized: true, 
+          role: userData.role, 
+          name: userData.full_name, 
+          dept: userData.dept, 
+          isPromoter: userData.role.toLowerCase().includes("промоутер"), 
+          scItems: finalScItems, 
+          adminPlan: gasData.adminPlan || null, 
+          tradeInModels: gasData.tradeInModels || [], 
+          hotChecks: gasData.hotChecks || [], 
+          info: gasData.info, 
+          userHistory: userHistory, 
+          userInbox: userInbox, 
+          adminInbox: adminInbox, 
+          adminHistory: adminHistory, 
+          adminEmployees: adminEmployees 
+      };
     }
-  } catch (error) {
-    console.error("CallBackend Error:", error);
-    return { success: false, error: error.message };
-  }
-}
 
 function vibrate(ms = 50) { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); else if (navigator.vibrate) navigator.vibrate(ms); }
 
