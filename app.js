@@ -529,23 +529,30 @@ async function callBackend(actionName, payloadData = {}) {
       // ПОЛНОСТЬЮ ОТКЛЮЧИЛИ ОБРАЩЕНИЯ К GOOGLE APPS SCRIPT
       let localData = {}; 
 
+      // ДОБАВЛЯЕМ tradeInModels В ЗАПРОС К SUPABASE
       const [
           { data: allUsers },
           { data: allReqs },
           { data: allUserDetails },
           { data: kpiDataRaw },
           { data: allSheetInfo },
-          { data: scItemsRaw } 
+          { data: scItemsRaw }, 
+          { data: tradeInRaw } // <--- НОВОЕ: Запрос моделей
       ] = await Promise.all([
           supabaseClient.from('users').select('iin, full_name, role, dept'),
           supabaseClient.from('requests').select('*').order('created_at', { ascending: false }),
           supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }),
           supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1),
           supabaseClient.from('user_sheet_info').select('*'),
-          supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1) 
+          supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1),
+          supabaseClient.from('trade_in_models').select('model_name').order('id', { ascending: true }) // <--- НОВОЕ
       ]);
 
+      // БЕРЕМ СЦ ТОВАРЫ ИЗ БАЗЫ
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : [];
+      
+      // ПРЕВРАЩАЕМ ОБЪЕКТЫ В ПРОСТОЙ МАССИВ СТРОК ДЛЯ ВЫПАДАЮЩЕГО СПИСКА
+      let tradeInList = (tradeInRaw && tradeInRaw.length > 0) ? tradeInRaw.map(item => item.model_name) : [];
 
       let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 };
       let freshHotChecks = [];
@@ -731,7 +738,7 @@ async function callBackend(actionName, payloadData = {}) {
           scItems: finalScItems, 
           adminScItems: finalScItems,
           adminPlan: localData.adminPlan || null, 
-          tradeInModels: [], // Т.к. больше нет связи с GAS, массив пока пустой. Если понадобятся, добавим в БД.
+          tradeInModels: tradeInList, // <--- ТЕПЕРЬ СПИСОК БЕРЕТСЯ ИЗ БАЗЫ ДАННЫХ
           hotChecks: localData.hotChecks || [], 
           info: localData.info, 
           userHistory: userHistory, 
