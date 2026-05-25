@@ -1444,12 +1444,15 @@ function renderHistoryItem(i, isCompact = false) {
     let rightText = String(i.type).toLowerCase().includes('штраф') ? (isDirOrZav ? i.source : "") : i.approver; rightText = formatShortName(rightText); 
     let isCurrent = isCurrentMonth(i.date); if (!isDirOrZav && !isCurrent) { rightText = ""; if (String(i.type).toLowerCase().includes('штраф')) i.source = ""; }
     
-    let sourceHtml = String(i.type).toLowerCase().includes('штраф') ? `<span style="color:gray;font-size:10px;">${i.date}</span>` : `<b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px; margin-left:5px;"> • ${i.date}</span>`; 
+    // ИСТОЧНИК ВОЗВРАЩАЕТСЯ ВНИЗ • ДАТА
+    let sourceHtml = String(i.type).toLowerCase().includes('штраф') ? `<span style="color:gray;font-size:10px;">${i.date}</span>` : `<b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px;"> • ${i.date}</span>`; 
     let approverHtml = (rightText) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${rightText}</span>` : ''; 
     
-    let inner = `<div style="flex:1;"><b style="font-size:12px; color:${typeColor}; display:inline-block; margin-bottom:3px;">${typeDisplay}</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div>${sourceHtml}</div>${approverHtml}</div></div><span class="${col}" style="margin-left:10px;">${valStr}</span>`; 
+    // СТРОГОЕ РАСПОЛОЖЕНИЕ: ЛЕВО И ПРАВО
+    let inner = `<div style="flex:1;"><b style="font-size:12px; color:${typeColor}; display:inline-block; margin-bottom:3px;">${typeDisplay}</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div>${sourceHtml}</div><div>${approverHtml}</div></div></div><span class="${col}" style="margin-left:10px;">${valStr}</span>`; 
     
-    if (isCompact) { return `<div style="padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--card-bg); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">${inner}</div>`; }
+    // ОВАЛЬНЫЕ КРАЯ И ЦВЕТНОЙ БОРТИК СЛЕВА
+    if (isCompact) { return `<div style="padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-color); border-left: 4px solid ${typeColor}; border-radius: 12px; background: var(--card-bg); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">${inner}</div>`; }
     return `<div class="detail-item">${inner}</div>`; 
 }
 
@@ -1463,9 +1466,21 @@ function openDetails(type) {
   let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); 
   document.getElementById("details-kpi-circle-container").innerHTML = ""; let listHtml = "";
   if (type === 'sc') { 
-      document.getElementById("details-title").innerText = "Детали СЦ | BRZY"; listHtml = "<div class='card' style='padding:0;'>"; 
+      document.getElementById("details-title").innerText = "Детали СЦ | BRZY"; listHtml = "<div style='padding:4px;'>"; 
       let currentSc = myScHistory.filter(i => isCurrentMonth(i.date)); currentSc.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
-      if (currentSc.length > 0) { listHtml += currentSc.map((i, idx) => { let srcColor = getSourceColor(i.source); return `<div class="detail-item"><div><span style="color:var(--text-color); font-size:12px;">${idx + 1}. ${i.reason}</span><br><b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${i.source}</b> <span style="color:gray;font-size:10px;"> • ${i.date}</span></div></div>`; }).join(""); } else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В текущем месяце пусто</div>"; 
+      if (currentSc.length > 0) { 
+          listHtml += currentSc.map((i, idx) => { 
+              let srcColor = getSourceColor(i.source); 
+              return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-left: 4px solid ${srcColor}; border-radius: 12px; margin-bottom: 8px; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+                          <div style="flex:1;">
+                              <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${i.reason}</span>
+                              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                                  <div><b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px;"> • ${i.date}</span></div>
+                              </div>
+                          </div>
+                      </div>`; 
+          }).join(""); 
+      } else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В текущем месяце пусто</div>"; 
       listHtml += "</div>"; 
   } 
   else if (type === 'points') { 
@@ -1768,12 +1783,11 @@ function openAdminPlanScDetails() {
             try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; } catch(e){}
             let sellerName = i.authorName;
             
-            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background: var(--card-bg);">
+            return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-left: 4px solid ${srcColor}; border-radius: 12px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                         <div style="flex:1;">
                             <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-                                <b style="color:${srcColor}; font-size:10px;">${sourceText}</b> 
-                                <span style="color:gray;font-size:10px;">${i.date}</span>
+                                <div><b style="color:${srcColor}; font-size:10px;">${sourceText}</b><span style="color:gray;font-size:10px;"> • ${i.date}</span></div>
                                 <span style="color:gray;font-size:10px;">${sellerName}</span>
                             </div>
                         </div>
@@ -1860,12 +1874,11 @@ function renderEmpScDetailsData(iin) {
             let match = rawDetails.match(/\n\[(.*?)\]$/); 
             if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
             
-            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background: var(--card-bg);">
+            return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-left: 4px solid ${srcColor}; border-radius: 12px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                         <div style="flex:1;">
                             <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${rawDetails}</span>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-                                <b style="color:${srcColor}; font-size:10px;">${i.source}</b> 
-                                <span style="color:gray;font-size:10px;">${i.date}</span>
+                                <div><b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px;"> • ${i.date}</span></div>
                                 <span style="color:gray;font-size:10px;">${emp.name}</span>
                             </div>
                         </div>
