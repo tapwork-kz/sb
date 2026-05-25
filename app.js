@@ -344,9 +344,9 @@ function generateDatePanelHTML(idPrefix, onChangeFuncName) {
     return `
     <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             <span style="color:gray; font-weight:bold;">-</span>
-            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             
             <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
                 <input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
@@ -1154,11 +1154,12 @@ function buildStandardRow(p) {
     let borderStyle = p.hasBorder ? `border-left: 2px solid ${p.typeColor};` : '';
     let rightTopHtml = p.valText ? `<span class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap;">${p.valText}</span>` : '';
     let rightBottomHtml = p.nameText ? `<span style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px;">${p.nameText}</span>` : '';
+    let titleWeight = p.isBoldTitle ? 'bold' : 'normal';
     
     return `
     <div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; justify-content: space-between; align-items: center; ${borderStyle}">
         <div style="flex:1; min-width:0;">
-            <div style="color:var(--text-color); font-size:12px; font-weight:bold; margin-bottom:4px; white-space:normal; word-break:break-word;">${p.title}</div>
+            <div style="color:var(--text-color); font-size:12px; font-weight:${titleWeight}; margin-bottom:4px; white-space:normal; word-break:break-word;">${p.title}</div>
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     <b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span>
@@ -1271,9 +1272,9 @@ function renderDashboardData(data, isSilent = false) {
                     </div>
                     
                     <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
                         <span style="color:gray; font-weight:bold;">-</span>
-                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
                         
                         <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
                             <input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
@@ -1525,14 +1526,15 @@ function openDetails(type) {
           if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } 
           
           listHtml += buildStandardRow({
-              title: dispName,
-              typeText: k.source,
-              typeColor: srcColor,
-              dateText: k.date || "За месяц",
-              valText: valStr,
-              valClass: col,
-              hasBorder: false
-          });
+          title: dispName,
+          isBoldTitle: (dispName === "Базовый KPI" || dispName === "База"),
+          typeText: k.source,
+          typeColor: srcColor,
+          dateText: k.date || "За месяц",
+          valText: valStr,
+          valClass: col,
+          hasBorder: false
+      });
       }); 
       listHtml += "</div>"; 
   }
@@ -1594,7 +1596,20 @@ function renderEmpDetailTab(tab, iin) {
   if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
   else if (tab === 'pts') { 
     html = `<div class="grid-details-container inner-block"><div style="display:flex; justify-content:space-around; text-align:center; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:10px;"><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Нач.</div><b style="font-size:15px;">${emp.pts.acc || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Исп.</div><b style="font-size:15px;">${emp.pts.use || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Ост.</div><b style="font-size:15px; color:#27ae60;">${emp.pts.rem || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Штрф.</div><b style="font-size:15px; color:#e74c3c;">${emp.pts.fin || 0}</b></div></div><div class="grid-details-title">История баллов</div></div>`; 
-    html += groupAndRenderByMonth((emp.ptsHistory || []).filter(p => p.type !== "KPI"), p => { let ptsNum = parseFloat(String(p.val).replace(',', '.')) || 0; if (ptsNum !== 0) return renderHistoryItem({...p, val: ptsNum}, true); return ""; });
+    
+    let displayHistory = (emp.ptsHistory || []).filter(p => { 
+        let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; 
+        if (p.type === "KPI" && p.source !== "Горячий чек") return false; 
+        if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; 
+        return ptsVal !== 0; 
+    });
+    
+    html += "<div class='card' style='padding:0; overflow:hidden;'>";
+    html += groupAndRenderByMonth(displayHistory, p => { 
+        let ptsNum = parseFloat(String(p.val).replace(',', '.')) || 0; 
+        return renderHistoryItem({...p, val: ptsNum}, true); 
+    });
+    html += "</div>";
   }
   else if (tab === 'viol') {
     html = `<div style="display:flex; gap:8px; margin-bottom:12px;"><button class="btn-red" onclick="document.getElementById('fine-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0;">Выписать штраф</button><button class="btn-orange" onclick="document.getElementById('remark-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0;">Сделать замечание</button></div>`;
@@ -1869,9 +1884,9 @@ function openEmpScDetails(iin) {
     let headerHtml = `
     <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-            <input type="date" id="emp-sc-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+            <input type="date" id="emp-sc-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             <span style="color:gray; font-weight:bold;">-</span>
-            <input type="date" id="emp-sc-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+            <input type="date" id="emp-sc-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             
             <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
                 <input type="date" onchange="setEmpScDates('single', this.value, '${iin}'); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
