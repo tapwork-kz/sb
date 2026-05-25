@@ -1425,15 +1425,7 @@ function renderHistoryItem(i, isCompact = false) {
     // ПРЯМО ТУТ ФИКСИРУЕМ ЗАГОЛОВКИ
     if (String(i.type).toLowerCase() === "начисление") { 
         typeColor = "#27ae60"; 
-        let src = String(i.source).toLowerCase();
-        let reas = String(i.reason).toLowerCase();
-        if (src.includes("фокус") || reas.includes("фокус")) {
-            typeDisplay = "Фокус";
-        } else if (src.includes("trade") || src.includes("brzy")) {
-            typeDisplay = "Trade-In";
-        } else {
-            typeDisplay = "СЦ";
-        }
+        typeDisplay = i.source; // Пишем СЦ, Фокус или Trade-In
     } else if (String(i.type).toLowerCase().includes('использ')) { typeColor = "#f39c12"; } else if (String(i.type).toLowerCase().includes('штраф')) { typeColor = "#e74c3c"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { typeColor = "#27ae60"; typeDisplay = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
     
     let rightText = String(i.type).toLowerCase().includes('штраф') ? (isDirOrZav ? i.source : "") : i.approver; rightText = formatShortName(rightText); 
@@ -1444,7 +1436,7 @@ function renderHistoryItem(i, isCompact = false) {
     let approverHtml = (rightText) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${rightText}</span>` : ''; 
     
     let inner = `<div style="flex:1;"><b style="font-size:12px; color:${typeColor}; display:inline-block; margin-bottom:3px;">${typeDisplay}</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div>${sourceHtml}</div>${approverHtml}</div></div><span class="${col}" style="margin-left:10px;">${valStr}</span>`; 
-    if (isCompact) { return `<div style="border-left: 3px solid ${typeColor}; padding: 10px 14px; border-bottom: 1px solid rgba(130, 130, 130, 0.35); display: flex; justify-content: space-between; align-items: center; margin: 0; background: var(--card-bg); box-shadow: none; border-radius: 0;">${inner}</div>`; }
+    if (isCompact) { return `<div class="req-item" style="border-left-color: ${typeColor}; border-left-width: 2px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">${inner}</div>`; }
     return `<div class="detail-item">${inner}</div>`; 
 }
 
@@ -1596,9 +1588,8 @@ function renderAdminEmps(dept, btnElement) {
    let container = document.getElementById("admin-emp-list"); let filtered = allEmployeesData.filter(e => e.dept.toLowerCase().includes(dept.toLowerCase())); let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
    container.innerHTML = filtered.map(e => { 
        let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix)); let curMonthSc = monthScHist.filter(p => !p.source.toLowerCase().includes("trade-in")).length; let curMonthTrade = monthScHist.filter(p => p.source.toLowerCase().includes("trade-in")).length; 
-       let kpiStrMain = String(e.kpi);
-       let kpiFontSize = kpiStrMain.includes('.') ? (kpiStrMain.length > 4 ? '6.5px' : '7.5px') : '10px';
-       return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px; height:34px; display:flex; align-items:center;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b>${curMonthSc}</b> | BRZY: <b>${curMonthTrade}</b> <span style="font-weight:normal; margin: 0 2px;">/</span> <b style="color:var(--text-color);">${e.sales.sc} | ${e.sales.trade}</b> 👆</span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
+       let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
+       return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px; height:34px; display:flex; align-items:center;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ | Brzy: <b style="color:var(--btn-color);">${curMonthSc} | ${curMonthTrade}</b> <span style="font-weight:normal; margin: 0 2px;">/</span> <b style="color:var(--text-color);">${e.sales.sc} | ${e.sales.trade}</b> 👆</span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
    }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
 }
 
@@ -1745,17 +1736,11 @@ function openAdminPlanScDetails() {
             try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; } catch(e){}
             let sellerName = formatShortName(i.authorName);
             
-            let currentSeller = typeof i.authorName !== 'undefined' ? i.authorName : emp.name;
-            let fullSellerName = formatShortName(currentSeller); // или оставь полное i.authorName если нужно без сокращений
-            
-            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); background: var(--card-bg);">
-                        <span style="color:var(--text-color); font-size:12px; font-weight:bold; display:block; word-break:break-word; margin-bottom:6px;">${idx + 1}. ${rawDetails}</span>
-                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px;">
-                            <div>
-                                <b style="color:${srcColor};">${sourceText}</b> 
-                                <span style="color:gray;"> • ${i.date}</span>
-                            </div>
-                            <div style="color:gray; text-align:right;">👤 ${fullSellerName}</div>
+            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                        <div style="flex:1;">
+                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span><br>
+                            <b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${sourceText}</b> 
+                            <span style="color:gray;font-size:10px;"> • ${i.date} • 👤 ${sellerName}</span>
                         </div>
                     </div>`;
         }).join("");
@@ -1774,85 +1759,32 @@ function openEmpScDetails(iin) {
     document.getElementById("details-title").innerText = `СЦ | BRZY: ${emp.name}`;
     document.getElementById("details-kpi-circle-container").innerHTML = ""; 
     
-    let html = `
-    <div class="no-swipe" style="padding: 12px; background: var(--card-bg); margin-bottom: 12px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; gap: 6px; align-items: center;">
-        <input type="date" id="emp-sc-start" style="flex:1; background:var(--bg-color); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;" onchange="renderFilteredEmpSc('${iin}')">
-        <span style="color:gray; font-weight:bold;">-</span>
-        <input type="date" id="emp-sc-end" style="flex:1; background:var(--bg-color); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;" onchange="renderFilteredEmpSc('${iin}')">
-        
-        <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
-            <input type="date" onchange="setEmpScDates('single', '${iin}', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
-            <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; position:relative; z-index:1;">📅</button>
-        </div>
-        
-        <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
-            <input type="month" onchange="setEmpScDates('month', '${iin}', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
-            <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:11px; font-weight:bold; position:relative; z-index:1;">МЕС</button>
-        </div>
-
-        <button class="btn-gray" style="margin:0; height:36px; font-size:12px; border-radius:8px; padding: 0 10px;" onclick="document.getElementById('emp-sc-start').value=''; document.getElementById('emp-sc-end').value=''; renderFilteredEmpSc('${iin}')">Все</button>
-    </div>
-    <div id="emp-sc-render-area"></div>`;
+    let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
+    let sales = emp.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix) && (p.source.toLowerCase().includes("сц") || p.source.toLowerCase().includes("фокус") || p.source.toLowerCase().includes("trade-in")));
     
-    document.getElementById("details-list").innerHTML = html;
-    renderFilteredEmpSc(iin);
-}
-
-// Вспомогательный обработчик быстрых дат для СЦ карточки сотрудника
-function setEmpScDates(type, iin, val) {
-    if (!val) return;
-    let startD = ''; let endD = '';
-    if (type === 'single') {
-        startD = val; endD = val;
-    } else if (type === 'month') {
-        let parts = val.split('-'); 
-        let year = parseInt(parts[0], 10); let month = parseInt(parts[1], 10);
-        startD = formatDateLocal(new Date(year, month - 1, 1));
-        endD = formatDateLocal(new Date(year, month, 0));
-    }
-    document.getElementById('emp-sc-start').value = startD;
-    document.getElementById('emp-sc-end').value = endD;
-    renderFilteredEmpSc(iin);
-}
-
-function renderFilteredEmpSc(iin) {
-    let emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin));
-    if(!emp) return;
-    
-    let startVal = document.getElementById("emp-sc-start").value;
-    let endVal = document.getElementById("emp-sc-end").value;
-    
-    let startTime = startVal ? new Date(startVal).getTime() : 0;
-    let endTime = endVal ? new Date(endVal).getTime() + 86400000 : Infinity;
-    
-    let sales = emp.ptsHistory.filter(p => {
-        if (p.type !== "Начисление") return false;
-        let isScItem = p.source.toLowerCase().includes("сц") || p.source.toLowerCase().includes("фокус") || p.source.toLowerCase().includes("trade-in");
-        if (!isScItem) return false;
-        
-        let rd = parseCustomDate(p.date);
-        return rd >= startTime && rd <= endTime;
-    });
-    
-    let listHtml = "<div class='card' style='padding:0; border:none; background:transparent;'>";
+    let listHtml = "<div class='card' style='padding:0;'>";
     if (sales.length > 0) {
-        listHtml += groupAndRenderByMonth(sales, (i) => {
+        sales.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+        listHtml += sales.map((i, idx) => {
             let srcColor = getSourceColor(i.source); 
+            
+            // Вырезаем квадратные скобки
             let rawDetails = i.reason || "";
             let match = rawDetails.match(/\n\[(.*?)\]$/); 
             if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
+            let sellerName = formatShortName(emp.name);
             
-            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); margin-bottom:4px; border-radius:8px;">
+            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
                         <div style="flex:1;">
-                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${rawDetails}</span><br>
+                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span><br>
                             <b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${i.source}</b> 
-                            <span style="color:gray;font-size:10px;"> • ${i.date}</span>
+                            <span style="color:gray;font-size:10px;"> • ${i.date} • 👤 ${sellerName}</span>
                         </div>
                     </div>`;
-        });
+        }).join("");
     } else {
-        listHtml += "<p style='padding:15px; text-align:center; color:gray; font-size:13px;'>Нет продаж за этот период</p>";
+        listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В этом месяце пусто</div>";
     }
     listHtml += "</div>";
-    document.getElementById("emp-sc-render-area").innerHTML = listHtml;
+    document.getElementById("details-list").innerHTML = listHtml;
 }
