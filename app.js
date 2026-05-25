@@ -1471,7 +1471,7 @@ function openDetails(type) {
       if (currentSc.length > 0) { 
           listHtml += currentSc.map((i, idx) => { 
               let srcColor = getSourceColor(i.source); 
-              return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-left: 4px solid ${srcColor}; border-radius: 12px; margin-bottom: 8px; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+              return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 8px; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                           <div style="flex:1;">
                               <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${i.reason}</span>
                               <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
@@ -1783,7 +1783,7 @@ function openAdminPlanScDetails() {
             try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; } catch(e){}
             let sellerName = i.authorName;
             
-            return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-left: 4px solid ${srcColor}; border-radius: 12px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+            return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                         <div style="flex:1;">
                             <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
@@ -1874,7 +1874,7 @@ function renderEmpScDetailsData(iin) {
             let match = rawDetails.match(/\n\[(.*?)\]$/); 
             if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
             
-            return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-left: 4px solid ${srcColor}; border-radius: 12px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
+            return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
                         <div style="flex:1;">
                             <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${rawDetails}</span>
                             <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
