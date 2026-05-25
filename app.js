@@ -775,7 +775,11 @@ async function callBackend(actionName, payloadData = {}) {
               }
 
               if (kpiChange !== 0) {
-                  let kpiItem = { name: ud.type === "Горячий чек" ? ud.action_text : (ud.type === "Продажа СЦ/Фокус" ? ud.action_text : ud.type), source: ud.type === "Продажа СЦ/Фокус" ? (ud.category || "СЦ") : ud.type, val: kpiChange, date: dateStr };
+                  let kName = ud.action_text || ud.type;
+                  let kSource = ud.category || (ud.type.includes("Trade-In") ? "Trade-In" : ud.type);
+                  if (ud.type.includes("СЦ/Фокус")) kSource = ud.category || "СЦ";
+                  if (ud.type === "Горячий чек") { kName = ud.action_text; kSource = "Горячий чек"; }
+                  let kpiItem = { name: kName, source: kSource, val: kpiChange, date: dateStr };
                   if (ud.iin === appState.iin) { 
                       if (!localData.info.kpiDetails) localData.info.kpiDetails = []; 
                       localData.info.kpiDetails.push(kpiItem); 
@@ -904,13 +908,11 @@ document.addEventListener("DOMContentLoaded", async () => {
       requestNotificationPermission(); initAutoScroll(); initSmartDates(); initSwipe(); 
       if(document.getElementById('password-input')) { 
     let pass = document.getElementById('password-input');
-    pass.style.width = '100%'; 
-    pass.style.boxSizing = 'border-box'; 
-    pass.style.height = '48px'; 
-    pass.style.padding = '0 16px';
-    pass.style.fontSize = '16px';
-    pass.style.borderRadius = '12px';
+    pass.style.width = '100%'; pass.style.boxSizing = 'border-box'; 
+    pass.style.height = '48px'; pass.style.padding = '0 16px';
+    pass.style.fontSize = '16px'; pass.style.borderRadius = '12px';
     pass.style.border = '1px solid var(--border-color)';
+    pass.style.background = 'var(--bg-color)'; pass.style.color = 'var(--text-color)';
     pass.style.marginTop = '8px';
 }
       const urlParams = new URLSearchParams(window.location.search); const urlIin = urlParams.get('iin');
@@ -1244,11 +1246,11 @@ function renderDashboardData(data, isSilent = false) {
                     <div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
-                        <div style="position:relative; display:inline-block; min-width:max-content;">
-                            <input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
-                            <button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none;">Месяц</button>
+                        <div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;">
+                            <input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
+                            <button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button>
                         </div>
-                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">Весь период</button>
+                        <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button>
                     </div>
                     
                     <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
@@ -1420,10 +1422,19 @@ function renderHistoryItem(i, isCompact = false) {
     let valStr = String(i.val).replace('.', ','); let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
     let typeColor = "#95a5a6"; let typeDisplay = i.type; let srcColor = getSourceColor(i.source); 
     
-    if (String(i.type).toLowerCase() === "начисление") { typeColor = "#27ae60"; } else if (String(i.type).toLowerCase().includes('использ')) { typeColor = "#f39c12"; } else if (String(i.type).toLowerCase().includes('штраф')) { typeColor = "#e74c3c"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { typeColor = "#27ae60"; typeDisplay = "Начисление"; col = "detail-plus"; i.approver = ""; }
+    // ПРЯМО ТУТ ФИКСИРУЕМ ЗАГОЛОВКИ
+    if (String(i.type).toLowerCase() === "начисление") { 
+        typeColor = "#27ae60"; 
+        typeDisplay = i.source; // Пишем СЦ, Фокус или Trade-In
+    } else if (String(i.type).toLowerCase().includes('использ')) { typeColor = "#f39c12"; } else if (String(i.type).toLowerCase().includes('штраф')) { typeColor = "#e74c3c"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { typeColor = "#27ae60"; typeDisplay = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
+    
     let rightText = String(i.type).toLowerCase().includes('штраф') ? (isDirOrZav ? i.source : "") : i.approver; rightText = formatShortName(rightText); 
     let isCurrent = isCurrentMonth(i.date); if (!isDirOrZav && !isCurrent) { rightText = ""; if (String(i.type).toLowerCase().includes('штраф')) i.source = ""; }
-    let approverHtml = (rightText) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${rightText}</span>` : ''; let sourceHtml = String(i.type).toLowerCase().includes('штраф') ? `<span style="color:gray;font-size:10px;">${i.date}</span>` : `<b style="color:${srcColor}; font-size:10px;">${i.source}</b> <span style="color:gray;font-size:10px;"> • ${i.date}</span>`; 
+    
+    // Убрали источник снизу для Начислений (т.к. он теперь в заголовке)
+    let sourceHtml = String(i.type).toLowerCase().includes('штраф') ? `<span style="color:gray;font-size:10px;">${i.date}</span>` : `<span style="color:gray;font-size:10px;">${i.date}</span>`; 
+    let approverHtml = (rightText) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${rightText}</span>` : ''; 
+    
     let inner = `<div style="flex:1;"><b style="font-size:12px; color:${typeColor}; display:inline-block; margin-bottom:3px;">${typeDisplay}</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div>${sourceHtml}</div>${approverHtml}</div></div><span class="${col}" style="margin-left:10px;">${valStr}</span>`; 
     if (isCompact) { return `<div class="req-item" style="border-left-color: ${typeColor}; border-left-width: 2px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center;">${inner}</div>`; }
     return `<div class="detail-item">${inner}</div>`; 
@@ -1448,7 +1459,7 @@ function openDetails(type) {
   else if (type === 'kpi') { 
       document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; listHtml = "<div class='card' style='padding:0;'>"; 
       let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date));
-      currentKpi.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name.replace(/^(Фокус|Trade-In|СЦ|Горячий чек)[\s\|:]*/i, '').trim(); if (!dispName) dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } let dateStr = k.date ? `<span style="color:gray;font-size:10px; margin-left:5px;"> • ${k.date}</span>` : ""; listHtml += `<div class="detail-item"><div><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${dispName}</span><br><b style="color:${srcColor}; font-size:10px;">${k.source}</b>${dateStr}</div><span class="${col}">${valStr}</span></div>`; }); 
+      currentKpi.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } let dateStr = k.date ? `<span style="color:gray;font-size:10px; margin-left:5px;"> • ${k.date}</span>` : ""; listHtml += `<div class="detail-item"><div><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${dispName}</span><br><b style="color:${srcColor}; font-size:10px;">${k.source}</b>${dateStr}</div><span class="${col}">${valStr}</span></div>`; }); 
       listHtml += "</div>"; 
   }
   else if (type === 'report') { document.getElementById("details-title").innerText = "Мои отчеты"; listHtml = "<div style='padding-top:5px;'>"; listHtml += myReports.map(generateHorizontalGrid).join(''); listHtml += "</div>"; }
@@ -1468,14 +1479,15 @@ function openEmpKpiDetails(iin, fromDetails = false) {
   let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => { if (fromDetails) openEmpDetails(iin); else switchTab(prevTab); };
   document.getElementById("details-title").innerText = "КФ. ЭФФ: " + emp.name; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
   let listHtml = "<div class='card' style='padding:0;'>"; 
-  emp.kpiDetails.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name.replace(/^(Фокус|Trade-In|СЦ|Горячий чек)[\s\|:]*/i, '').trim(); if (!dispName) dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } let dateStr = k.date ? `<span style="color:gray;font-size:10px; margin-left:5px;"> • ${k.date}</span>` : ""; listHtml += `<div class="detail-item"><div><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${dispName}</span><br><b style="color:${srcColor}; font-size:10px;">${k.source}</b>${dateStr}</div><span class="${col}">${valStr}</span></div>`; }); 
+  emp.kpiDetails.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } let dateStr = k.date ? `<span style="color:gray;font-size:10px; margin-left:5px;"> • ${k.date}</span>` : ""; listHtml += `<div class="detail-item"><div><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${dispName}</span><br><b style="color:${srcColor}; font-size:10px;">${k.source}</b>${dateStr}</div><span class="${col}">${valStr}</span></div>`; }); 
   listHtml += "</div>"; document.getElementById("details-list").innerHTML = listHtml; 
 }
 
 function openEmpDetails(iin) {
   const emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return; 
   let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); 
-  document.getElementById("details-title").innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><span style="flex:1; text-align:center; padding-left:28px;">${emp.name}</span><div class="circle-box" style="width:28px; min-width:28px; height:28px; margin:0; cursor:pointer; box-shadow:none;" onclick="openEmpKpiDetails('${emp.iin}', true)"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(emp.kpi, null, null)} ${emp.kpi > 100 ? 100 : emp.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:24px; height:24px;"><span style="font-size:9px; font-weight:bold; color:${setKpiColor(emp.kpi, null, null)}">${emp.kpi}%</span></div></div></div></div>`;
+  let kpiFontSizeDet = emp.kpi % 1 !== 0 ? '7.5px' : '9px';
+  document.getElementById("details-title").innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><span style="flex:1; text-align:center; padding-left:28px;">${emp.name}</span><div class="circle-box" style="width:28px; min-width:28px; height:28px; margin:0; cursor:pointer; box-shadow:none;" onclick="openEmpKpiDetails('${emp.iin}', true)"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(emp.kpi, null, null)} ${emp.kpi > 100 ? 100 : emp.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:24px; height:24px;"><span style="font-size:${kpiFontSizeDet}; font-weight:bold; color:${setKpiColor(emp.kpi, null, null)}">${emp.kpi}%</span></div></div></div></div>`;
   document.getElementById("details-kpi-circle-container").innerHTML = "";
   let tabsHtml = `<div style="display:flex; gap:6px; margin-bottom:12px; padding:0 4px;"><button id="emp-tab-rep" class="admin-flt active-flt" onclick="renderEmpDetailTab('rep', '${iin}')">Отчет</button><button id="emp-tab-pts" class="admin-flt" onclick="renderEmpDetailTab('pts', '${iin}')">Баллы</button><button id="emp-tab-viol" class="admin-flt" onclick="renderEmpDetailTab('viol', '${iin}')">Нарушения</button></div><div id="emp-detail-content" class="slide-up-fade"></div>`;
   document.getElementById("details-list").innerHTML = tabsHtml; renderEmpDetailTab(window.currentEmpDetailTab || 'rep', iin); 
@@ -1575,7 +1587,8 @@ function renderAdminEmps(dept, btnElement) {
    let container = document.getElementById("admin-emp-list"); let filtered = allEmployeesData.filter(e => e.dept.toLowerCase().includes(dept.toLowerCase())); let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
    container.innerHTML = filtered.map(e => { 
        let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix)); let curMonthSc = monthScHist.filter(p => !p.source.toLowerCase().includes("trade-in")).length; let curMonthTrade = monthScHist.filter(p => p.source.toLowerCase().includes("trade-in")).length; 
-       return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px; height:34px; display:flex; align-items:center;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:10px; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span>СЦ | Brzy: <b style="color:var(--btn-color);">${curMonthSc} | ${curMonthTrade}</b> <span style="font-weight:normal; margin: 0 2px;">/</span> <b style="color:var(--text-color);">${e.sales.sc} | ${e.sales.trade}</b></span><span>Ошибки по отчетам: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
+       let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
+       return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px; height:34px; display:flex; align-items:center;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ | Brzy: <b style="color:var(--btn-color);">${curMonthSc} | ${curMonthTrade}</b> <span style="font-weight:normal; margin: 0 2px;">/</span> <b style="color:var(--text-color);">${e.sales.sc} | ${e.sales.trade}</b> 👆</span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
    }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
 }
 
@@ -1713,19 +1726,63 @@ function openAdminPlanScDetails() {
         listHtml += sales.map((i, idx) => {
             let srcColor = getSourceColor(i.type); 
             let sourceText = i.type === 'Продажа Trade-In' ? 'Trade-In' : 'СЦ/Фокус';
+            
+            // Вырезаем квадратные скобки из текста (убираем одобряющего)
+            let rawDetails = i.details;
+            let match = rawDetails.match(/\n\[(.*?)\]$/); 
+            if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
+            
             try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; } catch(e){}
             let sellerName = formatShortName(i.authorName);
+            
             return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
-                        <div>
-                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${i.details}</span><br>
+                        <div style="flex:1;">
+                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span><br>
                             <b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${sourceText}</b> 
-                            <span style="color:gray;font-size:10px;"> • ${i.date}</span>
+                            <span style="color:gray;font-size:10px;"> • ${i.date} • 👤 ${sellerName}</span>
                         </div>
-                        <div style="color:gray; font-size:11px; text-align:right;">${sellerName}</div>
                     </div>`;
         }).join("");
     } else {
         listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В этом периоде пусто</div>";
+    }
+    listHtml += "</div>";
+    document.getElementById("details-list").innerHTML = listHtml;
+}
+
+function openEmpScDetails(iin) {
+    let emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin));
+    if(!emp) return;
+    let prevTab = lastActiveTab; switchTab('details'); 
+    document.getElementById("btn-details-back").onclick = () => switchTab(prevTab);
+    document.getElementById("details-title").innerText = `СЦ | BRZY: ${emp.name}`;
+    document.getElementById("details-kpi-circle-container").innerHTML = ""; 
+    
+    let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
+    let sales = emp.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix) && (p.source.toLowerCase().includes("сц") || p.source.toLowerCase().includes("фокус") || p.source.toLowerCase().includes("trade-in")));
+    
+    let listHtml = "<div class='card' style='padding:0;'>";
+    if (sales.length > 0) {
+        sales.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+        listHtml += sales.map((i, idx) => {
+            let srcColor = getSourceColor(i.source); 
+            
+            // Вырезаем квадратные скобки
+            let rawDetails = i.reason || "";
+            let match = rawDetails.match(/\n\[(.*?)\]$/); 
+            if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
+            let sellerName = formatShortName(emp.name);
+            
+            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                        <div style="flex:1;">
+                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span><br>
+                            <b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${i.source}</b> 
+                            <span style="color:gray;font-size:10px;"> • ${i.date} • 👤 ${sellerName}</span>
+                        </div>
+                    </div>`;
+        }).join("");
+    } else {
+        listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В этом месяце пусто</div>";
     }
     listHtml += "</div>";
     document.getElementById("details-list").innerHTML = listHtml;
