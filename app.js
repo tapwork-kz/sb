@@ -882,7 +882,6 @@ async function callBackend(actionName, payloadData = {}) {
 
 function vibrate(ms = 50) { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); else if (navigator.vibrate) navigator.vibrate(ms); }
 
-
 let autoScrollAnimation = true; let activeOutsTimer = null; let globalActiveOuts = []; let isUserPromoter = false; let currentAdminScDept = 'Цифра'; let currentEmpDept = 'Цифра'; let currentScTabDept = 'Цифра'; let pollingTimer = null; let lastActiveTab = 'time'; let processedReqIds = new Set(); let tradeInModelsGlobal = []; let selectedTradeInModel = null;
 
 function saveMemory(key, value) { try { localStorage.setItem(key, value); } catch(e){} document.cookie = key + "=" + encodeURIComponent(value || "") + "; max-age=31536000; path=/"; }
@@ -1150,6 +1149,26 @@ function renderTimeUI() { const standardBtns = document.getElementById("standard
 function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace(',','.'))); if (isNaN(n)) return "баллов"; if (n % 1 !== 0) return "балла"; n = Math.floor(n) % 100; let n10 = n % 10; if (n >= 11 && n <= 19) return "баллов"; if (n10 === 1) return "балл"; if (n10 >= 2 && n10 <= 4) return "балла"; return "баллов"; }
 function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 function getSourceColor(src) { let s = String(src).toLowerCase(); if(s.includes('фокус')) return '#e74c3c'; if(s.includes('сц')) return '#e67e22'; if(s.includes('trade-in')) return '#8e44ad'; if(s.includes('горячий')) return '#e84393'; if(s.includes('обмен')) return '#f39c12'; if(s.includes('исправл')) return '#3498db'; if(s.includes('мотивац')) return '#3390ec'; return '#7f8c8d'; }
+
+function buildStandardRow(p) {
+    let borderStyle = p.hasBorder ? `border-left: 2px solid ${p.typeColor};` : '';
+    let rightTopHtml = p.valText ? `<span class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap;">${p.valText}</span>` : '';
+    let rightBottomHtml = p.nameText ? `<span style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px;">${p.nameText}</span>` : '';
+    
+    return `
+    <div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; justify-content: space-between; align-items: center; ${borderStyle}">
+        <div style="flex:1; min-width:0;">
+            <div style="color:var(--text-color); font-size:12px; font-weight:bold; margin-bottom:4px; white-space:normal; word-break:break-word;">${p.title}</div>
+            <div style="display:flex; justify-content:space-between; align-items:center;">
+                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    <b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span>
+                </div>
+                ${rightBottomHtml}
+            </div>
+        </div>
+        ${rightTopHtml}
+    </div>`;
+}
 
 function initSmartDates() { const today = formatDateLocal(new Date()); document.querySelectorAll('.smart-date').forEach(el => { el.dataset.realdate = today; el.value = "Сегодня"; el.addEventListener('focus', function() { this.type = 'date'; this.value = this.dataset.realdate; if(this.showPicker) this.showPicker(); }); el.addEventListener('blur', function() { if(!this.value) this.value = today; this.dataset.realdate = this.value; if (this.value === today) { this.type = 'text'; this.value = "Сегодня"; } else { this.type = 'text'; const d = new Date(this.value); this.value = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } }); el.addEventListener('change', function() { this.blur(); }); }); }
 function initAutoScroll() { const scroller = document.getElementById("scroll-container"); let scrollDir = 1; let scrollTimer = setInterval(() => { if (!autoScrollAnimation || !scroller || scroller.closest('.hidden')) return; scroller.scrollLeft += 1 * scrollDir; if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 1) scrollDir = -1; else if (scroller.scrollLeft <= 0) scrollDir = 1; }, 40); if(scroller) { scroller.addEventListener('touchstart', () => autoScrollAnimation = false, {passive: true}); scroller.addEventListener('touchend', () => { setTimeout(()=>autoScrollAnimation=true, 2000); }, {passive: true}); } }
@@ -1437,23 +1456,28 @@ function generateHorizontalGrid(dataObj) { if (!dataObj.headers || dataObj.heade
 function renderHistoryItem(i, isCompact = false) { 
     let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
     let valStr = String(i.val).replace('.', ','); let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
-    let typeColor = "#95a5a6"; let typeDisplay = i.type; let srcColor = getSourceColor(i.source); 
+    let srcColor = getSourceColor(i.source); 
     
-    if (String(i.type).toLowerCase() === "начисление") { typeColor = "#27ae60"; } else if (String(i.type).toLowerCase().includes('использ')) { typeColor = "#f39c12"; } else if (String(i.type).toLowerCase().includes('штраф')) { typeColor = "#e74c3c"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { typeColor = "#27ae60"; typeDisplay = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
+    let finalType = i.source;
+    let finalColor = srcColor;
+    if (String(i.type).toLowerCase() === "начисление") { finalColor = "#27ae60"; } 
+    else if (String(i.type).toLowerCase().includes('использ')) { finalColor = "#f39c12"; finalType = "Мотивация"; } 
+    else if (String(i.type).toLowerCase().includes('штраф')) { finalColor = "#e74c3c"; finalType = "Штраф"; } 
+    else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { finalColor = "#27ae60"; finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
     
     let rightText = String(i.type).toLowerCase().includes('штраф') ? (isDirOrZav ? i.source : "") : i.approver; rightText = formatShortName(rightText); 
-    let isCurrent = isCurrentMonth(i.date); if (!isDirOrZav && !isCurrent) { rightText = ""; if (String(i.type).toLowerCase().includes('штраф')) i.source = ""; }
-    
-    // ИСТОЧНИК ВОЗВРАЩАЕТСЯ ВНИЗ • ДАТА
-    let sourceHtml = String(i.type).toLowerCase().includes('штраф') ? `<span style="color:gray;font-size:10px;">${i.date}</span>` : `<b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px;"> • ${i.date}</span>`; 
-    let approverHtml = (rightText) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${rightText}</span>` : ''; 
-    
-    // СТРОГОЕ РАСПОЛОЖЕНИЕ: ЛЕВО И ПРАВО
-    let inner = `<div style="flex:1;"><b style="font-size:12px; color:${typeColor}; display:inline-block; margin-bottom:3px;">${typeDisplay}</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div>${sourceHtml}</div><div>${approverHtml}</div></div></div><span class="${col}" style="margin-left:10px;">${valStr}</span>`; 
-    
-    // ОВАЛЬНЫЕ КРАЯ И ЦВЕТНОЙ БОРТИК СЛЕВА
-    if (isCompact) { return `<div style="padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-color); border-left: 4px solid ${typeColor}; border-radius: 12px; background: var(--card-bg); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">${inner}</div>`; }
-    return `<div class="detail-item">${inner}</div>`; 
+    let isCurrent = isCurrentMonth(i.date); if (!isDirOrZav && !isCurrent) { rightText = ""; }
+
+    return buildStandardRow({
+        title: i.reason,
+        typeText: finalType,
+        typeColor: finalColor,
+        dateText: i.date,
+        nameText: rightText,
+        valText: valStr,
+        valClass: col,
+        hasBorder: isCompact 
+    });
 }
 
 function renderMoneyFineItem(i) { 
@@ -1466,33 +1490,50 @@ function openDetails(type) {
   let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); 
   document.getElementById("details-kpi-circle-container").innerHTML = ""; let listHtml = "";
   if (type === 'sc') { 
-      document.getElementById("details-title").innerText = "Детали СЦ | BRZY"; listHtml = "<div style='padding:4px;'>"; 
+      document.getElementById("details-title").innerText = "Детали СЦ | BRZY"; 
+      listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
       let currentSc = myScHistory.filter(i => isCurrentMonth(i.date)); currentSc.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
       if (currentSc.length > 0) { 
           listHtml += currentSc.map((i, idx) => { 
-              let srcColor = getSourceColor(i.source); 
-              return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 8px; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                          <div style="flex:1;">
-                              <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${i.reason}</span>
-                              <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-                                  <div><b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px;"> • ${i.date}</span></div>
-                              </div>
-                          </div>
-                      </div>`; 
+              return buildStandardRow({
+                  title: `${idx + 1}. ${i.reason}`,
+                  typeText: i.source,
+                  typeColor: getSourceColor(i.source),
+                  dateText: i.date,
+                  hasBorder: false
+              });
           }).join(""); 
       } else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В текущем месяце пусто</div>"; 
       listHtml += "</div>"; 
   } 
   else if (type === 'points') { 
       document.getElementById("details-title").innerText = "История Баллов"; 
-      listHtml = "<div style='padding:4px;'>"; 
+      listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
       listHtml += groupAndRenderByMonth(myDisplayPointsHistory, i => renderHistoryItem(i, true)); 
       listHtml += "</div>"; 
   }
   else if (type === 'kpi') { 
-      document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; listHtml = "<div class='card' style='padding:0;'>"; 
+      document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; 
+      listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
       let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date));
-      currentKpi.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } let dateStr = k.date ? `<span style="color:gray;font-size:10px; margin-left:5px;"> • ${k.date}</span>` : ""; listHtml += `<div class="detail-item"><div><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${dispName}</span><br><b style="color:${srcColor}; font-size:10px;">${k.source}</b>${dateStr}</div><span class="${col}">${valStr}</span></div>`; }); 
+      currentKpi.forEach(k => { 
+          let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); 
+          let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; 
+          let srcColor = getSourceColor(k.source); 
+          let dispName = k.name; 
+          if (k.source === "База" || k.name === "Ошибки") dispName = k.name; 
+          if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } 
+          
+          listHtml += buildStandardRow({
+              title: dispName,
+              typeText: k.source,
+              typeColor: srcColor,
+              dateText: k.date || "За месяц",
+              valText: valStr,
+              valClass: col,
+              hasBorder: false
+          });
+      }); 
       listHtml += "</div>"; 
   }
   else if (type === 'report') { document.getElementById("details-title").innerText = "Мои отчеты"; listHtml = "<div style='padding-top:5px;'>"; listHtml += myReports.map(generateHorizontalGrid).join(''); listHtml += "</div>"; }
@@ -1511,9 +1552,28 @@ function openEmpKpiDetails(iin, fromDetails = false) {
   const emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return; 
   let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => { if (fromDetails) openEmpDetails(iin); else switchTab(prevTab); };
   document.getElementById("details-title").innerText = "КФ. ЭФФ: " + emp.name; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
-  let listHtml = "<div class='card' style='padding:0;'>"; 
-  emp.kpiDetails.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } let dateStr = k.date ? `<span style="color:gray;font-size:10px; margin-left:5px;"> • ${k.date}</span>` : ""; listHtml += `<div class="detail-item"><div><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${dispName}</span><br><b style="color:${srcColor}; font-size:10px;">${k.source}</b>${dateStr}</div><span class="${col}">${valStr}</span></div>`; }); 
-  listHtml += "</div>"; document.getElementById("details-list").innerHTML = listHtml; 
+  
+  let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
+  emp.kpiDetails.forEach(k => { 
+      let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); 
+      let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; 
+      let srcColor = getSourceColor(k.source); 
+      let dispName = k.name; 
+      if (k.source === "База" || k.name === "Ошибки") dispName = k.name; 
+      if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } 
+      
+      listHtml += buildStandardRow({
+          title: dispName,
+          typeText: k.source,
+          typeColor: srcColor,
+          dateText: k.date || "За месяц",
+          valText: valStr,
+          valClass: col,
+          hasBorder: false
+      });
+  }); 
+  listHtml += "</div>"; 
+  document.getElementById("details-list").innerHTML = listHtml; 
 }
 
 function openEmpDetails(iin) {
@@ -1769,29 +1829,23 @@ function openAdminPlanScDetails() {
         });
     }
     
-    let listHtml = "<div class='card' style='padding:0;'>";
+    let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>";
     if (sales.length > 0) {
         sales.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date));
         listHtml += sales.map((i, idx) => {
             let srcColor = getSourceColor(i.type); 
             let sourceText = i.type === 'Продажа Trade-In' ? 'Trade-In' : 'СЦ/Фокус';
-            
-            let rawDetails = i.details;
-            let match = rawDetails.match(/\n\[(.*?)\]$/); 
-            if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
-            
+            let rawDetails = i.details; let match = rawDetails.match(/\n\[(.*?)\]$/); if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
             try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; } catch(e){}
-            let sellerName = i.authorName;
             
-            return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                        <div style="flex:1;">
-                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-                                <div><b style="color:${srcColor}; font-size:10px;">${sourceText}</b><span style="color:gray;font-size:10px;"> • ${i.date}</span></div>
-                                <span style="color:gray;font-size:10px;">${sellerName}</span>
-                            </div>
-                        </div>
-                    </div>`;
+            return buildStandardRow({
+                title: `${idx + 1}. ${rawDetails}`,
+                typeText: sourceText,
+                typeColor: srcColor,
+                dateText: i.date,
+                nameText: i.authorName,
+                hasBorder: false 
+            });
         }).join("");
     } else {
         listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В этом периоде пусто</div>";
@@ -1866,23 +1920,18 @@ function renderEmpScDetailsData(iin) {
         return rd >= startTime && rd <= endTime;
     });
 
-    let listHtml = "<div class='card' style='padding:0;'>";
+    let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>";
     if (sales.length > 0) {
         listHtml += groupAndRenderByMonth(sales, i => {
-            let srcColor = getSourceColor(i.source); 
-            let rawDetails = i.reason || "";
-            let match = rawDetails.match(/\n\[(.*?)\]$/); 
-            if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
-            
-            return `<div class="detail-item" style="padding: 12px; border: 1px solid var(--border-color); border-radius: 12px; margin-bottom: 8px; display:flex; justify-content:space-between; align-items:center; background: var(--card-bg); box-shadow: 0 1px 3px rgba(0,0,0,0.02);">
-                        <div style="flex:1;">
-                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${rawDetails}</span>
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
-                                <div><b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px;"> • ${i.date}</span></div>
-                                <span style="color:gray;font-size:10px;">${emp.name}</span>
-                            </div>
-                        </div>
-                    </div>`;
+            let rawDetails = i.reason || ""; let match = rawDetails.match(/\n\[(.*?)\]$/); if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
+            return buildStandardRow({
+                title: rawDetails,
+                typeText: i.source,
+                typeColor: getSourceColor(i.source),
+                dateText: i.date,
+                nameText: emp.name,
+                hasBorder: false
+            });
         });
     } else {
         listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>";
