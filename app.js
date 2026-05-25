@@ -27,7 +27,6 @@ function fmtSum(val) {
     return String(Math.round(val)).replace(/\s/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " "); 
 }
 
-// Надежный фикс местного часового пояса для дат
 function formatDateLocal(d) {
     if (!d) d = new Date();
     let y = d.getFullYear(); let m = ("0" + (d.getMonth() + 1)).slice(-2); let day = ("0" + d.getDate()).slice(-2);
@@ -36,7 +35,6 @@ function formatDateLocal(d) {
 
 window.nomListOpen = false;
 
-// === СЛОВАРЬ НОМЕНКЛАТУР ===
 const NOM_DICT = {
     to: {
         cifra: ["Основной товар GSM", "Основной товар Цифровая и оргтехника", "Основной товар Черная техника"],
@@ -55,7 +53,6 @@ const NOM_DICT = {
     }
 };
 
-// === КАЛЬКУЛЯТОР ДАННЫХ ===
 function calcPlanEngine(rawPlanData) {
     if (!rawPlanData) return null;
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
@@ -109,7 +106,6 @@ function calcPlanEngine(rawPlanData) {
 
     setPcts(r.to, true); setPcts(r.aks, false); setPcts(r.usl, false);
 
-    // СТРОГИЙ ПОДСЧЕТ ПРОДАВЦОВ
     let sCount = { cifra: 0, mbt: 0, kbt: 0 };
     if (window.adminEmployeesGlobal) {
         window.adminEmployeesGlobal.forEach(e => {
@@ -123,7 +119,6 @@ function calcPlanEngine(rawPlanData) {
         });
     }
     
-    // План на продавца
     let sPlan = (cat, dept, count) => count > 0 ? Math.round(r[cat][dept].plan / count) : r[cat][dept].plan;
     let getRatio = (cat, dept) => r.to[dept].plan > 0 ? ((r[cat][dept].plan / r.to[dept].plan) * 100).toFixed(2).replace('.', ',') : "0,00";
     
@@ -136,7 +131,6 @@ function calcPlanEngine(rawPlanData) {
     return r;
 }
 
-// === УНИВЕРСАЛЬНАЯ РИСОВАЛКА КАРТОЧЕК ПЛАНА ===
 function renderPlanUI(pData) {
     let area = document.getElementById("plan-render-area");
     if (!area) return;
@@ -161,7 +155,6 @@ function renderPlanUI(pData) {
     let totalPct = totalPlan > 0 ? ((totalFact / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00";
     let totalPctEd = totalPlan > 0 ? ((totalFactEd / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00";
 
-    // Подсчет СЦ и BRZY за выбранный период дат
     let scCount = 0; let brzyCount = 0;
     if (window.adminHistoryGlobal) {
         let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01";
@@ -179,14 +172,12 @@ function renderPlanUI(pData) {
         });
     }
 
-    // 1. Сводка ОБЩАЯ
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
             <div style="font-size:14px; font-weight:bold; color:var(--text-color); text-transform:none;">Общая сводка</div>
             <div onclick="openAdminPlanScDetails()" style="font-size:11px; font-weight:bold; color:var(--btn-color); cursor:pointer; padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px;">СЦ: ${scCount} | BRZY: ${brzyCount}</div>
         </div>
         
-        <!-- ИТОГИ -->
         <div style="background:var(--card-bg); padding:10px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:12px;">
             <div style="color:#7f8c8d; font-size:12px; text-transform:uppercase; margin-bottom:8px; font-weight:bold; text-align:center; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">Итоговый показатель</div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
@@ -208,7 +199,6 @@ function renderPlanUI(pData) {
             </div>
         </div>
 
-        <!-- ТО -->
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Основной товарооборот</b>
@@ -221,7 +211,6 @@ function renderPlanUI(pData) {
             </div>
         </div>
 
-        <!-- АКС -->
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
@@ -234,7 +223,6 @@ function renderPlanUI(pData) {
             </div>
         </div>
 
-        <!-- УСЛУГИ -->
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
@@ -247,7 +235,6 @@ function renderPlanUI(pData) {
         </div>
     </div>`;
 
-    // 2. Номенклатурные группы
     if (pData.groups && pData.groups.length > 0) {
         html += `
         <div class="inner-block card" style="margin-bottom:12px; padding:0; overflow:hidden; border:1px solid var(--border-color); background:var(--card-bg);">
@@ -282,7 +269,6 @@ function renderPlanUI(pData) {
         </div>`;
     }
 
-    // 3. Отделы
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">Выполнение по отделам</div>`;
     let buildRow = (dTo, dAks, dUsl, isFact) => {
@@ -315,7 +301,6 @@ function renderPlanUI(pData) {
     }
     html += `</div>`;
 
-    // 4. План на продавца
     if (pData.sellers && pData.sellers.length > 0) {
         html += `<div class="inner-block card" style="padding:12px; background:var(--card-bg); border:1px solid var(--border-color);">
             <div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">План на продавца</div>`;
@@ -352,7 +337,42 @@ function renderPlanUI(pData) {
     area.innerHTML = html;
 }
 
-// === КНОПКИ ДАТ ===
+function generateDatePanelHTML(idPrefix, onChangeFuncName) {
+    let d = new Date();
+    let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1));
+    let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    return `
+    <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
+        <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
+            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+            <span style="color:gray; font-weight:bold;">-</span>
+            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+            
+            <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
+                <input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button>
+            </div>
+            
+            <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
+                <input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">🗓️</button>
+            </div>
+            <button class="btn-green" style="margin:0; border-radius:8px; width:36px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="${onChangeFuncName}('search')">🔍</button>
+        </div>
+    </div>`;
+}
+
+function setPanelDates(type, val, idPrefix, reloadFn) {
+    let endD = new Date(); let startD = new Date();
+    if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
+    else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } }
+    if (type !== 'search') {
+        document.getElementById(idPrefix + '-start').value = formatDateLocal(startD); 
+        document.getElementById(idPrefix + '-end').value = formatDateLocal(endD);
+    }
+    if(reloadFn) reloadFn();
+}
+
 function setPlanDates(type, val = null) {
     let endD = new Date(); let startD = new Date();
     if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
@@ -414,7 +434,6 @@ async function loadPlanHistory(isSilent = false) {
     renderPlanUI(pData);
 }
 
-// === ОСНОВНОЙ КОД ПРИЛОЖЕНИЯ ===
 async function callBackend(actionName, payloadData = {}) { 
   try { 
     const getRoleGroup = (roleText) => {
@@ -436,7 +455,7 @@ async function callBackend(actionName, payloadData = {}) {
     if (actionName === "recordAction") {
       const { iin, actionType, isReturn, isAutoReturn } = payloadData;
       const roleGroup = getRoleGroup(); 
-      const exactRole = appState.role; // Полная роль 
+      const exactRole = appState.role; 
       
       if (!isReturn) {
          const currentHour = new Date().getHours();
@@ -452,7 +471,6 @@ async function callBackend(actionName, payloadData = {}) {
             { data: todayLogs }
          ] = await Promise.all([
             supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(),
-            // Вытягиваем роли для правильного подсчета лимитов
             supabaseClient.from('time_tracking').select('*, users(role)').gte('created_at', todayStart.toISOString())
          ]);
 
@@ -477,8 +495,6 @@ async function callBackend(actionName, payloadData = {}) {
       }
       
       let direction = isReturn ? (isAutoReturn ? 'Автовозврат' : 'Возврат') : 'Уход';
-      
-      // ИСПРАВЛЕНИЕ: Если это промоутер, пишем точную роль (exactRole), иначе пишем группу (roleGroup = "Продавец")
       let roleToSave = roleGroup === 'Промоутер' ? exactRole : roleGroup;
 
       const { error } = await supabaseClient.from('time_tracking').insert([{ iin: iin, action_type: actionType, direction: direction, role_group: roleToSave }]);
@@ -495,7 +511,6 @@ async function callBackend(actionName, payloadData = {}) {
          { data: todayLogs }
       ] = await Promise.all([
          supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(),
-         // Забираем role и dept напрямую из join-таблицы users
          supabaseClient.from('time_tracking').select('*, users(full_name, role, dept)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true })
       ]);
 
@@ -534,7 +549,6 @@ async function callBackend(actionName, payloadData = {}) {
           activeOuts: Object.values(activeOutsMap).map(o => {
               let timerLimit = 10;
               let rRole = String(o.role || "").toLowerCase();
-              // ТАЙМЕРЫ: Разделяем промоутеров и продавцов
               if (rRole.includes('промоутер')) {
                   if (o.action === 'Обед') timerLimit = 60; else if (o.action === 'Полдник') timerLimit = 30; else timerLimit = 15;
               } else {
@@ -589,7 +603,6 @@ async function callBackend(actionName, payloadData = {}) {
                           let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type));
                           await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr);
                       }
-                      // Пингуем GAS для мгновенного проставления галочки (если настроено на бэке)
                       fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{});
                   }
               }
@@ -612,7 +625,6 @@ async function callBackend(actionName, payloadData = {}) {
       return { success: true };
     }
 
-    // Добавленный блок, который отправляет заявки (был удален)
     if (actionName === "submitRequest") {
       const { type, details, targetIin, metadata } = payloadData;
       let metaObj = {}; try { metaObj = metadata ? JSON.parse(metadata) : {}; } catch(e) {}
@@ -632,10 +644,8 @@ async function callBackend(actionName, payloadData = {}) {
       const { data: userData, error: userErr } = await supabaseClient.from('users').select('*').eq('iin', appState.iin).maybeSingle();
       if (userErr || !userData) return { authorized: false };
 
-      // ПОЛНОСТЬЮ ОТКЛЮЧИЛИ ОБРАЩЕНИЯ К GOOGLE APPS SCRIPT
       let localData = {}; 
 
-      // ДОБАВЛЯЕМ tradeInModels В ЗАПРОС К SUPABASE
       const [
           { data: allUsers },
           { data: allReqs },
@@ -643,7 +653,7 @@ async function callBackend(actionName, payloadData = {}) {
           { data: kpiDataRaw },
           { data: allSheetInfo },
           { data: scItemsRaw }, 
-          { data: tradeInRaw } // <--- НОВОЕ: Запрос моделей
+          { data: tradeInRaw } 
       ] = await Promise.all([
           supabaseClient.from('users').select('iin, full_name, role, dept'),
           supabaseClient.from('requests').select('*').order('created_at', { ascending: false }),
@@ -651,13 +661,10 @@ async function callBackend(actionName, payloadData = {}) {
           supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1),
           supabaseClient.from('user_sheet_info').select('*'),
           supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1),
-          supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }) // <--- НОВОЕ
+          supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }) 
       ]);
 
-      // БЕРЕМ СЦ ТОВАРЫ ИЗ БАЗЫ
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : [];
-      
-      // ПРЕВРАЩАЕМ ОБЪЕКТЫ В ПРОСТОЙ МАССИВ СТРОК ДЛЯ ВЫПАДАЮЩЕГО СПИСКА
       let tradeInList = (tradeInRaw && tradeInRaw.length > 0) ? tradeInRaw.map(item => item.model_name) : [];
 
       let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 };
@@ -733,7 +740,6 @@ async function callBackend(actionName, payloadData = {}) {
               if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" });
               if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
 
-              // Строгий фильтр: берем только продавцов
               if (u.role.toLowerCase().includes("продавец")) {
                   let emp = { 
                       iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: u.role || 'Продавец', 
@@ -847,7 +853,6 @@ async function callBackend(actionName, payloadData = {}) {
           });
       }
 
-      // Формируем список сменщиков из того же отдела
       let mySellers = adminEmployees.filter(e => e.dept === userData.dept && e.iin !== appState.iin).map(e => ({ iin: e.iin, name: e.name }));
 
       return { 
@@ -867,7 +872,7 @@ async function callBackend(actionName, payloadData = {}) {
           adminInbox: adminInbox, 
           adminHistory: adminHistory, 
           adminEmployees: adminEmployees,
-          sellers: mySellers // <--- Передаем продавцов во фронтенд
+          sellers: mySellers 
       };
     }
   } catch (error) {
@@ -906,17 +911,15 @@ function groupAndRenderByMonth(itemsArray, renderItemFn) {
 document.addEventListener("DOMContentLoaded", async () => {
   try {
       requestNotificationPermission(); initAutoScroll(); initSmartDates(); initSwipe(); 
-      // НАЙТИ ЭТОТ БЛОК:
-if(document.getElementById('password-input')) { 
-    let pass = document.getElementById('password-input');
-    pass.style.width = '100%'; pass.style.boxSizing = 'border-box'; 
-    pass.style.height = '48px'; pass.style.padding = '0 16px';
-    pass.style.fontSize = '16px'; pass.style.borderRadius = '12px';
-    pass.style.border = '1px solid var(--border-color)';
-    // ИЗМЕНИТЬ ФОН ТУТ:
-    pass.style.background = 'var(--card-bg)'; pass.style.color = 'var(--text-color)';
-    pass.style.marginTop = '8px';
-}
+      if(document.getElementById('password-input')) { 
+          let pass = document.getElementById('password-input');
+          pass.style.width = '100%'; pass.style.boxSizing = 'border-box'; 
+          pass.style.height = '48px'; pass.style.padding = '0 16px';
+          pass.style.fontSize = '16px'; pass.style.borderRadius = '12px';
+          pass.style.border = '1px solid var(--border-color)';
+          pass.style.background = 'var(--card-bg)'; pass.style.color = 'var(--text-color)';
+          pass.style.marginTop = '8px';
+      }
       const urlParams = new URLSearchParams(window.location.search); const urlIin = urlParams.get('iin');
       if (appState.iin && appState.token) { 
           document.getElementById("auth-screen").classList.add("hidden"); document.getElementById("main-screen").classList.remove("hidden"); 
@@ -985,14 +988,12 @@ function startPolling() {
     pollingTimer = setInterval(async () => { 
         if (isSensitiveState()) return; 
         if(appState.token && !document.hidden) { 
-            // Каждые 30 сек жестко проверяем очередь перерывов (Делает сайт "живым")
             let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin });
             if(state) { 
                 globalActiveOuts = state.activeOuts || []; 
                 if (appState.role.toLowerCase().includes("директор") || appState.role.toLowerCase().includes("заведующий")) renderAdminOuts(); 
                 else applyLimits(state); 
             }
-            // Если не в инбоксе, обновляем и дашборд
             if (lastActiveTab !== 'inbox') {
                 let data = await callBackend('getDashboardData', { token: appState.token }); 
                 if (data && data.authorized !== false) renderDashboardData(data, true);
@@ -1045,7 +1046,6 @@ function switchTab(tab, direction = null) {
 
 function applyLimits(state) { if (!appState.currentAction) { document.getElementById("btn-break").disabled = !state.canBreak; document.getElementById("btn-lunch").disabled = !state.canLunch; document.getElementById("btn-snack").disabled = !state.canSnack; document.getElementById("action-hint").innerText = (state.canBreak || state.canLunch || state.canSnack) ? "Выберите действие:" : "Очередь заполнена или лимит исчерпан"; } if (state.activeOuts) { globalActiveOuts = state.activeOuts; renderActiveOuts(); } }
 
-// --- УНИВЕРСАЛЬНЫЙ АВТОВОЗВРАТ ДЛЯ ВСЕХ ---
 async function triggerUniversalAutoReturn(iin, actionType, roleGroup) {
     const todayStart = new Date(); todayStart.setHours(0,0,0,0);
     const { data } = await supabaseClient.from('time_tracking')
@@ -1079,7 +1079,6 @@ function renderActiveOuts() {
            let rRole = String(out.role || "").toLowerCase(); 
            let isProm = rRole.includes('промоутер');
 
-           // АВТОВОЗВРАТ ПРОДАВЦОВ (не промоутеров). Если время вышло, скрываем и закрываем в БД.
            if (diffMin <= 0 && !isProm) {
                triggerUniversalAutoReturn(out.iin, out.action, out.role);
                if (out.iin === appState.iin && appState.currentAction === out.action) {
@@ -1087,10 +1086,9 @@ function renderActiveOuts() {
                    document.getElementById("btn-break").disabled = false;
                    document.getElementById("action-hint").innerText = "Выберите действие:";
                }
-               return ""; // Мгновенно убираем из списка
+               return ""; 
            }
            
-           // ОФОРМЛЕНИЕ ТАЙМЕРА (Надпись "Опаздывает")
            if (diffMin > 0) {
                timeText = `${diffMin} мин`; 
            } else { 
@@ -1134,7 +1132,6 @@ async function triggerReturn() {
     document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); 
     document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Фиксируем возвращение..."; 
     
-    // Ручной возврат (isAutoReturn: false) отправляет уведомление в ТГ
     let res = await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isAutoReturn: false }); 
     if (res.success) { 
         document.getElementById("action-hint").innerText = "Обновление лимитов..."; 
@@ -1152,43 +1149,6 @@ function getDeclension(action) { if (!action) return ""; if (action.startsWith("
 function renderTimeUI() { const standardBtns = document.getElementById("standard-buttons"); const returnContainer = document.getElementById("return-button-container"); let actStr = String(appState.currentAction); if (appState.currentAction && actStr !== "null" && actStr !== "undefined" && actStr !== "") { document.getElementById("btn-return").disabled = false; standardBtns.classList.add("hidden"); returnContainer.classList.remove("hidden"); const declension = getDeclension(appState.currentAction); document.getElementById("return-text").innerText = "Вернуться с " + declension; document.getElementById("action-hint").innerText = "Ожидаем возвращения:"; } else { standardBtns.classList.remove("hidden"); returnContainer.classList.add("hidden"); } }
 function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace(',','.'))); if (isNaN(n)) return "баллов"; if (n % 1 !== 0) return "балла"; n = Math.floor(n) % 100; let n10 = n % 10; if (n >= 11 && n <= 19) return "баллов"; if (n10 === 1) return "балл"; if (n10 >= 2 && n10 <= 4) return "балла"; return "баллов"; }
 function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
-
-function generateDatePanelHTML(idPrefix, onChangeFuncName) {
-    let d = new Date();
-    let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1));
-    let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-    return `
-    <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
-        <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
-            <span style="color:gray; font-weight:bold;">-</span>
-            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
-            
-            <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
-                <input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
-                <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button>
-            </div>
-            
-            <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
-                <input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
-                <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">🗓️</button>
-            </div>
-            <button class="btn-green" style="margin:0; border-radius:8px; width:36px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="${onChangeFuncName}('search')">🔍</button>
-        </div>
-    </div>`;
-}
-
-function setPanelDates(type, val, idPrefix, reloadFn) {
-    let endD = new Date(); let startD = new Date();
-    if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
-    else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } }
-    if (type !== 'search') {
-        document.getElementById(idPrefix + '-start').value = formatDateLocal(startD); 
-        document.getElementById(idPrefix + '-end').value = formatDateLocal(endD);
-    }
-    if(reloadFn) reloadFn();
-}
-
 function getSourceColor(src) { let s = String(src).toLowerCase(); if(s.includes('фокус')) return '#e74c3c'; if(s.includes('сц')) return '#e67e22'; if(s.includes('trade-in')) return '#8e44ad'; if(s.includes('горячий')) return '#e84393'; if(s.includes('обмен')) return '#f39c12'; if(s.includes('исправл')) return '#3498db'; if(s.includes('мотивац')) return '#3390ec'; return '#7f8c8d'; }
 
 function initSmartDates() { const today = formatDateLocal(new Date()); document.querySelectorAll('.smart-date').forEach(el => { el.dataset.realdate = today; el.value = "Сегодня"; el.addEventListener('focus', function() { this.type = 'date'; this.value = this.dataset.realdate; if(this.showPicker) this.showPicker(); }); el.addEventListener('blur', function() { if(!this.value) this.value = today; this.dataset.realdate = this.value; if (this.value === today) { this.type = 'text'; this.value = "Сегодня"; } else { this.type = 'text'; const d = new Date(this.value); this.value = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } }); el.addEventListener('change', function() { this.blur(); }); }); }
@@ -1281,7 +1241,6 @@ function renderDashboardData(data, isSilent = false) {
               adminPlanList.innerHTML = `
                 <style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style>
                 <div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
-                    <!-- Отключаем свайп вкладок внутри этой ленты -->
                     <div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button>
                         <button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button>
@@ -1297,7 +1256,6 @@ function renderDashboardData(data, isSilent = false) {
                         <span style="color:gray; font-weight:bold;">-</span>
                         <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
                         
-                        <!-- Кнопка ДЕНЬ (календарик) перед лупой -->
                         <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
                             <input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                             <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button>
@@ -1344,7 +1302,7 @@ function renderDashboardData(data, isSilent = false) {
   if(infoTabel) { infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div>`; }
 
   myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.moneyFine && p.moneyFine !== "0" && p.moneyFine !== ""); myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек");
-  window.myCurrentKpi = kpiValue; // Сохраняем для проверки в форме мотивации
+  window.myCurrentKpi = kpiValue; 
   myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
 
   let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear; 
@@ -1481,19 +1439,16 @@ function renderHistoryItem(i, isCompact = false) {
     let valStr = String(i.val).replace('.', ','); let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
     let typeColor = "#95a5a6"; let typeDisplay = i.type; let srcColor = getSourceColor(i.source); 
     
-    // ВОЗВРАЩАЕМ ЗАГОЛОВКИ (Начисление, Использование, Штраф)
     if (String(i.type).toLowerCase() === "начисление") { typeColor = "#27ae60"; } else if (String(i.type).toLowerCase().includes('использ')) { typeColor = "#f39c12"; } else if (String(i.type).toLowerCase().includes('штраф')) { typeColor = "#e74c3c"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { typeColor = "#27ae60"; typeDisplay = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
     
     let rightText = String(i.type).toLowerCase().includes('штраф') ? (isDirOrZav ? i.source : "") : i.approver; rightText = formatShortName(rightText); 
     let isCurrent = isCurrentMonth(i.date); if (!isDirOrZav && !isCurrent) { rightText = ""; if (String(i.type).toLowerCase().includes('штраф')) i.source = ""; }
     
-    // ИСТОЧНИК ВОЗВРАЩАЕТСЯ ВНИЗ
     let sourceHtml = String(i.type).toLowerCase().includes('штраф') ? `<span style="color:gray;font-size:10px;">${i.date}</span>` : `<b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px; margin-left:5px;"> • ${i.date}</span>`; 
     let approverHtml = (rightText) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${rightText}</span>` : ''; 
     
     let inner = `<div style="flex:1;"><b style="font-size:12px; color:${typeColor}; display:inline-block; margin-bottom:3px;">${typeDisplay}</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div>${sourceHtml}</div>${approverHtml}</div></div><span class="${col}" style="margin-left:10px;">${valStr}</span>`; 
     
-    // КРАСИВЫЕ КАРТОЧКИ ВМЕСТО СПЛОШНОГО ТЕКСТА
     if (isCompact) { return `<div style="padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--card-bg); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">${inner}</div>`; }
     return `<div class="detail-item">${inner}</div>`; 
 }
@@ -1515,7 +1470,7 @@ function openDetails(type) {
   } 
   else if (type === 'points') { 
       document.getElementById("details-title").innerText = "История Баллов"; 
-      listHtml = "<div class='card' style='padding:0 14px;'>"; 
+      listHtml = "<div style='padding:4px;'>"; 
       listHtml += groupAndRenderByMonth(myDisplayPointsHistory, i => renderHistoryItem(i, true)); 
       listHtml += "</div>"; 
   }
@@ -1596,6 +1551,8 @@ function markAsSeen(id, el) { let stored = {}; try { stored = JSON.parse(localSt
 
 let currentHistFilter = 'all';
 function renderAdminHistory(filterType) {
+  if(filterType) currentHistFilter = filterType; ['all', 'sales', 'pts', 'viol'].forEach(f => { let el = document.getElementById('flt-hist-' + f); if(el) el.classList.remove('active-flt'); }); let activeEl = document.getElementById('flt-hist-' + currentHistFilter); if(activeEl) activeEl.classList.add('active-flt');
+  
   let listContainer = document.getElementById("admin-history-list");
   if (!document.getElementById("admin-hist-panel")) {
       let panelDiv = document.createElement("div");
@@ -1614,12 +1571,9 @@ function renderAdminHistory(filterType) {
 
   let aHist = window.adminHistoryGlobal || [];
   aHist = aHist.filter(r => { let rd = parseCustomDate(r.date); return rd >= startTime && rd <= endTime; });
-  
-  // Дальше идет существующий код: if (currentHistFilter === 'sales') { aHist = aHist.filter(...) } ...
-  if(filterType) currentHistFilter = filterType; ['all', 'sales', 'pts', 'viol'].forEach(f => { let el = document.getElementById('flt-hist-' + f); if(el) el.classList.remove('active-flt'); }); let activeEl = document.getElementById('flt-hist-' + currentHistFilter); if(activeEl) activeEl.classList.add('active-flt');
-  let aHist = window.adminHistoryGlobal || [];
+
   if (currentHistFilter === 'sales') { aHist = aHist.filter(r => ["Продажа СЦ/Фокус", "Продажа Trade-In", "Горячий чек"].includes(r.type)); } else if (currentHistFilter === 'pts') { aHist = aHist.filter(r => r.type === "Баллы мотивации"); } else if (currentHistFilter === 'viol') { aHist = aHist.filter(r => r.type === "Замечание" || r.type === "Штраф" || r.type === "Запрос на штраф"); }
-  document.getElementById("admin-history-list").innerHTML = groupAndRenderByMonth(aHist, r => {
+  listContainer.innerHTML = groupAndRenderByMonth(aHist, r => {
     let stColor = r.status === "approved" || r.status === "approved_notify_zav" ? "#27ae60" : (r.status === "rejected" || r.status === "rejected_by_user" || r.status === "rejected_notify_user" || r.status === "rejected_notify_zav" ? "#e74c3c" : "#95a5a6"); let stText = r.status === "approved" || r.status === "approved_notify_zav" ? "Одобрен" : (String(r.status).includes("rejected") ? "Отклонен" : "Просмотрен"); if(r.status === "rejected_by_user") stText = "Отклонен сменщиком"; if (r.type === "Исправление смены") { if (r.status.includes("approved")) stText = "Исправлен"; else if (r.status.includes("rejected")) stText = "Отклонен"; }
     let rawDesc = String(r.details || ""); let approverName = ""; let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){} let match = rawDesc.match(/\n\[(.*?)\]$/); if (match) { approverName = formatShortName(match[1]); rawDesc = rawDesc.replace(/\n\[(.*?)\]$/, "").trim(); } if (metaObj.approver) approverName = formatShortName(metaObj.approver); if (!approverName && r.approver) approverName = formatShortName(r.approver);
     let selDateHtml = metaObj.date ? `<br><span style="color:gray; font-size:11px;">📅 Дата в заявке: <b>${metaObj.date}</b></span>` : ""; let desc = r.type === "Обмен сменами" ? `Сменщик: ${r.targetName || ''}<br>${rawDesc}` : rawDesc; desc = formatRemarkText(desc, r.type === 'Замечание' ? r.targetName : null); let finalDescHtml = r.type === "Замечание" ? `<b>${r.targetName}</b> — ${desc}` : `<b>Детали:</b> ${desc}${selDateHtml}`; let authorStr = r.type === "Замечание" || r.type === "Запрос на штраф" ? `<b style="color:#f39c12;">${formatRemarkAuthor(r.authorName, r.authorRole)}</b>` : `<b>От:</b> ${r.authorName || ''}`;
@@ -1638,7 +1592,6 @@ function renderAdminOuts() {
       let rRole = String(out.role || "").toLowerCase(); 
       let isProm = rRole.includes('промоутер');
 
-      // Универсальный автовозврат для админа (чтобы не видел "опаздывающих" продавцов)
       if (diffMin <= 0 && !isProm) {
           triggerUniversalAutoReturn(out.iin, out.action, out.role);
           return ""; 
@@ -1672,7 +1625,7 @@ function renderAdminEmps(dept, btnElement) {
    container.innerHTML = filtered.map(e => { 
        let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix)); let curMonthSc = monthScHist.filter(p => !p.source.toLowerCase().includes("trade-in")).length; let curMonthTrade = monthScHist.filter(p => p.source.toLowerCase().includes("trade-in")).length; 
        let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
-       return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px; height:34px; display:flex; align-items:center;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | BRZY: <b style="color:var(--btn-color);">${curMonthTrade}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
+       return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px; height:34px; display:flex; align-items:center;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | BRZY: <b style="color:var(--btn-color);">${curMonthTrade}</b> 👆</span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
    }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
 }
 
@@ -1702,16 +1655,13 @@ function renderAdminScItems(dept, btnElement) {
        container.innerHTML = groupAndRenderByMonth(sold, r => {
            const isFocus = dept === "Фокус"; const tagColor = isFocus ? "#f39c12" : "#3390ec"; let metaObj = {}; try { metaObj = JSON.parse(r.meta); } catch(e){} let displayAct = r.actUrl || metaObj.docUrl || ""; let displayDisc = r.discount || metaObj.discount || "0%"; 
            
-           // Вытаскиваем кто одобрил из квадратных скобок внизу строки
            let rawDetails = String(r.details || "");
            let match = rawDetails.match(/\n\[(.*?)\]$/);
            let approverName = "";
            if (match) { approverName = formatShortName(match[1]); rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
 
-           // Формируем блок акта (для Фокуса убираем "(Акт не прикреплен)")
            let actHtml = displayAct ? `📄 <a href="${displayAct}" target="_blank" style="color:#3390ec; text-decoration:none; font-weight:bold;" onclick="event.stopPropagation()">Акт товара</a>` : (isFocus ? '' : '<span style="color:gray; font-size:10px;">(Акт не прикреплен)</span>');
            
-           // Формируем блок кто одобрил
            let approverHtml = approverName ? `<div style="margin-top:6px; font-size:10px; color:gray; text-align:right;">Одобрил: ${approverName}</div>` : '';
 
            return `<div class="inner-block sc-item card" onclick="this.classList.toggle('selected')" style="padding:10px; margin-bottom:8px; border-left: 3px solid ${tagColor}; cursor: pointer; background: var(--card-bg);"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="type-label" style="font-size:9px; font-weight:bold; color:${tagColor};">${isFocus ? 'ФОКУС' : 'СЦ'}</span><span style="font-size:9px; color:gray;">${r.date}</span></div><div style="font-size:12px; font-weight:bold; margin-bottom:4px;">${rawDetails}</div><div style="font-size:11px; line-height:1.4;">👤 <span style="color:gray;">Продавец:</span> <b>${r.authorName}</b><br>${displayDisc !== "0%" ? `🏷️ <span style="color:gray;">Скидка:</span> <b style="color:#e74c3c;">${displayDisc}</b><br>` : ''}${actHtml}</div>${approverHtml}</div>`; 
@@ -1816,8 +1766,7 @@ function openAdminPlanScDetails() {
             if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
             
             try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; } catch(e){}
-            
-            let sellerName = i.authorName; // Берем полное имя, без formatShortName
+            let sellerName = i.authorName;
             
             return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background: var(--card-bg);">
                         <div style="flex:1;">
@@ -1850,19 +1799,19 @@ function openEmpScDetails(iin) {
     let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
     
     let headerHtml = `
-    <div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
+    <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
             <input type="date" id="emp-sc-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
             <span style="color:gray; font-weight:bold;">-</span>
             <input type="date" id="emp-sc-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
             
             <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
-                <input type="date" onchange="setEmpScDates('single', this.value, '${iin}')" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                <input type="date" onchange="setEmpScDates('single', this.value, '${iin}'); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                 <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button>
             </div>
             
             <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
-                <input type="month" onchange="setEmpScDates('month', this.value, '${iin}')" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                <input type="month" onchange="setEmpScDates('month', this.value, '${iin}'); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
                 <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">🗓️</button>
             </div>
             <button class="btn-green" style="margin:0; border-radius:8px; width:36px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="renderEmpScDetailsData('${iin}')">🔍</button>
