@@ -1152,6 +1152,43 @@ function getDeclension(action) { if (!action) return ""; if (action.startsWith("
 function renderTimeUI() { const standardBtns = document.getElementById("standard-buttons"); const returnContainer = document.getElementById("return-button-container"); let actStr = String(appState.currentAction); if (appState.currentAction && actStr !== "null" && actStr !== "undefined" && actStr !== "") { document.getElementById("btn-return").disabled = false; standardBtns.classList.add("hidden"); returnContainer.classList.remove("hidden"); const declension = getDeclension(appState.currentAction); document.getElementById("return-text").innerText = "Вернуться с " + declension; document.getElementById("action-hint").innerText = "Ожидаем возвращения:"; } else { standardBtns.classList.remove("hidden"); returnContainer.classList.add("hidden"); } }
 function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace(',','.'))); if (isNaN(n)) return "баллов"; if (n % 1 !== 0) return "балла"; n = Math.floor(n) % 100; let n10 = n % 10; if (n >= 11 && n <= 19) return "баллов"; if (n10 === 1) return "балл"; if (n10 >= 2 && n10 <= 4) return "балла"; return "баллов"; }
 function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+
+function generateDatePanelHTML(idPrefix, onChangeFuncName) {
+    let d = new Date();
+    let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1));
+    let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    return `
+    <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
+        <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
+            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+            <span style="color:gray; font-weight:bold;">-</span>
+            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;">
+            
+            <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
+                <input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button>
+            </div>
+            
+            <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
+                <input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
+                <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">🗓️</button>
+            </div>
+            <button class="btn-green" style="margin:0; border-radius:8px; width:36px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="${onChangeFuncName}('search')">🔍</button>
+        </div>
+    </div>`;
+}
+
+function setPanelDates(type, val, idPrefix, reloadFn) {
+    let endD = new Date(); let startD = new Date();
+    if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
+    else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } }
+    if (type !== 'search') {
+        document.getElementById(idPrefix + '-start').value = formatDateLocal(startD); 
+        document.getElementById(idPrefix + '-end').value = formatDateLocal(endD);
+    }
+    if(reloadFn) reloadFn();
+}
+
 function getSourceColor(src) { let s = String(src).toLowerCase(); if(s.includes('фокус')) return '#e74c3c'; if(s.includes('сц')) return '#e67e22'; if(s.includes('trade-in')) return '#8e44ad'; if(s.includes('горячий')) return '#e84393'; if(s.includes('обмен')) return '#f39c12'; if(s.includes('исправл')) return '#3498db'; if(s.includes('мотивац')) return '#3390ec'; return '#7f8c8d'; }
 
 function initSmartDates() { const today = formatDateLocal(new Date()); document.querySelectorAll('.smart-date').forEach(el => { el.dataset.realdate = today; el.value = "Сегодня"; el.addEventListener('focus', function() { this.type = 'date'; this.value = this.dataset.realdate; if(this.showPicker) this.showPicker(); }); el.addEventListener('blur', function() { if(!this.value) this.value = today; this.dataset.realdate = this.value; if (this.value === today) { this.type = 'text'; this.value = "Сегодня"; } else { this.type = 'text'; const d = new Date(this.value); this.value = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } }); el.addEventListener('change', function() { this.blur(); }); }); }
@@ -1374,7 +1411,27 @@ function renderDashboardData(data, isSilent = false) {
   let uHistory = data.userHistory || []; uHistory = uHistory.filter(r => !(r.type === "Запрос на штраф" && r.targetIin === appState.iin));
   let uHistList = document.getElementById("user-history-list");
   if (uHistList) {
-      uHistList.innerHTML = groupAndRenderByMonth(uHistory, r => {
+      if (!document.getElementById("user-hist-panel")) {
+          let panelDiv = document.createElement("div");
+          panelDiv.id = "user-hist-panel";
+          panelDiv.innerHTML = generateDatePanelHTML('user-hist', 'window.triggerUserHistReload');
+          uHistList.parentNode.insertBefore(panelDiv, uHistList);
+          
+          window.triggerUserHistReload = function(type, val) {
+              if(type) setPanelDates(type, val, 'user-hist', () => {
+                  let dStr = localStorage.getItem("dashData_" + appState.iin);
+                  if(dStr) renderDashboardData(JSON.parse(dStr), true);
+              });
+          };
+      }
+
+      let usD = document.getElementById("user-hist-start").value;
+      let ueD = document.getElementById("user-hist-end").value;
+      let usTime = new Date(usD).getTime(); let ueTime = new Date(ueD).getTime() + 86400000;
+
+      let filteredUHistory = uHistory.filter(r => { let rd = parseCustomDate(r.date); return rd >= usTime && rd <= ueTime; });
+
+      uHistList.innerHTML = groupAndRenderByMonth(filteredUHistory, r => {
           let stText = "Просмотрен"; let stColor = "#95a5a6";
           if (r.status.includes("approved")) { stText = "Одобрен"; stColor = "#27ae60"; } else if (r.status.includes("rejected")) { stText = "Отклонен"; stColor = "#e74c3c"; }
           if (r.type === "Исправление смены") { if (r.status.includes("approved")) stText = "Исправлен"; else if (r.status.includes("rejected")) stText = "Отклонен"; }
@@ -1424,24 +1481,20 @@ function renderHistoryItem(i, isCompact = false) {
     let valStr = String(i.val).replace('.', ','); let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
     let typeColor = "#95a5a6"; let typeDisplay = i.type; let srcColor = getSourceColor(i.source); 
     
-    // ПРЯМО ТУТ ФИКСИРУЕМ ЗАГОЛОВКИ
-    if (String(i.type).toLowerCase() === "начисление") { 
-        typeColor = "#27ae60"; 
-        typeDisplay = i.source; // Пишем СЦ, Фокус или Trade-In
-    } else if (String(i.type).toLowerCase().includes('использ')) { typeColor = "#f39c12"; } else if (String(i.type).toLowerCase().includes('штраф')) { typeColor = "#e74c3c"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { typeColor = "#27ae60"; typeDisplay = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
+    // ВОЗВРАЩАЕМ ЗАГОЛОВКИ (Начисление, Использование, Штраф)
+    if (String(i.type).toLowerCase() === "начисление") { typeColor = "#27ae60"; } else if (String(i.type).toLowerCase().includes('использ')) { typeColor = "#f39c12"; } else if (String(i.type).toLowerCase().includes('штраф')) { typeColor = "#e74c3c"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { typeColor = "#27ae60"; typeDisplay = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
     
     let rightText = String(i.type).toLowerCase().includes('штраф') ? (isDirOrZav ? i.source : "") : i.approver; rightText = formatShortName(rightText); 
     let isCurrent = isCurrentMonth(i.date); if (!isDirOrZav && !isCurrent) { rightText = ""; if (String(i.type).toLowerCase().includes('штраф')) i.source = ""; }
     
-    // Убрали источник снизу для Начислений (т.к. он теперь в заголовке)
-    let sourceHtml = String(i.type).toLowerCase().includes('штраф') ? `<span style="color:gray;font-size:10px;">${i.date}</span>` : `<span style="color:gray;font-size:10px;">${i.date}</span>`; 
+    // ИСТОЧНИК ВОЗВРАЩАЕТСЯ ВНИЗ
+    let sourceHtml = String(i.type).toLowerCase().includes('штраф') ? `<span style="color:gray;font-size:10px;">${i.date}</span>` : `<b style="color:${srcColor}; font-size:10px;">${i.source}</b><span style="color:gray;font-size:10px; margin-left:5px;"> • ${i.date}</span>`; 
     let approverHtml = (rightText) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${rightText}</span>` : ''; 
     
-    // Заменить последние строки внутри функции renderHistoryItem:
     let inner = `<div style="flex:1;"><b style="font-size:12px; color:${typeColor}; display:inline-block; margin-bottom:3px;">${typeDisplay}</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div>${sourceHtml}</div>${approverHtml}</div></div><span class="${col}" style="margin-left:10px;">${valStr}</span>`; 
-    if (isCompact) { 
-        return `<div style="padding: 10px 0; border-bottom: 1px solid rgba(150,150,150,0.1); display: flex; justify-content: space-between; align-items: center;">${inner}</div>`; 
-    }
+    
+    // КРАСИВЫЕ КАРТОЧКИ ВМЕСТО СПЛОШНОГО ТЕКСТА
+    if (isCompact) { return `<div style="padding: 12px; margin-bottom: 8px; border: 1px solid var(--border-color); border-radius: 12px; background: var(--card-bg); display: flex; justify-content: space-between; align-items: center; box-shadow: 0 1px 3px rgba(0,0,0,0.02);">${inner}</div>`; }
     return `<div class="detail-item">${inner}</div>`; 
 }
 
@@ -1543,6 +1596,26 @@ function markAsSeen(id, el) { let stored = {}; try { stored = JSON.parse(localSt
 
 let currentHistFilter = 'all';
 function renderAdminHistory(filterType) {
+  let listContainer = document.getElementById("admin-history-list");
+  if (!document.getElementById("admin-hist-panel")) {
+      let panelDiv = document.createElement("div");
+      panelDiv.id = "admin-hist-panel";
+      panelDiv.innerHTML = generateDatePanelHTML('admin-hist', 'window.triggerAdminHistReload');
+      listContainer.parentNode.insertBefore(panelDiv, listContainer);
+      window.triggerAdminHistReload = function(type, val) {
+          if(type) setPanelDates(type, val, 'admin-hist', () => renderAdminHistory(currentHistFilter));
+          else renderAdminHistory(currentHistFilter);
+      };
+  }
+  
+  let startD = document.getElementById("admin-hist-start").value;
+  let endD = document.getElementById("admin-hist-end").value;
+  let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000;
+
+  let aHist = window.adminHistoryGlobal || [];
+  aHist = aHist.filter(r => { let rd = parseCustomDate(r.date); return rd >= startTime && rd <= endTime; });
+  
+  // Дальше идет существующий код: if (currentHistFilter === 'sales') { aHist = aHist.filter(...) } ...
   if(filterType) currentHistFilter = filterType; ['all', 'sales', 'pts', 'viol'].forEach(f => { let el = document.getElementById('flt-hist-' + f); if(el) el.classList.remove('active-flt'); }); let activeEl = document.getElementById('flt-hist-' + currentHistFilter); if(activeEl) activeEl.classList.add('active-flt');
   let aHist = window.adminHistoryGlobal || [];
   if (currentHistFilter === 'sales') { aHist = aHist.filter(r => ["Продажа СЦ/Фокус", "Продажа Trade-In", "Горячий чек"].includes(r.type)); } else if (currentHistFilter === 'pts') { aHist = aHist.filter(r => r.type === "Баллы мотивации"); } else if (currentHistFilter === 'viol') { aHist = aHist.filter(r => r.type === "Замечание" || r.type === "Штраф" || r.type === "Запрос на штраф"); }
@@ -1746,11 +1819,11 @@ function openAdminPlanScDetails() {
             
             let sellerName = i.authorName; // Берем полное имя, без formatShortName
             
-            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background: var(--card-bg);">
                         <div style="flex:1;">
-                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span><br>
-                            <b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${sourceText}</b> 
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${idx + 1}. ${rawDetails}</span>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                                <b style="color:${srcColor}; font-size:10px;">${sourceText}</b> 
                                 <span style="color:gray;font-size:10px;">${i.date}</span>
                                 <span style="color:gray;font-size:10px;">${sellerName}</span>
                             </div>
@@ -1838,11 +1911,11 @@ function renderEmpScDetailsData(iin) {
             let match = rawDetails.match(/\n\[(.*?)\]$/); 
             if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); }
             
-            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; background: var(--card-bg);">
                         <div style="flex:1;">
-                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${rawDetails}</span><br>
-                            <b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${i.source}</b> 
-                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;">
+                            <span style="color:var(--text-color); font-size:12px; font-weight:bold;">${rawDetails}</span>
+                            <div style="display:flex; justify-content:space-between; align-items:center; margin-top:6px;">
+                                <b style="color:${srcColor}; font-size:10px;">${i.source}</b> 
                                 <span style="color:gray;font-size:10px;">${i.date}</span>
                                 <span style="color:gray;font-size:10px;">${emp.name}</span>
                             </div>
