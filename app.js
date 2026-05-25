@@ -1444,7 +1444,7 @@ function renderHistoryItem(i, isCompact = false) {
     let approverHtml = (rightText) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${rightText}</span>` : ''; 
     
     let inner = `<div style="flex:1;"><b style="font-size:12px; color:${typeColor}; display:inline-block; margin-bottom:3px;">${typeDisplay}</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div>${sourceHtml}</div>${approverHtml}</div></div><span class="${col}" style="margin-left:10px;">${valStr}</span>`; 
-    if (isCompact) { return `<div style="border-left: 2px solid ${typeColor}; padding: 6px 0 6px 10px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; margin: 0; background: transparent; box-shadow: none; border-radius: 0;">${inner}</div>`; }
+    if (isCompact) { return `<div style="border-left: 3px solid ${typeColor}; padding: 10px 14px; border-bottom: 1px solid rgba(130, 130, 130, 0.35); display: flex; justify-content: space-between; align-items: center; margin: 0; background: var(--card-bg); box-shadow: none; border-radius: 0;">${inner}</div>`; }
     return `<div class="detail-item">${inner}</div>`; 
 }
 
@@ -1745,14 +1745,18 @@ function openAdminPlanScDetails() {
             try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; } catch(e){}
             let sellerName = formatShortName(i.authorName);
             
-            let fullSellerName = i.authorName || i.authorIin;
-            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; gap:12px;">
-                        <div style="flex:1; min-width:0;">
-                            <span style="color:var(--text-color); font-size:12px; font-weight:bold; display:block; word-break:break-word;">${idx + 1}. ${rawDetails}</span>
-                            <b style="color:${srcColor}; font-size:10px; display:inline-block; margin-top:3px;">${sourceText}</b> 
-                            <span style="color:gray;font-size:10px;"> • ${i.date}</span>
+            let currentSeller = typeof i.authorName !== 'undefined' ? i.authorName : emp.name;
+            let fullSellerName = formatShortName(currentSeller); // или оставь полное i.authorName если нужно без сокращений
+            
+            return `<div class="detail-item" style="padding: 12px; border-bottom: 1px solid var(--border-color); background: var(--card-bg);">
+                        <span style="color:var(--text-color); font-size:12px; font-weight:bold; display:block; word-break:break-word; margin-bottom:6px;">${idx + 1}. ${rawDetails}</span>
+                        <div style="display:flex; justify-content:space-between; align-items:center; font-size:10px;">
+                            <div>
+                                <b style="color:${srcColor};">${sourceText}</b> 
+                                <span style="color:gray;"> • ${i.date}</span>
+                            </div>
+                            <div style="color:gray; text-align:right;">👤 ${fullSellerName}</div>
                         </div>
-                        <div style="color:gray; font-size:11px; text-align:right; font-weight:bold; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px;">${fullSellerName}</div>
                     </div>`;
         }).join("");
     } else {
@@ -1771,15 +1775,43 @@ function openEmpScDetails(iin) {
     document.getElementById("details-kpi-circle-container").innerHTML = ""; 
     
     let html = `
-    <div class="no-swipe" style="padding: 10px; background: var(--card-bg); margin-bottom: 12px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; gap: 6px; align-items: center;">
-        <input type="date" id="emp-sc-start" style="flex:1; background:var(--bg-color); border:1px solid var(--border-color); color:var(--text-color); padding:6px; border-radius:8px; font-size:12px; height:34px; box-sizing:border-box;" onchange="renderFilteredEmpSc('${iin}')">
+    <div class="no-swipe" style="padding: 12px; background: var(--card-bg); margin-bottom: 12px; border-radius: 12px; border: 1px solid var(--border-color); display: flex; gap: 6px; align-items: center;">
+        <input type="date" id="emp-sc-start" style="flex:1; background:var(--bg-color); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;" onchange="renderFilteredEmpSc('${iin}')">
         <span style="color:gray; font-weight:bold;">-</span>
-        <input type="date" id="emp-sc-end" style="flex:1; background:var(--bg-color); border:1px solid var(--border-color); color:var(--text-color); padding:6px; border-radius:8px; font-size:12px; height:34px; box-sizing:border-box;" onchange="renderFilteredEmpSc('${iin}')">
-        <button class="btn-gray" style="margin:0; padding:0 12px; height:34px; font-size:12px; border-radius:8px;" onclick="document.getElementById('emp-sc-start').value=''; document.getElementById('emp-sc-end').value=''; renderFilteredEmpSc('${iin}')">Все</button>
+        <input type="date" id="emp-sc-end" style="flex:1; background:var(--bg-color); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:6px; font-size:12px; margin:0; height:36px; box-sizing:border-box;" onchange="renderFilteredEmpSc('${iin}')">
+        
+        <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
+            <input type="date" onchange="setEmpScDates('single', '${iin}', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
+            <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; position:relative; z-index:1;">📅</button>
+        </div>
+        
+        <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
+            <input type="month" onchange="setEmpScDates('month', '${iin}', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;">
+            <button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:11px; font-weight:bold; position:relative; z-index:1;">МЕС</button>
+        </div>
+
+        <button class="btn-gray" style="margin:0; height:36px; font-size:12px; border-radius:8px; padding: 0 10px;" onclick="document.getElementById('emp-sc-start').value=''; document.getElementById('emp-sc-end').value=''; renderFilteredEmpSc('${iin}')">Все</button>
     </div>
     <div id="emp-sc-render-area"></div>`;
     
     document.getElementById("details-list").innerHTML = html;
+    renderFilteredEmpSc(iin);
+}
+
+// Вспомогательный обработчик быстрых дат для СЦ карточки сотрудника
+function setEmpScDates(type, iin, val) {
+    if (!val) return;
+    let startD = ''; let endD = '';
+    if (type === 'single') {
+        startD = val; endD = val;
+    } else if (type === 'month') {
+        let parts = val.split('-'); 
+        let year = parseInt(parts[0], 10); let month = parseInt(parts[1], 10);
+        startD = formatDateLocal(new Date(year, month - 1, 1));
+        endD = formatDateLocal(new Date(year, month, 0));
+    }
+    document.getElementById('emp-sc-start').value = startD;
+    document.getElementById('emp-sc-end').value = endD;
     renderFilteredEmpSc(iin);
 }
 
