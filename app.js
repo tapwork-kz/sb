@@ -205,9 +205,9 @@ function renderPlanUI(pData) {
                 <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.to.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.to.total.plan)}</div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact)}</div><div><span style="color:${getDynColor(pData.to.total.pct)}; font-weight:bold; font-size:10px;">${pData.to.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact + pData.to.total.ed)}</div><div><span style="color:${getDynColor(pData.to.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.to.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(pData.to.total.plan)}</div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact)}</div><div><span style="color:${getDynColor(pData.to.total.pct)}; font-weight:bold; font-size:10px;">${pData.to.total.pct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact + pData.to.total.ed)}</div><div><span style="color:${getDynColor(pData.to.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.to.total.pctEd}%</span></div></div>
             </div>
         </div>
 
@@ -217,9 +217,9 @@ function renderPlanUI(pData) {
                 <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.aks.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.aks.total.targetPct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pct, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pctEd, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.aks.total.targetPct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pct, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pctEd, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div>
             </div>
         </div>
 
@@ -228,9 +228,9 @@ function renderPlanUI(pData) {
                 <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.usl.total.targetPct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pct, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pct}%</span></div></div>
-                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pctEd, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.usl.total.targetPct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pct, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pct}%</span></div></div>
+                <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pctEd, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div>
             </div>
         </div>
     </div>`;
@@ -344,9 +344,9 @@ function generateDatePanelHTML(idPrefix, onChangeFuncName) {
     return `
     <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; line-height:34px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             <span style="color:gray; font-weight:bold;">-</span>
-            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; line-height:34px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             
             <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
                 <input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
@@ -1466,8 +1466,11 @@ function renderHistoryItem(i, isCompact = false) {
     else if (String(i.type).toLowerCase().includes('штраф')) { finalColor = "#e74c3c"; finalType = "Штраф"; } 
     else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { finalColor = "#27ae60"; finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
     
-    let rightText = String(i.type).toLowerCase().includes('штраф') ? (isDirOrZav ? i.source : "") : i.approver; rightText = formatShortName(rightText); 
-    let isCurrent = isCurrentMonth(i.date); if (!isDirOrZav && !isCurrent) { rightText = ""; }
+    let rightText = "";
+    if (isDirOrZav) {
+        let rTextRaw = String(i.type).toLowerCase().includes('штраф') ? i.source : i.approver;
+        rightText = formatShortName(rTextRaw);
+    }
 
     return buildStandardRow({
         title: i.reason,
@@ -1492,26 +1495,44 @@ function openDetails(type) {
   document.getElementById("details-kpi-circle-container").innerHTML = ""; let listHtml = "";
   if (type === 'sc') { 
       document.getElementById("details-title").innerText = "Детали СЦ | BRZY"; 
-      listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
-      let currentSc = myScHistory.filter(i => isCurrentMonth(i.date)); currentSc.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
-      if (currentSc.length > 0) { 
-          listHtml += currentSc.map((i, idx) => { 
-              return buildStandardRow({
-                  title: `${idx + 1}. ${i.reason}`,
-                  typeText: i.source,
-                  typeColor: getSourceColor(i.source),
-                  dateText: i.date,
-                  hasBorder: false
-              });
-          }).join(""); 
-      } else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В текущем месяце пусто</div>"; 
-      listHtml += "</div>"; 
+      listHtml = generateDatePanelHTML('my-sc', 'window.triggerMyScReload');
+      listHtml += "<div id='my-sc-list-container' class='card' style='padding:0; overflow:hidden;'></div>";
+      document.getElementById("details-list").innerHTML = listHtml;
+      
+      window.triggerMyScReload = function(t, val) {
+          if(t && t !== 'search') setPanelDates(t, val, 'my-sc', () => window.triggerMyScReload('search'));
+          else {
+              let st = parseCustomDate(document.getElementById('my-sc-start').value);
+              let en = parseCustomDate(document.getElementById('my-sc-end').value) + 86400000;
+              let arr = myScHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; });
+              arr.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+              let h = "";
+              if(arr.length > 0) {
+                  h += arr.map((i, idx) => buildStandardRow({title: `${idx + 1}. ${i.reason}`, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, hasBorder: false})).join("");
+              } else { h = "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; }
+              document.getElementById('my-sc-list-container').innerHTML = h;
+          }
+      };
+      window.triggerMyScReload('search');
+      return; // Прерываем функцию, так как HTML уже вставлен
   } 
   else if (type === 'points') { 
       document.getElementById("details-title").innerText = "История Баллов"; 
-      listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
-      listHtml += groupAndRenderByMonth(myDisplayPointsHistory, i => renderHistoryItem(i, true)); 
-      listHtml += "</div>"; 
+      listHtml = generateDatePanelHTML('my-pts', 'window.triggerMyPtsReload');
+      listHtml += "<div id='my-pts-list-container' class='card' style='padding:0; overflow:hidden;'></div>";
+      document.getElementById("details-list").innerHTML = listHtml;
+      
+      window.triggerMyPtsReload = function(t, val) {
+          if(t && t !== 'search') setPanelDates(t, val, 'my-pts', () => window.triggerMyPtsReload('search'));
+          else {
+              let st = parseCustomDate(document.getElementById('my-pts-start').value);
+              let en = parseCustomDate(document.getElementById('my-pts-end').value) + 86400000;
+              let arr = myDisplayPointsHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; });
+              document.getElementById('my-pts-list-container').innerHTML = groupAndRenderByMonth(arr, i => renderHistoryItem(i, true));
+          }
+      };
+      window.triggerMyPtsReload('search');
+      return; // Прерываем функцию, так как HTML уже вставлен
   }
   else if (type === 'kpi') { 
       document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; 
