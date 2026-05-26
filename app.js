@@ -1747,10 +1747,7 @@ function renderEmpDetailTab(tab, iin) {
             });
 
             document.getElementById('emp-pts-render-area').innerHTML = groupAndRenderByMonth(displayHistory, p => { 
-                let ptsNum = parseFloat(String(p.val).replace(',', '.')) || 0; 
-                // Добавляем плюс для положительных значений
-                let formattedVal = ptsNum > 0 ? "+" + ptsNum : ptsNum;
-                return renderHistoryItem({...p, val: formattedVal}, true); 
+                return renderHistoryItem(p, true); 
             });
         }
     };
