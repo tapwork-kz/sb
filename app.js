@@ -929,6 +929,7 @@ async function callBackend(actionName, payloadData = {}) {
           adminPlan: localData.adminPlan || null, 
           tradeInModels: tradeInList,
           hotChecks: localData.hotChecks || [], 
+          promoLists: localData.promoLists || [], // <--- ДОБАВИТЬ ЭТУ СТРОКУ
           info: localData.info, 
           userHistory: userHistory, 
           userInbox: userInbox, 
