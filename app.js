@@ -344,9 +344,9 @@ function generateDatePanelHTML(idPrefix, onChangeFuncName) {
     return `
     <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; line-height:34px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+            <input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 4px; font-size:12px; font-family:inherit; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             <span style="color:gray; font-weight:bold;">-</span>
-            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; line-height:34px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+            <input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 4px; font-size:12px; font-family:inherit; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             
             <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
                 <input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
@@ -1272,9 +1272,9 @@ function renderDashboardData(data, isSilent = false) {
                     </div>
                     
                     <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; line-height:34px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 4px; font-size:12px; font-family:inherit; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
                         <span style="color:gray; font-weight:bold;">-</span>
-                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; line-height:34px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 4px; font-size:12px; font-family:inherit; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
                         
                         <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
                             <input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
@@ -1466,14 +1466,23 @@ function renderHistoryItem(i, isCompact = false) {
     else if (String(i.type).toLowerCase().includes('штраф')) { finalColor = "#e74c3c"; finalType = "Штраф"; } 
     else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { finalColor = "#27ae60"; finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
     
+    // Извлекаем ФИО одобряющего из квадратных скобок (если есть)
+    let rawReason = i.reason || "";
+    let extractedApprover = "";
+    let match = rawReason.match(/\n\[(.*?)\]$/);
+    if (match) { 
+        extractedApprover = match[1]; 
+        rawReason = rawReason.replace(/\n\[(.*?)\]$/, "").trim(); 
+    }
+
     let rightText = "";
     if (isDirOrZav) {
-        let rTextRaw = String(i.type).toLowerCase().includes('штраф') ? i.source : i.approver;
+        let rTextRaw = String(i.type).toLowerCase().includes('штраф') ? i.source : (extractedApprover || i.approver);
         rightText = formatShortName(rTextRaw);
     }
 
     return buildStandardRow({
-        title: i.reason,
+        title: rawReason,
         typeText: finalType,
         typeColor: finalColor,
         dateText: i.date,
@@ -1756,7 +1765,7 @@ function renderAdminEmps(dept, btnElement) {
    container.innerHTML = filtered.map(e => { 
        let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix)); let curMonthSc = monthScHist.filter(p => !p.source.toLowerCase().includes("trade-in")).length; let curMonthTrade = monthScHist.filter(p => p.source.toLowerCase().includes("trade-in")).length; 
        let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
-       return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px; height:34px; display:flex; align-items:center;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | BRZY: <b style="color:var(--btn-color);">${curMonthTrade}</b> 👆</span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
+       return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 12px; height:34px; display:flex; align-items:center; justify-content:space-between;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | BRZY: <b style="color:var(--btn-color);">${curMonthTrade}</b> 👆</span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
    }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
 }
 
@@ -1925,9 +1934,9 @@ function openEmpScDetails(iin) {
     let headerHtml = `
     <div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">
         <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-            <input type="date" id="emp-sc-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+            <input type="date" id="emp-sc-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 4px; font-size:12px; font-family:inherit; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             <span style="color:gray; font-weight:bold;">-</span>
-            <input type="date" id="emp-sc-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+            <input type="date" id="emp-sc-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 4px; font-size:12px; font-family:inherit; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
             
             <div style="position:relative; width:36px; height:36px; flex-shrink:0;">
                 <input type="date" onchange="setEmpScDates('single', this.value, '${iin}'); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
