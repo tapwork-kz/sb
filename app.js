@@ -150,7 +150,7 @@ function renderPlanUI(pData) {
     let totalPlan = pData.totalPlan;
     let totalFact = pData.to.total.fact + pData.aks.total.fact + pData.usl.total.fact;
     let totalFactEd = pData.to.total.fact + pData.to.total.ed + pData.aks.total.fact + pData.aks.total.ed + pData.usl.total.fact + pData.usl.total.ed;
-    let remPlan = Math.max(0, totalPlan - totalFactEd);
+    let remPlan = totalPlan - totalFactEd;
 
     let totalPct = totalPlan > 0 ? ((totalFact / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00";
     let totalPctEd = totalPlan > 0 ? ((totalFactEd / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00";
@@ -201,7 +201,7 @@ function renderPlanUI(pData) {
 
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
-                <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Основной товарооборот</b>
+                <b style="color:#7f8c8d; font-size:12px; text-transform:uppercase;">Основной товарооборот</b>
                 <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.to.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
@@ -213,7 +213,7 @@ function renderPlanUI(pData) {
 
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
-                <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
+                <b style="color:#7f8c8d; font-size:12px; text-transform:uppercase;">Сопутствующие товары</b>
                 <span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.aks.total.ed)}</span>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
@@ -225,7 +225,7 @@ function renderPlanUI(pData) {
 
         <div style="background:var(--card-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">
-                <b style="color:var(--text-color); font-size:12px; text-transform:uppercase;">Услуги</b>
+                <b style="color:#7f8c8d; font-size:12px; text-transform:uppercase;">Услуги</b>
             </div>
             <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;">
                 <div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.usl.total.targetPct}%</span></div></div>
@@ -1583,15 +1583,15 @@ function openDetails(type) {
           if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } 
           
           listHtml += buildStandardRow({
-          title: dispName,
-          isBoldTitle: (dispName === "Базовый KPI" || dispName === "База"),
-          typeText: k.source,
-          typeColor: srcColor,
-          dateText: k.date || "За месяц",
-          valText: valStr,
-          valClass: col,
-          hasBorder: false
-      });
+              title: dispName,
+              isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"),
+              typeText: k.source,
+              typeColor: srcColor,
+              dateText: k.date || "За месяц",
+              valText: valStr,
+              valClass: col,
+              hasBorder: false
+          });
       }); 
       listHtml += "</div>"; 
   }
@@ -1623,6 +1623,7 @@ function openEmpKpiDetails(iin, fromDetails = false) {
       
       listHtml += buildStandardRow({
           title: dispName,
+          isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"),
           typeText: k.source,
           typeColor: srcColor,
           dateText: k.date || "За месяц",
