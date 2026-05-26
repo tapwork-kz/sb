@@ -1452,7 +1452,7 @@ function renderDashboardData(data, isSilent = false) {
           hcCard.innerHTML += hcHtml;
       }
 
-      // 2. Отрисовка новых под-списков (promoLists)
+// 2. Отрисовка новых под-списков (promoLists)
 let promoLists = data.promoLists || [];
 if (promoLists.length > 0) {
     hasContent = true;
@@ -1464,35 +1464,45 @@ if (promoLists.length > 0) {
         promoHtml += `<div style="margin-bottom: 8px; font-size:13px; font-weight:bold; color:var(--text-color); border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${safeTitle}</div>`;
         promoHtml += `<div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px;">`;
         list.items.forEach(item => {
-            let combinedName = list.prefix ? `${list.prefix} ${item.name}` : item.name;
-            let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')) || 0;
-            let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')) || 0;
+            try {
+                let combinedName = list.prefix ? `${list.prefix} ${item.name}` : item.name;
+                let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')) || 0;
+                let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')) || 0;
 
-            let badgeHtml = "";
-            if (ptsVal > 0 || kpiBonus > 0) {
-                badgeHtml = `<div style="display:flex; gap:4px; margin-left:8px;">`;
-                if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">+${kpiBonus}%</span>`;
-                if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">+${ptsVal}</span>`;
-                badgeHtml += `</div>`;
+                let badgeHtml = "";
+                if (ptsVal > 0 || kpiBonus > 0) {
+                    badgeHtml = `<div style="display:flex; gap:4px; margin-left:8px;">`;
+                    if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">+${kpiBonus}%</span>`;
+                    if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">+${ptsVal}</span>`;
+                    badgeHtml += `</div>`;
+                }
+
+                // ПОЛНОЕ ЭКРАНИРОВАНИЕ для передачи в onclick (замена кавычек и экранирование)
+                let safeName = combinedName.replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                let safeVal = String(item.val || "0").replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                let safePts = String(item.pts || "0").replace(/\\/g, '\\\\').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                let displayName = escapeHtml(item.name);
+
+                promoHtml += `<div style="display:flex; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); border-radius:8px; padding:2px;">
+                    <button class="btn-gray" style="flex:1; text-align:left; margin:0; font-size:13px; padding:10px; border:none; background:transparent;" 
+                            onclick="submitHotCheck('${safeName}', '${safeVal}', '${safePts}')">
+                        ${displayName}
+                    </button>
+                    ${badgeHtml}
+                </div>`;
+            } catch (err) {
+                console.error("Ошибка рендеринга кнопки промо:", err, item);
+                promoHtml += `<div style="color:red; padding:5px;">Ошибка: ${escapeHtml(item.name)}</div>`;
             }
-
-            // Экранирование для передачи в onclick
-            let safeName = combinedName.replace(/'/g, "\\'");
-            let safeVal = String(item.val).replace(/'/g, "\\'");
-            let safePts = String(item.pts || "0").replace(/'/g, "\\'");
-            let displayName = escapeHtml(item.name);
-
-            promoHtml += `<div style="display:flex; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); border-radius:8px; padding:2px;">
-                <button class="btn-gray" style="flex:1; text-align:left; margin:0; font-size:13px; padding:10px; border:none; background:transparent;" 
-                        onclick="submitHotCheck('${safeName}', '${safeVal}', '${safePts}')">
-                    ${displayName}
-                </button>
-                ${badgeHtml}
-            </div>`;
         });
         promoHtml += `</div>`;
     });
-    hcCard.innerHTML += promoHtml;
+    try {
+        hcCard.innerHTML += promoHtml;
+    } catch (err) {
+        console.error("Ошибка вставки промо-блока:", err);
+        hcCard.innerHTML += `<div style="color:red; padding:10px;">Ошибка отображения акций. Сообщите администратору.</div>`;
+    }
 }
 
       if (hasContent) hcCard.classList.remove("hidden");
