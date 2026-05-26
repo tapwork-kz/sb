@@ -17,7 +17,12 @@ if (tg) { tg.expand(); }
 if ('serviceWorker' in navigator) { 
     window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); }); 
 }
-
+function escapeHtml(str) {
+    if (!str) return '';
+    return str.replace(/&/g, '&amp;')
+              .replace(/</g, '&lt;')
+              .replace(/>/g, '&gt;');
+}
 function safeIin(val) { if(val === undefined || val === null) return ""; return String(val).trim().replace(/^0+/, ''); }
 function requestNotificationPermission() { if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") Notification.requestPermission(); }
 function showPushNotification(title, bodyText) { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: bodyText, icon: "icon.png" }); }
@@ -717,54 +722,71 @@ async function callBackend(actionName, payloadData = {}) {
           else if (d.includes("кбт")) { nameCol = 'col_k_kbt_name'; kpiCol = 'col_l_kbt_kpi'; ptsCol = 'col_m_kbt_pts'; }
           
           if (nameCol) {
-          let currentSub = "";
-          let activePromoList = null;
-          localData.promoLists = []; // Принудительная инициализация
-          freshHotChecks = [];
+    let currentSub = "";
+    let activePromoList = null;
+    localData.promoLists = [];
+    freshHotChecks = [];
 
-          rows.forEach(r => {
-              let btnName = String(r[nameCol] || "").trim();
-              if (!btnName) return;
-              
-              let rawVal = String(r[kpiCol] || "").trim();
-              let btnPts = String(r[ptsCol] || "0").replace('%', '').replace(',', '.').trim();
+    for (let i = 0; i < rows.length; i++) {
+        let r = rows[i];
+        let btnName = String(r[nameCol] || "").trim();
+        if (!btnName) continue;
 
-              if (btnName.startsWith("_")) {
-                  let title = btnName.substring(1).trim();
-                  let prefix = ""; let defKpi = "0";
-                  
-                  if (rawVal.startsWith("_")) {
-                      let spaceIdx = rawVal.indexOf(" ");
-                      if (spaceIdx !== -1) {
-                          prefix = rawVal.substring(1, spaceIdx).trim();
-                          defKpi = rawVal.substring(spaceIdx).replace('%', '').replace(',', '.').trim();
-                      } else {
-                          prefix = rawVal.substring(1).trim();
-                      }
-                  } else {
-                      defKpi = rawVal.replace('%', '').replace(',', '.').trim();
-                  }
-                  
-                  activePromoList = { title: title, prefix: prefix, defKpi: defKpi, items: [] };
-                  localData.promoLists.push(activePromoList);
+        let rawVal = String(r[kpiCol] || "").trim();
+        let btnPts = String(r[ptsCol] || "0").replace('%', '').replace(',', '.').trim();
 
-              } else if (btnName.includes("*")) { 
-                  activePromoList = null; 
-                  let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
-                  freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); 
-              } else { 
-                  if (activePromoList) {
-                      let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
-                      if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi;
-                      activePromoList.items.push({ name: btnName, val: btnVal, pts: btnPts });
-                  } else {
-                      currentSub = btnName; 
-                  }
-              }
-          });
-      }
-      
-      if (freshHotChecks.length > 0) localData.hotChecks = freshHotChecks;
+        if (btnName.startsWith("_")) {
+            // Закрываем предыдущий список (если был)
+            activePromoList = null;
+            let title = btnName.substring(1).trim();
+            let prefix = "";
+            let defKpi = "0";
+
+            if (rawVal.startsWith("_")) {
+                let spaceIdx = rawVal.indexOf(" ");
+                if (spaceIdx !== -1) {
+                    prefix = rawVal.substring(1, spaceIdx).trim();
+                    defKpi = rawVal.substring(spaceIdx).replace('%', '').replace(',', '.').trim();
+                } else {
+                    prefix = rawVal.substring(1).trim();
+                }
+            } else {
+                defKpi = rawVal.replace('%', '').replace(',', '.').trim();
+            }
+
+            activePromoList = { title: title, prefix: prefix, defKpi: defKpi, items: [] };
+            localData.promoLists.push(activePromoList);
+        }
+        else if (btnName.includes("*")) {
+            // Горячий чек – закрываем список
+            activePromoList = null;
+            let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
+            freshHotChecks.push({
+                sub: currentSub,
+                name: btnName.replace(/\*/g, '').trim(),
+                val: btnVal,
+                pts: btnPts
+            });
+        }
+        else {
+            // Обычная строка
+            if (activePromoList) {
+                let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
+                if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi;
+                activePromoList.items.push({
+                    name: btnName,
+                    val: btnVal,
+                    pts: btnPts
+                });
+            } else {
+                // Это заголовок подраздела (например, "Смартфоны")
+                currentSub = btnName;
+            }
+        }
+    }
+
+    if (freshHotChecks.length > 0) localData.hotChecks = freshHotChecks;
+}
 
       let userMap = {}; let adminEmployees = []; let empMap = {};
 
@@ -1430,33 +1452,48 @@ function renderDashboardData(data, isSilent = false) {
           hcCard.innerHTML += hcHtml;
       }
 
-      // 2. Отрисовка новых под-списков
-      let promoLists = data.promoLists || [];
-      if (promoLists.length > 0) {
-          hasContent = true;
-          let promoHtml = "";
-          promoLists.forEach(list => {
-              promoHtml += `<div style="margin-bottom: 8px; font-size:13px; font-weight:bold; color:var(--text-color); border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${list.title}</div>`;
-              promoHtml += `<div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px;">`;
-              list.items.forEach(item => {
-                  let combinedName = list.prefix ? `${list.prefix} ${item.name}` : item.name;
-                  let badgeHtml = ""; 
-                  let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
-                  let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
-                  
-                  if (ptsVal > 0 || kpiBonus > 0) { 
-                      badgeHtml = `<div style="display:flex; gap:4px; margin-left:8px;">`;
-                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">+${kpiBonus}%</span>`;
-                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">+${ptsVal}</span>`;
-                      badgeHtml += `</div>`;
-                  }
-                  
-                  promoHtml += `<div style="display:flex; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); border-radius:8px; padding:2px;"><button class="btn-gray" style="flex:1; text-align:left; margin:0; font-size:13px; padding:10px; border:none; background:transparent;" onclick="submitHotCheck('${combinedName}', '${item.val}', '${item.pts || 0}')">${item.name}</button>${badgeHtml}</div>`;
-              });
-              promoHtml += `</div>`;
-          });
-          hcCard.innerHTML += promoHtml; 
-      }
+      // 2. Отрисовка новых под-списков (promoLists)
+let promoLists = data.promoLists || [];
+if (promoLists.length > 0) {
+    hasContent = true;
+    let promoHtml = "";
+    promoLists.forEach(list => {
+        if (!list || !list.items || !list.items.length) return;
+        // Безопасное экранирование заголовка
+        let safeTitle = escapeHtml(list.title);
+        promoHtml += `<div style="margin-bottom: 8px; font-size:13px; font-weight:bold; color:var(--text-color); border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${safeTitle}</div>`;
+        promoHtml += `<div style="display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px;">`;
+        list.items.forEach(item => {
+            let combinedName = list.prefix ? `${list.prefix} ${item.name}` : item.name;
+            let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')) || 0;
+            let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')) || 0;
+
+            let badgeHtml = "";
+            if (ptsVal > 0 || kpiBonus > 0) {
+                badgeHtml = `<div style="display:flex; gap:4px; margin-left:8px;">`;
+                if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">+${kpiBonus}%</span>`;
+                if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px;">+${ptsVal}</span>`;
+                badgeHtml += `</div>`;
+            }
+
+            // Экранирование для передачи в onclick
+            let safeName = combinedName.replace(/'/g, "\\'");
+            let safeVal = String(item.val).replace(/'/g, "\\'");
+            let safePts = String(item.pts || "0").replace(/'/g, "\\'");
+            let displayName = escapeHtml(item.name);
+
+            promoHtml += `<div style="display:flex; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); border-radius:8px; padding:2px;">
+                <button class="btn-gray" style="flex:1; text-align:left; margin:0; font-size:13px; padding:10px; border:none; background:transparent;" 
+                        onclick="submitHotCheck('${safeName}', '${safeVal}', '${safePts}')">
+                    ${displayName}
+                </button>
+                ${badgeHtml}
+            </div>`;
+        });
+        promoHtml += `</div>`;
+    });
+    hcCard.innerHTML += promoHtml;
+}
 
       if (hasContent) hcCard.classList.remove("hidden");
       else hcCard.classList.add("hidden");
