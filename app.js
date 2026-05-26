@@ -1272,9 +1272,9 @@ function renderDashboardData(data, isSilent = false) {
                     </div>
                     
                     <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
-                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+                        <input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; line-height:34px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
                         <span style="color:gray; font-weight:bold;">-</span>
-                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
+                        <input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; line-height:34px; font-size:12px; text-align:center; margin:0; height:36px; box-sizing:border-box; letter-spacing:-0.5px;">
                         
                         <div style="position:relative; width:44px; height:36px; flex-shrink:0;">
                             <input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;">
@@ -1502,8 +1502,11 @@ function openDetails(type) {
       window.triggerMyScReload = function(t, val) {
           if(t && t !== 'search') setPanelDates(t, val, 'my-sc', () => window.triggerMyScReload('search'));
           else {
-              let st = parseCustomDate(document.getElementById('my-sc-start').value);
-              let en = parseCustomDate(document.getElementById('my-sc-end').value) + 86400000;
+              let startParts = document.getElementById('my-sc-start').value.split('-');
+              let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime();
+              let endParts = document.getElementById('my-sc-end').value.split('-');
+              let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime();
+              
               let arr = myScHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; });
               arr.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
               let h = "";
@@ -1525,8 +1528,11 @@ function openDetails(type) {
       window.triggerMyPtsReload = function(t, val) {
           if(t && t !== 'search') setPanelDates(t, val, 'my-pts', () => window.triggerMyPtsReload('search'));
           else {
-              let st = parseCustomDate(document.getElementById('my-pts-start').value);
-              let en = parseCustomDate(document.getElementById('my-pts-end').value) + 86400000;
+              let startParts = document.getElementById('my-pts-start').value.split('-');
+              let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime();
+              let endParts = document.getElementById('my-pts-end').value.split('-');
+              let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime();
+              
               let arr = myDisplayPointsHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; });
               document.getElementById('my-pts-list-container').innerHTML = groupAndRenderByMonth(arr, i => renderHistoryItem(i, true));
           }
@@ -1618,19 +1624,33 @@ function renderEmpDetailTab(tab, iin) {
   else if (tab === 'pts') { 
     html = `<div class="grid-details-container inner-block"><div style="display:flex; justify-content:space-around; text-align:center; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:10px;"><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Нач.</div><b style="font-size:15px;">${emp.pts.acc || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Исп.</div><b style="font-size:15px;">${emp.pts.use || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Ост.</div><b style="font-size:15px; color:#27ae60;">${emp.pts.rem || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Штрф.</div><b style="font-size:15px; color:#e74c3c;">${emp.pts.fin || 0}</b></div></div><div class="grid-details-title">История баллов</div></div>`; 
     
-    let displayHistory = (emp.ptsHistory || []).filter(p => { 
-        let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; 
-        if (p.type === "KPI" && p.source !== "Горячий чек") return false; 
-        if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; 
-        return ptsVal !== 0; 
-    });
+    html += generateDatePanelHTML('emp-pts', `window.triggerEmpPtsReload_${iin}`);
+    html += `<div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
+
+    window[`triggerEmpPtsReload_${iin}`] = function(t, val) {
+        if(t && t !== 'search') setPanelDates(t, val, 'emp-pts', () => window[`triggerEmpPtsReload_${iin}`]('search'));
+        else {
+            let startParts = document.getElementById('emp-pts-start').value.split('-');
+            let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime();
+            let endParts = document.getElementById('emp-pts-end').value.split('-');
+            let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime();
+            
+            let displayHistory = (emp.ptsHistory || []).filter(p => { 
+                let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; 
+                if (p.type === "KPI" && p.source !== "Горячий чек") return false; 
+                if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; 
+                let rd = parseCustomDate(p.date);
+                return ptsVal !== 0 && rd >= st && rd <= en; 
+            });
+
+            document.getElementById('emp-pts-render-area').innerHTML = groupAndRenderByMonth(displayHistory, p => { 
+                let ptsNum = parseFloat(String(p.val).replace(',', '.')) || 0; 
+                return renderHistoryItem({...p, val: ptsNum}, true); 
+            });
+        }
+    };
     
-    html += "<div class='card' style='padding:0; overflow:hidden;'>";
-    html += groupAndRenderByMonth(displayHistory, p => { 
-        let ptsNum = parseFloat(String(p.val).replace(',', '.')) || 0; 
-        return renderHistoryItem({...p, val: ptsNum}, true); 
-    });
-    html += "</div>";
+    setTimeout(() => window[`triggerEmpPtsReload_${iin}`]('search'), 100);
   }
   else if (tab === 'viol') {
     html = `<div style="display:flex; gap:8px; margin-bottom:12px;"><button class="btn-red" onclick="document.getElementById('fine-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0;">Выписать штраф</button><button class="btn-orange" onclick="document.getElementById('remark-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0;">Сделать замечание</button></div>`;
