@@ -583,34 +583,59 @@ async function callBackend(actionName, payloadData = {}) {
       else {
           let roleStr = String(currentUser.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
           if (isDir) {
-              if (reqAction === "reject_admin") { newStatus = reqType === "Запрос на штраф" ? "rejected_notify_zav" : "rejected_notify_user"; newDetails = req.details + "\n[" + currentUser.full_name + "]"; isHandled = true; responseMsg = "Отклонено"; }
-              else if ((currentStatus === "pending_admin_view" || currentStatus === "pending") && reqAction === "viewed") { newStatus = "viewed"; isHandled = true; responseMsg = "Просмотрено"; }
+              if (reqAction === "reject_admin") { 
+                  // ЗАПИСЫВАЕМ ЧИСТО В МЕТАДАННЫЕ, БЕЗ СКОБОК В ТЕКСТЕ
+                  metaObj.approver = currentUser.full_name;
+                  metaObj.approverIin = appState.iin;
+                  newDetails = req.details; 
+                  newStatus = reqType === "Запрос на штраф" ? "rejected_notify_zav" : "rejected_notify_user"; 
+                  isHandled = true; responseMsg = "Отклонено"; 
+              }
+              else if ((currentStatus === "pending_admin_view" || currentStatus === "pending") && reqAction === "viewed") { 
+                  newStatus = "viewed"; isHandled = true; responseMsg = "Просмотрено"; 
+              }
               else if ((currentStatus === "pending_admin" || currentStatus === "pending") && reqAction === "approve_admin") {
-                  newDetails = req.details + "\n[" + currentUser.full_name + "]";
-                  if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
-                  else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
-                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In") { 
-                  let isTradeIn = reqType === "Продажа Trade-In"; 
-                  let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); 
-                  let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); 
-                  await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: 3, manager_iin: appState.iin }]); 
-                  newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
+                  // ЗАПИСЫВАЕМ ЧИСТО В МЕТАДАННЫЕ
+                  metaObj.approver = currentUser.full_name;
+                  metaObj.approverIin = appState.iin;
+                  newDetails = req.details; 
 
-                  if (reqType === "Продажа СЦ/Фокус" && metaObj.row && metaObj.dept) {
-                      const todayStr = formatDateLocal(new Date());
-                      const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle();
-                      if (scData && scData.items_data) {
-                          let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type));
-                          await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr);
+                  if (reqType === "Запрос на штраф") { 
+                      await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); 
+                      await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); 
+                      newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; 
+                  }
+                  else if (reqType === "Горячий чек") { 
+                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); 
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
+                  }
+                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In") { 
+                      let isTradeIn = reqType === "Продажа Trade-In"; 
+                      let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); 
+                      let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); 
+                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: 3, manager_iin: appState.iin }]); 
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
+
+                      if (reqType === "Продажа СЦ/Фокус" && metaObj.row && metaObj.dept) {
+                          const todayStr = formatDateLocal(new Date());
+                          const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle();
+                          if (scData && scData.items_data) {
+                              let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type));
+                              await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr);
+                          }
+                          fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{});
                       }
-                      fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{});
+                  }
+                  else if (reqType.includes("Баллы мотивации")) { 
+                      let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; 
+                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); 
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
+                  }
+                  else { 
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
                   }
               }
-                  else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
-                  else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
-              }
           }
-      }
       if (isHandled) { await supabaseClient.from('requests').update({ status: newStatus, details: newDetails, metadata: metaObj }).eq('id', reqId); return { success: true, msg: responseMsg }; } else { return { success: false, error: `Действие не распознано` }; }
     }
 
