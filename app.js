@@ -636,6 +636,8 @@ async function callBackend(actionName, payloadData = {}) {
                   }
               }
           }
+      }
+      
       if (isHandled) { await supabaseClient.from('requests').update({ status: newStatus, details: newDetails, metadata: metaObj }).eq('id', reqId); return { success: true, msg: responseMsg }; } else { return { success: false, error: `Действие не распознано` }; }
     }
 
