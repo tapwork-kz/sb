@@ -719,6 +719,8 @@ async function callBackend(actionName, payloadData = {}) {
           if (nameCol) {
           let currentSub = "";
           let activePromoList = null;
+          localData.promoLists = []; // Принудительная инициализация
+          freshHotChecks = [];
 
           rows.forEach(r => {
               let btnName = String(r[nameCol] || "").trim();
@@ -728,7 +730,6 @@ async function callBackend(actionName, payloadData = {}) {
               let btnPts = String(r[ptsCol] || "0").replace('%', '').replace(',', '.').trim();
 
               if (btnName.startsWith("_")) {
-                  // Создаем новый подраздел (список)
                   let title = btnName.substring(1).trim();
                   let prefix = ""; let defKpi = "0";
                   
@@ -745,15 +746,13 @@ async function callBackend(actionName, payloadData = {}) {
                   }
                   
                   activePromoList = { title: title, prefix: prefix, defKpi: defKpi, items: [] };
-                  if (!localData.promoLists) localData.promoLists = [];
                   localData.promoLists.push(activePromoList);
+
               } else if (btnName.includes("*")) { 
-                  // Обычный горячий чек
                   activePromoList = null; 
                   let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
                   freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); 
               } else { 
-                  // Элемент списка или старый подзаголовок
                   if (activePromoList) {
                       let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
                       if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi;
@@ -929,7 +928,7 @@ async function callBackend(actionName, payloadData = {}) {
           adminPlan: localData.adminPlan || null, 
           tradeInModels: tradeInList,
           hotChecks: localData.hotChecks || [], 
-          promoLists: localData.promoLists || [], // <--- ДОБАВИТЬ ЭТУ СТРОКУ
+          promoLists: localData.promoLists || [], // ЖЕСТКО ВОЗВРАЩАЕМ
           info: localData.info, 
           userHistory: userHistory, 
           userInbox: userInbox, 
@@ -1431,7 +1430,7 @@ function renderDashboardData(data, isSilent = false) {
           hcCard.innerHTML += hcHtml;
       }
 
-      // 2. Отрисовка новых под-списков (Слив товаров и т.д.)
+      // 2. Отрисовка новых под-списков
       let promoLists = data.promoLists || [];
       if (promoLists.length > 0) {
           hasContent = true;
@@ -1557,8 +1556,22 @@ function renderDashboardData(data, isSilent = false) {
 function generateHorizontalGrid(dataObj) { if (!dataObj.headers || dataObj.headers.length === 0) return "<div style='padding:8px;text-align:center;color:gray;font-size:12px;'>Нет данных</div>"; let gridCols = `repeat(${dataObj.headers.length}, 1fr)`; let html = `<div class="grid-details-container inner-block"><div class="grid-details-title" style="margin-bottom: 6px;">${dataObj.title}</div><div class="grid-details-box" style="grid-template-columns: ${gridCols}; gap:3px;">`; dataObj.headers.forEach(h => { html += `<div class="grid-details-header">${h || '-'}</div>`; }); dataObj.values.forEach(v => { let displayVal = '-'; if (v === '✔') displayVal = '✅'; else if (v === '✖') displayVal = '❌'; else if (v === 'ПР') displayVal = '<span style="color:#e74c3c;font-weight:bold;">ПР</span>'; else if (v !== '' && v !== '-') displayVal = '<span style="color:#f39c12;font-weight:bold;">'+v+'</span>'; else displayVal = v || '-'; html += `<div class="grid-details-value" style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:4px 0; display:flex; align-items:center; justify-content:center; min-height:28px; width:100%; box-sizing:border-box;">${displayVal}</div>`; }); html += `</div></div>`; return html; }
 
 function renderHistoryItem(i, isCompact = false) { 
-    let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
-    let valStr = String(i.val).replace('.', ','); let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
+    let roleStr = String(appState.role).toLowerCase(); 
+    let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
+    
+    // ЖЕЛЕЗНАЯ ЛОГИКА: Извлекаем число и принудительно ставим знак
+    let rawNum = parseFloat(String(i.val).replace(',', '.').replace('+', '')) || 0;
+    let valStr = String(rawNum).replace('.', ',');
+    
+    // Если число положительное и это не штраф - жестко ставим плюс
+    if (rawNum > 0 && !String(i.type).toLowerCase().includes('штраф')) {
+        valStr = '+' + valStr;
+    } else if (rawNum < 0) {
+        valStr = '-' + Math.abs(rawNum).toString().replace('.', ',');
+    }
+
+    let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; 
+    if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
     let srcColor = getSourceColor(i.source); 
     
     let finalType = i.source;
@@ -1731,26 +1744,27 @@ function renderEmpDetailTab(tab, iin) {
     html += `<div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
 
     window[`triggerEmpPtsReload_${iin}`] = function(t, val) {
-        if(t && t !== 'search') setPanelDates(t, val, 'emp-pts', () => window[`triggerEmpPtsReload_${iin}`]('search'));
-        else {
-            let startParts = document.getElementById('emp-pts-start').value.split('-');
-            let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime();
-            let endParts = document.getElementById('emp-pts-end').value.split('-');
-            let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime();
-            
-            let displayHistory = (emp.ptsHistory || []).filter(p => { 
-                let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; 
-                if (p.type === "KPI" && p.source !== "Горячий чек") return false; 
-                if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; 
-                let rd = parseCustomDate(p.date);
-                return ptsVal !== 0 && rd >= st && rd <= en; 
-            });
+                if(t && t !== 'search') setPanelDates(t, val, 'emp-pts', () => window[`triggerEmpPtsReload_${iin}`]('search'));
+                else {
+                    let startParts = document.getElementById('emp-pts-start').value.split('-');
+                    let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime();
+                    let endParts = document.getElementById('emp-pts-end').value.split('-');
+                    let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime();
+                    
+                    let displayHistory = (emp.ptsHistory || []).filter(p => { 
+                        let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; 
+                        if (p.type === "KPI" && p.source !== "Горячий чек") return false; 
+                        if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; 
+                        let rd = parseCustomDate(p.date);
+                        return ptsVal !== 0 && rd >= st && rd <= en; 
+                    });
 
-            document.getElementById('emp-pts-render-area').innerHTML = groupAndRenderByMonth(displayHistory, p => { 
-                return renderHistoryItem(p, true); 
-            });
-        }
-    };
+                    // Функция renderHistoryItem теперь сама проставит плюсы
+                    document.getElementById('emp-pts-render-area').innerHTML = groupAndRenderByMonth(displayHistory, p => { 
+                        return renderHistoryItem(p, true); 
+                    });
+                }
+            };
     
     setTimeout(() => window[`triggerEmpPtsReload_${iin}`]('search'), 100);
   }
