@@ -718,13 +718,38 @@ async function callBackend(actionName, payloadData = {}) {
           
           if (nameCol) {
               let currentSub = "";
+              let currentSpecial = null;
+              
               rows.forEach(r => {
                   let btnName = String(r[nameCol] || "").trim();
                   if (!btnName) return;
-                  let btnVal = String(r[kpiCol] || "0").replace('%', '').replace(',', '.').trim();
+                  let btnValRaw = String(r[kpiCol] || "").trim();
+                  let btnVal = btnValRaw.replace('%', '').replace(',', '.');
                   let btnPts = String(r[ptsCol] || "0").replace('%', '').replace(',', '.').trim();
-                  if (btnName.includes("*")) { freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); } 
-                  else { currentSub = btnName; }
+
+                  if (btnName.startsWith("_")) {
+                      let title = btnName.substring(1).trim();
+                      let prefix = ""; let kpi = 0;
+                      if (btnValRaw.startsWith("_")) {
+                          let match = btnValRaw.match(/_([A-Za-zА-Яа-яЁё]+)\s*([\d\.\,\%]+)?/);
+                          if (match) { 
+                              prefix = match[1]; 
+                              kpi = (match[2] || "0").replace('%', '').replace(',', '.'); 
+                          }
+                      }
+                      currentSpecial = { title: title, prefix: prefix, kpi: kpi, items: [] };
+                      if (!localData.specialLists) localData.specialLists = [];
+                      localData.specialLists.push(currentSpecial);
+                  } else if (btnName.includes("*")) {
+                      freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts });
+                      currentSpecial = null;
+                  } else {
+                      if (currentSpecial) {
+                          currentSpecial.items.push({ name: btnName, pts: btnPts });
+                      } else {
+                          currentSub = btnName;
+                      }
+                  }
               });
           }
       }
@@ -893,6 +918,7 @@ async function callBackend(actionName, payloadData = {}) {
           adminPlan: localData.adminPlan || null, 
           tradeInModels: tradeInList,
           hotChecks: localData.hotChecks || [], 
+          specialLists: localData.specialLists || [], 
           info: localData.info, 
           userHistory: userHistory, 
           userInbox: userInbox, 
@@ -1362,34 +1388,72 @@ function renderDashboardData(data, isSilent = false) {
   let scEl = document.getElementById("info-sc-val"); if(scEl) { scEl.innerText = `${countSc} | ${countTrade}`; if (countSc + countTrade > 0) scEl.style.color = "#27ae60"; else scEl.style.color = "#e74c3c"; }
 
   let hcCard = document.getElementById("hot-check-card");
-  if (hcCard && data.hotChecks && data.hotChecks.length > 0) {
-      let hcHtml = `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
-      for(let sub in groups) {
-          if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
-          let colsCount = Math.min(groups[sub].length, 4); hcHtml += `<div style="display: grid; grid-template-columns: repeat(${colsCount}, 1fr); gap: 6px; margin-bottom: 6px;">`;
-          groups[sub].forEach(btn => { 
-              let combinedName = sub ? `${sub} ${btn.name}` : btn.name; 
-              let badgeHtml = ""; 
-              let ptsVal = parseFloat(String(btn.pts || "0").replace(',', '.')); 
-              let kpiBonus = parseFloat(String(btn.val || "0").replace(',', '.')); 
-              if (ptsVal > 0 || kpiBonus > 0) { 
-                  badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`;
-                  if (kpiBonus > 0) {
-                      let displayKpi = Number.isInteger(kpiBonus) ? kpiBonus : kpiBonus; 
-                      badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${displayKpi}%</span>`;
-                  }
-                  if (ptsVal > 0) {
-                      let displayPts = Number.isInteger(ptsVal) ? ptsVal : ptsVal;
-                      badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${displayPts}</span>`;
-                  }
-                  badgeHtml += `</div>`;
-              } 
-              hcHtml += `<div style="position:relative; display:flex; flex:1;"><button class="btn-green" style="padding:10px 4px; font-size:12px; margin:0; width:100%;" onclick="submitHotCheck('${combinedName}', '${btn.val}', '${btn.pts || 0}')">${btn.name}</button>${badgeHtml}</div>`; 
-          }); 
-          hcHtml += `</div>`;
+  if (hcCard && ((data.hotChecks && data.hotChecks.length > 0) || (data.specialLists && data.specialLists.length > 0))) {
+      let hcHtml = "";
+      
+      if (data.hotChecks && data.hotChecks.length > 0) {
+          hcHtml += `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; 
+          let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
+          for(let sub in groups) {
+              if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
+              let colsCount = Math.min(groups[sub].length, 4); hcHtml += `<div style="display: grid; grid-template-columns: repeat(${colsCount}, 1fr); gap: 6px; margin-bottom: 6px;">`;
+              groups[sub].forEach(btn => { 
+                  let combinedName = sub ? `${sub} ${btn.name}` : btn.name; 
+                  let badgeHtml = ""; 
+                  let ptsVal = parseFloat(String(btn.pts || "0").replace(',', '.')); 
+                  let kpiBonus = parseFloat(String(btn.val || "0").replace(',', '.')); 
+                  if (ptsVal > 0 || kpiBonus > 0) { 
+                      badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`;
+                      if (kpiBonus > 0) {
+                          let displayKpi = Number.isInteger(kpiBonus) ? kpiBonus : kpiBonus; 
+                          badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${displayKpi}%</span>`;
+                      }
+                      if (ptsVal > 0) {
+                          let displayPts = Number.isInteger(ptsVal) ? ptsVal : ptsVal;
+                          badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${displayPts}</span>`;
+                      }
+                      badgeHtml += `</div>`;
+                  } 
+                  hcHtml += `<div style="position:relative; display:flex; flex:1;"><button class="btn-green" style="padding:10px 4px; font-size:12px; margin:0; width:100%;" onclick="submitHotCheck('${combinedName}', '${btn.val}', '${btn.pts || 0}')">${btn.name}</button>${badgeHtml}</div>`; 
+              }); 
+              hcHtml += `</div>`;
+          }
       }
-      hcCard.innerHTML = hcHtml; hcCard.classList.remove("hidden");
-  } else if (hcCard) { hcCard.classList.add("hidden"); }
+
+      if (data.specialLists && data.specialLists.length > 0) {
+          data.specialLists.forEach(sl => {
+              if (sl.items.length === 0) return;
+              hcHtml += `<div style="margin-bottom: 8px; font-size:13px; font-weight:bold; color:var(--btn-color); border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sl.title}</div>`;
+              let colsCount = Math.min(sl.items.length, 3);
+              hcHtml += `<div style="display: grid; grid-template-columns: repeat(${colsCount}, 1fr); gap: 6px; margin-bottom: 6px;">`;
+              sl.items.forEach(item => {
+                  let combinedName = sl.prefix ? `${sl.prefix} ${item.name}` : item.name;
+                  let badgeHtml = "";
+                  let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.'));
+                  let kpiBonus = parseFloat(String(sl.kpi || "0").replace(',', '.'));
+                  if (ptsVal > 0 || kpiBonus > 0) {
+                      badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`;
+                      if (kpiBonus > 0) {
+                          let displayKpi = Number.isInteger(kpiBonus) ? kpiBonus : kpiBonus;
+                          badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${displayKpi}%</span>`;
+                      }
+                      if (ptsVal > 0) {
+                          let displayPts = Number.isInteger(ptsVal) ? ptsVal : ptsVal;
+                          badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${displayPts}</span>`;
+                      }
+                      badgeHtml += `</div>`;
+                  }
+                  hcHtml += `<div style="position:relative; display:flex; flex:1;"><button class="btn-gray" style="padding:10px 4px; font-size:12px; margin:0; width:100%; border: 1px solid var(--border-color);" onclick="submitHotCheck('${combinedName}', '${sl.kpi}', '${item.pts || 0}')">${item.name}</button>${badgeHtml}</div>`;
+              });
+              hcHtml += `</div>`;
+          });
+      }
+
+      hcCard.innerHTML = hcHtml; 
+      hcCard.classList.remove("hidden");
+  } else if (hcCard) { 
+      hcCard.classList.add("hidden"); 
+  }
     
   let savedReplies = {}; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { savedReplies[ta.id] = ta.value; });
   let uInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; let inboxList = document.getElementById("inbox-list");
@@ -1676,7 +1740,8 @@ function renderEmpDetailTab(tab, iin) {
 
             document.getElementById('emp-pts-render-area').innerHTML = groupAndRenderByMonth(displayHistory, p => { 
                 let ptsNum = parseFloat(String(p.val).replace(',', '.')) || 0; 
-                return renderHistoryItem({...p, val: ptsNum}, true); 
+                let formattedVal = ptsNum > 0 ? "+" + ptsNum : ptsNum;
+                return renderHistoryItem({...p, val: formattedVal}, true); 
             });
         }
     };
