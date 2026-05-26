@@ -1179,22 +1179,25 @@ function getSourceColor(src) { let s = String(src).toLowerCase(); if(s.includes(
 
 function buildStandardRow(p) {
     let borderStyle = p.hasBorder ? `border-left: 2px solid ${p.typeColor};` : '';
-    let rightTopHtml = p.valText ? `<span class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap;">${p.valText}</span>` : '';
-    let rightBottomHtml = p.nameText ? `<span style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px;">${p.nameText}</span>` : '';
     let titleWeight = p.isBoldTitle ? 'bold' : 'normal';
     
+    // Блоки для правой стороны с фиксированным отступом и запретом на сжатие (flex-shrink:0)
+    let rightTopHtml = p.valText ? `<div class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap; flex-shrink:0;">${p.valText}</div>` : '';
+    let rightBottomHtml = p.nameText ? `<div style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px; flex-shrink:0; text-align:right;">${p.nameText}</div>` : '';
+    
+    // Структура разбита на 2 независимые строки (flex-direction: column)
     return `
-    <div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; justify-content: space-between; align-items: center; ${borderStyle}">
-        <div style="flex:1; min-width:0;">
-            <div style="color:var(--text-color); font-size:12px; font-weight:${titleWeight}; margin-bottom:4px; white-space:normal; word-break:break-word;">${p.title}</div>
-            <div style="display:flex; justify-content:space-between; align-items:center;">
-                <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
-                    <b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span>
-                </div>
-                ${rightBottomHtml}
-            </div>
+    <div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; flex-direction: column; justify-content: center; ${borderStyle}">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;">
+            <div style="color:var(--text-color); font-size:12px; font-weight:${titleWeight}; flex:1; min-width:0; white-space:normal; word-break:break-word; line-height:1.3;">${p.title}</div>
+            ${rightTopHtml}
         </div>
-        ${rightTopHtml}
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+            <div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;">
+                <b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span>
+            </div>
+            ${rightBottomHtml}
+        </div>
     </div>`;
 }
 
