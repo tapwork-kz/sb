@@ -439,14 +439,12 @@ function getSourceColor(src) {
     if(s.includes('обмен')) return '#f39c12'; 
     if(s.includes('исправл')) return '#3498db'; 
     if(s.includes('мотивац')) return '#3390ec'; 
+    if(s.includes('фокус')) return '#f39c12'; // Строго оранжевый
     
-    // Универсальная генерация цвета для любой приставки (Фокус, Акция и т.д.)
     let hash = 0; 
-    for(let i = 0; i < s.length; i++) {
-        hash = s.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const colors = ['#e74c3c', '#1abc9c', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#d35400', '#c0392b', '#f39c12'];
-    return colors[Math.abs(hash) % colors.length] || '#7f8c8d'; 
+    for(let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
+    const colors = ['#f39c12', '#e67e22', '#d35400', '#e74c3c', '#27ae60', '#16a085', '#2980b9']; 
+    return colors[Math.abs(hash) % colors.length] || '#f39c12'; 
 }
 
 function buildStandardRow(p) { let borderStyle = p.hasBorder ? `border-left: 2px solid ${p.typeColor};` : ''; let titleWeight = p.isBoldTitle ? 'bold' : 'normal'; let rightTopHtml = p.valText ? `<div class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap; flex-shrink:0;">${p.valText}</div>` : ''; let rightBottomHtml = p.nameText ? `<div style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px; flex-shrink:0; text-align:right;">${p.nameText}</div>` : ''; return `<div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; flex-direction: column; justify-content: center; ${borderStyle}"><div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;"><div style="color:var(--text-color); font-size:12px; font-weight:${titleWeight}; flex:1; min-width:0; white-space:normal; word-break:break-word; line-height:1.3;">${p.title}</div>${rightTopHtml}</div><div style="display: flex; justify-content: space-between; align-items: center;"><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;"><b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span></div>${rightBottomHtml}</div></div>`; }
@@ -550,30 +548,27 @@ function renderDashboardData(data, isSilent = false) {
                       if (urlMatch) link = urlMatch[0];
                   }
 
-                  // Бейджи над кнопкой (шапка)
+                  // Бейджи в шапке кнопки (абсолютное позиционирование как в горячих чеках)
                   let badgeHtml = "";
                   if (ptsVal > 0 || kpiBonus > 0) { 
-                      badgeHtml = `<div style="display:flex; gap:4px; margin-bottom:4px; font-size:10px;">`; 
-                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-weight:bold; padding:2px 6px; border-radius:8px;">+${kpiBonus}%</span>`; 
-                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-weight:bold; padding:2px 6px; border-radius:8px;">+${ptsVal} б.</span>`; 
+                      badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`; 
+                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${kpiBonus}%</span>`; 
+                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${ptsVal}</span>`; 
                       badgeHtml += `</div>`; 
                   }
                   
-                  // Кнопка-ссылка вынесена за рамку
-                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:var(--inner-bg); color:var(--btn-color); font-size:14px; width:30px; height:30px; border-radius:8px; text-decoration:none; margin-right:8px; flex-shrink:0; border:1px solid rgba(150,150,150,0.2);">🌐</a>` : '';
-                  // Бейдж оставшегося количества
-                  let countBadge = count ? `<div id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; margin-left:8px; flex-shrink:0;">Ост: <span class="val">${count}</span></div>` : '';
+                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:var(--inner-bg); color:var(--btn-color); font-size:16px; width:36px; height:36px; border-radius:8px; text-decoration:none; margin-right:8px; flex-shrink:0; border:1px solid rgba(150,150,150,0.2);">🌐</a>` : '';
+                  let countBadge = count ? `<span id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; margin-left:6px; white-space:nowrap;">Ост: <span class="val">${count}</span></span>` : '';
                   
-                  // Компактный блок
                   promoHtml += `
-                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; align-items:flex-start; margin-bottom:8px;">
+                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; align-items:center; margin-bottom:12px;">
                       ${linkBtn}
-                      <div style="display:flex; flex-direction:column; max-width:calc(100% - 38px);">
-                          ${badgeHtml}
-                          <div style="display:inline-flex; align-items:center; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; padding:6px 10px; width:max-content; max-width:100%; box-sizing:border-box; cursor:pointer;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
-                              <span style="font-size:12px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${cleanName}</span>
+                      <div style="position:relative; display:flex; flex:1; align-items:center;">
+                          <button class="btn-gray" style="margin:0; width:100%; text-align:left; font-size:13px; padding:10px; border:1px solid var(--border-color); background:var(--card-bg); border-radius:8px; display:flex; align-items:center; justify-content:space-between;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
+                              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${cleanName}</span>
                               ${countBadge}
-                          </div>
+                          </button>
+                          ${badgeHtml}
                       </div>
                   </div>`;
               });
