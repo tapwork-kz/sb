@@ -717,7 +717,7 @@ function renderAdminEmps(dept, btnElement) {
    container.innerHTML = filtered.map(e => { 
        let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
        
-       // ИСПРАВЛЕНО: добавлена скобка в .includes("trade-in")
+       // Исправлено: добавлена ( перед "trade-in"
        let curMonthSc = monthScHist.filter(p => !p.source.toLowerCase().includes("trade-in")).length; 
        let curMonthTrade = monthScHist.filter(p => p.source.toLowerCase().includes("trade-in")).length; 
        
