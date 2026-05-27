@@ -9,51 +9,13 @@ const GAS_URL = "https://script.google.com/macros/s/AKfycbxb2UW5ctVar9QhWmjI-IIF
 let tg = window.Telegram ? window.Telegram.WebApp : null; if (tg) { tg.expand(); }
 if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
 
-function saveMemory(key, value) { try { localStorage.setItem(key, value); } catch(e){} document.cookie = key + "=" + encodeURIComponent(value || "") + "; max-age=31536000; path=/"; }
-function getMemory(key) { let val = null; try { val = localStorage.getItem(key); } catch(e){} if (!val) { let match = document.cookie.match(new RegExp('(^| )' + key + '=([^;]+)')); if (match) val = decodeURIComponent(match[2]); } return val; }
-function clearMemory() { try { localStorage.clear(); } catch(e){} let cookies = document.cookie.split("; "); for (let c of cookies) document.cookie = c.split("=")[0] + "=; max-age=0; path=/"; }
-
-let appState = { token: getMemory("userToken"), iin: getMemory("userIIN"), firstName: getMemory("userName") || "", currentAction: getMemory("currentAction"), role: getMemory("userRole") || "Продавец", dept: getMemory("userDept") || "Цифра", lastInboxCount: 0 };
-window.dynamicPrefixColors = JSON.parse(localStorage.getItem('dynamicColors') || '{}');
-window.nomListOpen = false;
-window.typingLockTime = 0; 
-
-let autoScrollAnimation = true; let activeOutsTimer = null; let globalActiveOuts = []; let isUserPromoter = false; 
-let currentAdminScDept = 'Цифра'; let currentEmpDept = 'Цифра'; let currentScTabDept = 'Цифра'; let currentAdminScTabType = 'active';
-let pollingTimer = null; let lastActiveTab = 'time'; let processedReqIds = new Set(); let savedScrollPos = {};
-let globalSellers = []; let globalScItems = []; let adminScItemsGlobal = []; let selectedScItem = null; let tradeInModelsGlobal = []; let selectedTradeInModel = null;
-let myReports = []; let myPointsHistory = []; let myDisplayPointsHistory = []; let myScHistory = []; let myKpiDetails = []; let allEmployeesData = []; let myMoneyFinesHistory = [];
-let currentHistFilter = 'all';
-
 function safeIin(val) { if(val === undefined || val === null) return ""; return String(val).trim().replace(/^0+/, ''); }
 function requestNotificationPermission() { if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") Notification.requestPermission(); }
 function showPushNotification(title, bodyText) { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: bodyText, icon: "icon.png" }); }
 function fmtSum(val) { if(!val) return "0"; return String(Math.round(val)).replace(/\s/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 function formatDateLocal(d) { if (!d) d = new Date(); let y = d.getFullYear(); let m = ("0" + (d.getMonth() + 1)).slice(-2); let day = ("0" + d.getDate()).slice(-2); return `${y}-${m}-${day}`; }
-function formatShortName(fullName) { if (!fullName) return ""; let p = String(fullName).trim().split(/\s+/); if (p.length > 1 && p[1]) return p[0] + " " + p[1].charAt(0).toUpperCase() + "."; return p[0]; }
-function isCurrentMonth(dateStr) { if (!dateStr) return true; let d = new Date(); let m = ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); return String(dateStr).includes(m); }
-function getMonthName(dateStr) { if(!dateStr) return "Неизвестно"; let parts = dateStr.split('.'); if(parts.length < 2) return dateStr; let m = parseInt(parts[0], 10); let months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]; return (months[m-1] || parts[0]) + " " + (parts[1].length === 4 ? parts[1] : parts[2] || ""); }
-function parseCustomDate(dStr) { if (!dStr) return 0; let parts = String(dStr).split(' '); let dParts = parts[0].split('.'); if (dParts.length !== 3) return 0; let timeParts = parts[1] ? parts[1].split(':') : [0, 0]; return new Date(dParts[2], dParts[1] - 1, dParts[0], timeParts[0] || 0, timeParts[1] || 0).getTime(); }
-function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace(',','.'))); if (isNaN(n)) return "баллов"; if (n % 1 !== 0) return "балла"; n = Math.floor(n) % 100; let n10 = n % 10; if (n >= 11 && n <= 19) return "баллов"; if (n10 === 1) return "балл"; if (n10 >= 2 && n10 <= 4) return "балла"; return "баллов"; }
-function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
-function vibrate(ms = 50) { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); else if (navigator.vibrate) navigator.vibrate(ms); }
-function showToast(msg, isError = false, duration = 3000) { const t = document.getElementById("toast"); t.innerText = msg; t.style.background = isError ? "#e74c3c" : "#34495e"; t.classList.add("show"); if (duration !== 9999) setTimeout(() => t.classList.remove("show"), duration); }
 
-function getSourceColor(src) { 
-    let originalSrc = String(src).trim();
-    if (window.dynamicPrefixColors && window.dynamicPrefixColors[originalSrc]) return window.dynamicPrefixColors[originalSrc];
-    let s = originalSrc.toLowerCase(); 
-    if(s.includes('сц')) return '#e67e22'; 
-    if(s.includes('trade-in')) return '#8e44ad'; 
-    if(s.includes('горячий')) return '#e84393'; 
-    if(s.includes('обмен')) return '#f39c12'; 
-    if(s.includes('исправл')) return '#3498db'; 
-    if(s.includes('мотивац')) return '#3390ec'; 
-    let hash = 0; for(let i = 0; i < s.length; i++) { hash = s.charCodeAt(i) + ((hash << 5) - hash); }
-    const colors = ['#e74c3c', '#1abc9c', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#d35400', '#c0392b', '#f39c12'];
-    return colors[Math.abs(hash) % colors.length] || '#7f8c8d'; 
-}
-
+window.nomListOpen = false;
 const NOM_DICT = { to: { cifra: ["Основной товар GSM", "Основной товар Цифровая и оргтехника", "Основной товар Черная техника"], mbt: ["Основной товар МБТ"], kbt: ["Основной товар Белая техника", "Основной товар Кондиционеры"] }, aks: { cifra: ["Сопутствующий товар GSM", "Сопутствующий товар Цифровая и оргтехника", "Сопутствующий товар Черная техника"], mbt: ["Сопутствующий товар МБТ"], kbt: ["Сопутствующий товар Белая техника"] }, usl: { cifra: ["Услуга ESD", "Услуга IT", "Услуга TV", "Услуга ММС", "Услуга Настройка TV", "Услуга Онлайн-кинотеатр", "Услуга Сервис Плюс IT", "Услуга Сервис Плюс TV", "Услуги IT на ПК, ноутбуки и моноблоки", "Услуги IT на смартфоны и планшеты", "Услуги установки Черной техники", "Услуги электронные"], mbt: ["Услуга SDA"], kbt: ["Услуга MDA", "Услуга Сервис Плюс MDA", "Услуги установки Белой техники", "Услуги установки Кондиционеров"] } };
 
 function calcPlanEngine(rawPlanData) {
@@ -71,10 +33,87 @@ function calcPlanEngine(rawPlanData) {
     return r;
 }
 
+function renderPlanUI(pData) {
+    let area = document.getElementById("plan-render-area"); if (!area) return;
+    if (!pData || !pData.to) { area.innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет данных за этот период</p>"; return; }
+    let getDynColor = (valStr, targetStr = "100") => { let val = parseFloat(String(valStr).replace(/\s/g, '').replace(',', '.')) || 0; let target = parseFloat(String(targetStr).replace(/\s/g, '').replace(',', '.')) || 100; if (target === 0) return val > 0 ? "#27ae60" : "#e74c3c"; let ratio = (val / target) * 100; return ratio >= 100 ? "#27ae60" : (ratio >= 80 ? "#f39c12" : "#e74c3c"); };
+    let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
+    let html = ""; let totalPlan = pData.totalPlan; let totalFact = pData.to.total.fact + pData.aks.total.fact + pData.usl.total.fact; let totalFactEd = pData.to.total.fact + pData.to.total.ed + pData.aks.total.fact + pData.aks.total.ed + pData.usl.total.fact + pData.usl.total.ed; let remPlan = totalPlan - totalFactEd; let totalPct = totalPlan > 0 ? ((totalFact / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00"; let totalPctEd = totalPlan > 0 ? ((totalFactEd / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00";
+    let scCount = 0; let brzyCount = 0;
+    if (window.adminHistoryGlobal) { let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000; window.adminHistoryGlobal.forEach(r => { let rd = parseCustomDate(r.date); if (rd >= startTime && rd <= endTime && r.status === 'approved') { if (r.type === 'Продажа СЦ/Фокус') { try { let m = JSON.parse(r.meta); if(m.type !== "Фокус" && !r.details.toLowerCase().includes("фокус")) scCount++; } catch(e){} } if (r.type === 'Продажа Trade-In') brzyCount++; } }); }
+
+    html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div style="font-size:14px; font-weight:bold; color:var(--text-color); text-transform:none;">Общая сводка</div><div onclick="openAdminPlanScDetails()" style="font-size:11px; font-weight:bold; color:var(--btn-color); cursor:pointer; padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px;">СЦ: ${scCount} | BRZY: ${brzyCount}</div></div><div style="background:var(--card-bg); padding:10px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:12px;"><div style="color:#7f8c8d; font-size:12px; text-transform:uppercase; margin-bottom:8px; font-weight:bold; text-align:center; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">Итоговый показатель</div><div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;"><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold;">${fmtSum(totalPlan)}</div><div style="margin-top:4px; font-size:10px; color:${remPlan <= 0 ? '#27ae60' : '#e74c3c'};">Ост: <b>${fmtSum(remPlan)}</b></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px;">${fmtSum(totalFact)}</div><div><span style="color:${getDynColor(totalPct)}; font-weight:bold; font-size:10px;">${totalPct}%</span></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px;">${fmtSum(totalFactEd)}</div><div><span style="color:${getDynColor(totalPctEd)}; font-weight:bold; font-size:10px;">${totalPctEd}%</span></div></div></div></div>`;
+    html += `<div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;"><b style="color:#7f8c8d; font-size:12px; text-transform:uppercase;">Основной товарооборот</b><span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.to.total.ed)}</span></div><div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;"><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(pData.to.total.plan)}</div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact)}</div><div><span style="color:${getDynColor(pData.to.total.pct)}; font-weight:bold; font-size:10px;">${pData.to.total.pct}%</span></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact + pData.to.total.ed)}</div><div><span style="color:${getDynColor(pData.to.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.to.total.pctEd}%</span></div></div></div></div>`;
+    html += `<div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;"><b style="color:#7f8c8d; font-size:12px; text-transform:uppercase;">Сопутствующие товары</b><span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.aks.total.ed)}</span></div><div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;"><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.aks.total.targetPct}%</span></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pct, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pct}%</span></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.aks.total.fact + pData.aks.total.ed)}</div><div><span style="color:${getDynColor(pData.aks.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.aks.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.aks.total.pctEd, pData.aks.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.aks.total.pctEd}%</span></div></div></div></div>`;
+    html += `<div style="background:var(--card-bg); border-radius:12px; padding:10px; border:1px solid var(--border-color);"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;"><b style="color:#7f8c8d; font-size:12px; text-transform:uppercase;">Услуги</b></div><div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;"><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.plan)}</div><div style="color:gray; font-size:9px; font-weight:bold; margin-top:4px;">Цель: <span style="color:var(--text-color);">${pData.usl.total.targetPct}%</span></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPct)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pct, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pct}%</span></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.usl.total.fact + pData.usl.total.ed)}</div><div><span style="color:${getDynColor(pData.usl.total.sumPctEd)}; font-size:10px; font-weight:bold;">${pData.usl.total.sumPctEd}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(pData.usl.total.pctEd, pData.usl.total.targetPct)}; font-weight:bold; font-size:10px;">${pData.usl.total.pctEd}%</span></div></div></div></div></div>`;
+
+    if (pData.groups && pData.groups.length > 0) {
+        html += `<div class="inner-block card" style="margin-bottom:12px; padding:0; overflow:hidden; border:1px solid var(--border-color); background:var(--card-bg);"><div onclick="window.nomListOpen = !window.nomListOpen; document.getElementById('nom-list').classList.toggle('hidden'); document.getElementById('nom-icon').innerText = window.nomListOpen ? '▲' : '▼';" style="padding:14px; display:flex; justify-content:space-between; align-items:center; background:rgba(150, 150, 150, 0.05); cursor:pointer; transition:0.3s;"><span style="font-weight:bold; font-size:13px; color:var(--text-color);">Номенклатурные группы</span><span id="nom-icon" style="color:var(--text-color); font-size:12px; font-weight:bold;">${window.nomListOpen ? '▲' : '▼'}</span></div><div id="nom-list" class="${window.nomListOpen ? '' : 'hidden'}" style="padding:4px 14px; background:var(--card-bg);">` + pData.groups.map(g => {
+            let n = g.name.toLowerCase(); let p = parse(g.plan); let f = parse(g.fact); let e = parse(g.factEd || g.ed); let fEd = f + e;
+            let pct = (p > 0) ? ((f / p) * 100).toFixed(2).replace('.', ',') : "0,00"; let pctEd = (p > 0) ? ((fEd / p) * 100).toFixed(2).replace('.', ',') : "0,00";
+            let hideEd = n.includes('сертификат') || n.includes('фишк') || n.includes('услуг');
+            let edContent = hideEd ? '' : (e > 0 ? `<span style="display:flex; align-items:center; gap:4px;"><span style="color:var(--btn-color); font-weight:bold;">${fmtSum(e)}</span> <span style="color:${getDynColor(pctEd)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pctEd}%</span></span>` : '');
+            return `<div style="padding:10px 0; border-bottom:1px solid var(--border-color);"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; font-size:12px;"><span style="color:gray; font-weight:bold; font-size:13px;">${fmtSum(p)}</span><div style="display:flex; gap:12px; align-items:center;"><span style="display:flex; align-items:center; gap:4px;"><span style="color:#27ae60; font-weight:bold;">${fmtSum(f)}</span> <span style="color:${getDynColor(pct)}; font-size:9px; font-weight:bold; background:var(--inner-bg); padding:2px 4px; border-radius:4px;">${pct}%</span></span>${edContent}</div></div><div style="color:var(--desc-color); font-size:11px; line-height:1.2;">${g.name}</div></div>`;
+        }).join('') + `</div></div>`;
+    }
+
+    html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">Выполнение по отделам</div>`;
+    let buildRow = (dTo, dAks, dUsl, isFact) => { let fTo = isFact ? dTo.fact : dTo.plan; let fAks = isFact ? dAks.fact : dAks.plan; let fUsl = isFact ? dUsl.fact : dUsl.plan; let cTo = isFact ? '#27ae60' : 'var(--text-color)'; let lbl = isFact ? 'Факт' : 'План'; return `<div style="color:gray; font-size:9px; text-align:left;">${lbl}</div><div style="color:${cTo}; font-size:12px; font-weight:normal;">${fmtSum(fTo)}</div><div style="color:${cTo}; font-size:12px; font-weight:normal;">${fmtSum(fAks)}</div><div style="color:${cTo}; font-size:12px; font-weight:normal;">${fmtSum(fUsl)}</div>`; };
+    for (let i = 0; i < 3; i++) {
+        let d = ['cifra', 'mbt', 'kbt'][i]; let dTo = pData.to[d]; let dAks = pData.aks[d]; let dUsl = pData.usl[d]; let title = d === 'cifra' ? 'Цифра / ЧТ' : (d === 'mbt' ? 'МБТ' : 'КБТ');
+        html += `<div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);"><div style="font-weight:bold; font-size:12px; margin-bottom:8px; color:var(--text-color); text-align:left; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">${title}</div><div style="display:grid; grid-template-columns: 35px 1fr 1fr 1fr; gap:6px; font-size:11px; text-align:center; align-items:center;"><div></div> <div style="color:gray; font-size:9px; text-transform:uppercase;">ТО</div> <div style="color:gray; font-size:9px; text-transform:uppercase;">АКС</div> <div style="color:gray; font-size:9px; text-transform:uppercase;">УСЛ</div>${buildRow(dTo, dAks, dUsl, false)}${buildRow(dTo, dAks, dUsl, true)}<div></div><div><span style="color:${getDynColor(dTo.pct)}; font-size:10px; font-weight:bold;">${dTo.pct}%</span></div><div><span style="color:${getDynColor(dAks.sumPct)}; font-size:10px; font-weight:bold;">${dAks.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(dAks.pct, dAks.targetPct)}; font-size:10px; font-weight:bold;">${dAks.pct}%</span></div><div><span style="color:${getDynColor(dUsl.sumPct)}; font-size:10px; font-weight:bold;">${dUsl.sumPct}%</span> <span style="color:gray; font-size:9px; font-weight:normal;">/</span> <span style="color:${getDynColor(dUsl.pct, dUsl.targetPct)}; font-size:10px; font-weight:bold;">${dUsl.pct}%</span></div></div></div>`;
+    }
+    html += `</div>`;
+    if (pData.sellers && pData.sellers.length > 0) {
+        html += `<div class="inner-block card" style="padding:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div style="text-align:left; font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:12px;">План на продавца</div>`;
+        pData.sellers.forEach((s, idx) => { html += `<div style="padding:10px 0; border-bottom:${idx === pData.sellers.length - 1 ? 'none' : '1px solid var(--border-color)'};"><div style="font-size:13px; margin-bottom:8px; color:var(--text-color); font-weight:bold;">${s.name}</div><div style="display:flex; justify-content:space-between; align-items:center; background:var(--card-bg); padding:8px 12px; border-radius:8px; border:1px solid var(--border-color);"><div style="text-align:center;"><div style="color:gray; font-size:9px;">ТО</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.to)}</div></div><div style="text-align:center;"><div style="color:gray; font-size:9px;">АКС</div><div style="display:flex; justify-content:center; align-items:center; gap:4px;"><span style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.aks)}</span><span style="color:gray; font-weight:bold; font-size:9px;">${s.aksPct}%</span></div></div><div style="text-align:center;"><div style="color:gray; font-size:9px;">УСЛ</div><div style="display:flex; justify-content:center; align-items:center; gap:4px;"><span style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(s.usl)}</span><span style="color:gray; font-weight:bold; font-size:9px;">${s.uslPct}%</span></div></div></div></div>`; });
+        html += `</div>`;
+    }
+    area.innerHTML = html;
+}
+
+function generateDatePanelHTML(idPrefix, onChangeFuncName) {
+    let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><div style="position:relative; width:36px; height:36px; flex-shrink:0;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button></div><div style="position:relative; width:36px; height:36px; flex-shrink:0;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">🗓️</button></div><button class="btn-green" style="margin:0; border-radius:8px; width:36px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="${onChangeFuncName}('search')">🔍</button></div></div>`;
+}
+
+function setPanelDates(type, val, idPrefix, reloadFn) {
+    let endD = new Date(); let startD = new Date();
+    if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
+    else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } }
+    if (type !== 'search') { document.getElementById(idPrefix + '-start').value = formatDateLocal(startD); document.getElementById(idPrefix + '-end').value = formatDateLocal(endD); }
+    if(reloadFn) reloadFn();
+}
+
+function setPlanDates(type, val = null) {
+    let endD = new Date(); let startD = new Date();
+    if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
+    else if (type === 'today') { } else if (type === 'yesterday') { startD.setDate(startD.getDate() - 1); endD.setDate(endD.getDate() - 1); } 
+    else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } else { startD.setDate(1); } } 
+    else if (type === 'all') { startD = new Date(2024, 0, 1); }
+    document.getElementById('plan-filter-start').value = formatDateLocal(startD); document.getElementById('plan-filter-end').value = formatDateLocal(endD);
+    loadPlanHistory();
+}
+
+async function loadPlanHistory(isSilent = false) {
+    let startD = document.getElementById("plan-filter-start").value; let endD = document.getElementById("plan-filter-end").value;
+    if (!isSilent) showToast("Загрузка периода...", false, 9999);
+    const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
+    if (error) { if (!isSilent) showToast("Ошибка базы: " + error.message, true); return; }
+    if (!plansData || plansData.length === 0) { if (!isSilent) showToast("За этот период данных нет", true); document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; return; }
+    document.getElementById("toast").classList.remove("show");
+    let aggregatedGroups = JSON.parse(JSON.stringify(plansData[0].plan_data.groups || [])); let aggTotalPlan = parseFloat(String(plansData[0].plan_data.totalPlan || "0").replace(/\s/g, '').replace(',', '.')) || 0;
+    let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
+    if (plansData.length > 1) {
+        aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; });
+        plansData.forEach(day => { let groups = day.plan_data.groups; if (groups) { groups.forEach((g, idx) => { if (aggregatedGroups[idx]) { aggregatedGroups[idx].fact += parse(g.fact); let e = parse(g.factEd || g.ed); aggregatedGroups[idx].factEd = (aggregatedGroups[idx].factEd || 0) + e; aggregatedGroups[idx].ed = aggregatedGroups[idx].factEd; } }); } });
+    }
+    let pData = calcPlanEngine({ groups: aggregatedGroups, totalPlan: aggTotalPlan }); renderPlanUI(pData);
+}
+
 async function callBackend(actionName, payloadData = {}) { 
   try { 
     const getRoleGroup = (roleText) => { const r = (roleText || appState.role || "").toLowerCase(); if (r.includes("промоутер")) return "Промоутер"; if (r.includes("продавец")) return "Продавец"; return "Продавец"; };
-    
     if (actionName === "loginByIIN") {
       const { iin, password } = payloadData; const { data, error } = await supabaseClient.from('users').select('*').eq('iin', iin).single();
       if (error || !data) return { success: false, error: "Этот ИИН не найден в базе данных" };
@@ -121,9 +160,7 @@ async function callBackend(actionName, payloadData = {}) {
       const { reqId, reqAction, replyText } = payloadData; const { data: req, error: reqErr } = await supabaseClient.from('requests').select('*').eq('id', reqId).single(); const { data: currentUser } = await supabaseClient.from('users').select('*').eq('iin', appState.iin).single();
       if (reqErr || !req) return { success: false, error: "Запрос не найден" };
       let currentStatus = String(req.status || "").trim().toLowerCase(); let reqType = String(req.type || "").trim(); let newStatus = currentStatus; let newDetails = req.details; let metaObj = {}; try { metaObj = typeof req.metadata === 'string' ? JSON.parse(req.metadata) : (req.metadata || {}); } catch(e){} let isHandled = false; let responseMsg = "Обработано";
-      
       if (["approved", "rejected", "rejected_by_user", "viewed"].includes(currentStatus) && !reqAction.includes("dismiss")) { return { success: false, error: `Уже обработана` }; }
-      
       if ((currentStatus === "rejected_notify_zav" || currentStatus === "approved_notify_zav") && reqAction === "dismiss_notification") { newStatus = currentStatus.includes("rejected") ? "rejected" : "approved"; isHandled = true; responseMsg = "Ознакомлен"; }
       else if (currentStatus === "notify_user_fine" && reqAction === "dismiss_notification") { newStatus = "viewed_fine"; isHandled = true; responseMsg = "Ознакомлен"; }
       else if ((currentStatus === "pending_user_reply" || currentStatus === "pending_admin_view_remark") && reqAction === "dismiss_notification") { if (!metaObj.dismissedBy) metaObj.dismissedBy = []; if (!metaObj.dismissedBy.includes(appState.iin)) metaObj.dismissedBy.push(appState.iin); isHandled = true; responseMsg = "Перенесено в историю"; }
@@ -138,38 +175,20 @@ async function callBackend(actionName, payloadData = {}) {
               else if ((currentStatus === "pending_admin_view" || currentStatus === "pending") && reqAction === "viewed") { newStatus = "viewed"; isHandled = true; responseMsg = "Просмотрено"; }
               else if ((currentStatus === "pending_admin" || currentStatus === "pending") && reqAction === "approve_admin") {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
-                  if (reqType === "Запрос на штраф") { 
-                      await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); 
-                      await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); 
-                      newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; 
-                  }
-                  else if (reqType === "Горячий чек") { 
-                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); 
-                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
-                  }
+                  if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
+                  else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In" || metaObj.type || reqType === metaObj.type) { 
                       let earnSourceType = (reqType === "Продажа Trade-In") ? "Trade-In" : (metaObj.type || reqType); 
                       let pts = (reqType === "Продажа Trade-In") ? 1 : (parseFloat(metaObj.pts) || 0); 
+                      // Берем реальный процент из меты, а не захардкоженные 3%
                       let bonus = metaObj.bonus ? parseFloat(metaObj.bonus) : (reqType === "Продажа СЦ/Фокус" ? 3 : 0);
                       
                       await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: bonus, manager_iin: appState.iin }]); 
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
                       
-                      if ((reqType === "Продажа СЦ/Фокус" || metaObj.type) && metaObj.row && metaObj.dept) { 
-                          const todayStr = formatDateLocal(new Date()); 
-                          const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); 
-                          if (scData && scData.items_data) { 
-                              let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); 
-                              await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); 
-                          } 
-                          fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); 
-                      }
+                      if ((reqType === "Продажа СЦ/Фокус" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
                   }
-                  else if (reqType.includes("Баллы мотивации")) { 
-                      let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; 
-                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); 
-                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
-                  }
+                  else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
               }
           }
@@ -203,25 +222,6 @@ async function callBackend(actionName, payloadData = {}) {
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : []; let tradeInList = (tradeInRaw && tradeInRaw.length > 0) ? tradeInRaw.map(item => item.model_name) : [];
       let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 }; let freshHotChecks = [];
 
-      let tempColors = JSON.parse(localStorage.getItem('dynamicColors') || '{}');
-      if (kpiDataRaw && kpiDataRaw.length > 0) {
-          let rows = kpiDataRaw[0].data || [];
-          rows.forEach(r => {
-              ['col_e_cifra_name', 'col_h_mbt_name', 'col_k_kbt_name'].forEach((nCol, idx) => {
-                  let pCol = ['col_g_cifra_pts', 'col_j_mbt_pts', 'col_m_kbt_pts'][idx];
-                  let bName = String(r[nCol] || "").trim();
-                  let bPts = String(r[pCol] || "").trim();
-                  if (bName.startsWith("_") && bPts.startsWith("_#")) {
-                      let prefix = bName.substring(1).split(" ")[0].trim();
-                      let color = bPts.substring(1).split(" ")[0].trim();
-                      if (prefix && color) tempColors[prefix] = color;
-                  }
-              });
-          });
-          window.dynamicPrefixColors = tempColors;
-          localStorage.setItem('dynamicColors', JSON.stringify(tempColors));
-      }
-
       if (kpiDataRaw && kpiDataRaw.length > 0) {
           let rows = kpiDataRaw[0].data || [];
           rows.forEach(r => {
@@ -233,6 +233,26 @@ async function callBackend(actionName, payloadData = {}) {
               if (r.col_c_penalty_name === 'Ген. уборка') kpiCfg.ub = pVal || -7;
               if (r.col_c_penalty_name && r.col_c_penalty_name.includes('БЛ')) kpiCfg.bl = pVal || -1;
               if (r.col_c_penalty_name && r.col_c_penalty_name.includes('ПР')) kpiCfg.pr = pVal || -10;
+          });
+
+          window.dynamicPrefixColors = window.dynamicPrefixColors || {};
+          const allDeptsCols = [
+              {n: 'col_e_cifra_name', k: 'col_f_cifra_kpi', p: 'col_g_cifra_pts'},
+              {n: 'col_h_mbt_name', k: 'col_i_mbt_kpi', p: 'col_j_mbt_pts'},
+              {n: 'col_k_kbt_name', k: 'col_l_kbt_kpi', p: 'col_m_kbt_pts'}
+          ];
+          allDeptsCols.forEach(cols => {
+              rows.forEach(r => {
+                  let btnName = String(r[cols.n] || "").trim();
+                  let rawVal = String(r[cols.k] || "").trim();
+                  let rawPts = String(r[cols.p] || "").trim();
+                  
+                  if (btnName.startsWith("_") && rawVal.startsWith("_") && rawPts.startsWith("_#")) {
+                      let prefix = rawVal.indexOf(" ") !== -1 ? rawVal.substring(1, rawVal.indexOf(" ")).trim() : rawVal.substring(1).trim();
+                      let listColor = rawPts.indexOf(" ") !== -1 ? rawPts.substring(1, rawPts.indexOf(" ")).trim() : rawPts.substring(1).trim();
+                      if (prefix) window.dynamicPrefixColors[prefix] = listColor;
+                  }
+              });
           });
 
           let d = String(userData.dept).toLowerCase(); let nameCol, kpiCol, ptsCol;
@@ -263,6 +283,7 @@ async function callBackend(actionName, payloadData = {}) {
                           defKpi = rawVal.replace('%', '').replace(',', '.').trim(); 
                       }
                       
+                      // Парсим цвет из колонки PTS и сохраняем глобально для всех карточек
                       if (rawPts.startsWith("_#")) {
                           let spaceIdx = rawPts.indexOf(" ");
                           if (spaceIdx !== -1) {
@@ -270,6 +291,7 @@ async function callBackend(actionName, payloadData = {}) {
                           } else {
                               listColor = rawPts.substring(1).trim();
                           }
+                          if (prefix) window.dynamicPrefixColors[prefix] = listColor;
                       }
                       
                       activePromoList = { title: title, prefix: prefix, defKpi: defKpi, listColor: listColor, items: [] };
@@ -294,6 +316,7 @@ async function callBackend(actionName, payloadData = {}) {
                           }
                           
                           if (count !== null && allReqs) {
+                              // Строгая фильтрация по ПРИСТАВКЕ, чтобы списки не воровали значения друг у друга
                               let approvedCount = allReqs.filter(req => 
                                   (req.status === 'approved' || req.status === 'approved_notify_zav') && 
                                   String(req.details).trim() === cleanName &&
@@ -343,6 +366,7 @@ async function callBackend(actionName, payloadData = {}) {
               
               let dynamicType = ud.category || ud.type;
               let cleanActionText = ud.action_text || "";
+              // Удаляем приставку типа из начала строки, если она там присутствует
               if (dynamicType && cleanActionText.startsWith(dynamicType + " ")) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
               }
@@ -395,43 +419,25 @@ async function callBackend(actionName, payloadData = {}) {
   } catch (error) { return { success: false, error: error.message }; }
 }
 
-function generateDatePanelHTML(idPrefix, onChangeFuncName) {
-    let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><div style="position:relative; width:36px; height:36px; flex-shrink:0;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button></div><div style="position:relative; width:36px; height:36px; flex-shrink:0;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">🗓️</button></div><button class="btn-green" style="margin:0; border-radius:8px; width:36px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="${onChangeFuncName}('search')">🔍</button></div></div>`;
-}
+function vibrate(ms = 50) { if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); else if (navigator.vibrate) navigator.vibrate(ms); }
+let autoScrollAnimation = true; let activeOutsTimer = null; let globalActiveOuts = []; let isUserPromoter = false; let currentAdminScDept = 'Цифра'; let currentEmpDept = 'Цифра'; let currentScTabDept = 'Цифра'; let pollingTimer = null; let lastActiveTab = 'time'; let processedReqIds = new Set(); let tradeInModelsGlobal = []; let selectedTradeInModel = null;
+function saveMemory(key, value) { try { localStorage.setItem(key, value); } catch(e){} document.cookie = key + "=" + encodeURIComponent(value || "") + "; max-age=31536000; path=/"; }
+function getMemory(key) { let val = null; try { val = localStorage.getItem(key); } catch(e){} if (!val) { let match = document.cookie.match(new RegExp('(^| )' + key + '=([^;]+)')); if (match) val = decodeURIComponent(match[2]); } return val; }
+function clearMemory() { try { localStorage.clear(); } catch(e){} let cookies = document.cookie.split("; "); for (let c of cookies) document.cookie = c.split("=")[0] + "=; max-age=0; path=/"; }
 
-function setPanelDates(type, val, idPrefix, reloadFn) {
-    let endD = new Date(); let startD = new Date();
-    if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
-    else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } }
-    if (type !== 'search') { document.getElementById(idPrefix + '-start').value = formatDateLocal(startD); document.getElementById(idPrefix + '-end').value = formatDateLocal(endD); }
-    if(reloadFn) reloadFn();
-}
+let appState = { token: getMemory("userToken"), iin: getMemory("userIIN"), firstName: getMemory("userName") || "", currentAction: getMemory("currentAction"), role: getMemory("userRole") || "Продавец", dept: getMemory("userDept") || "Цифра", lastInboxCount: 0 };
+let savedScrollPos = {}; function formatShortName(fullName) { if (!fullName) return ""; let p = String(fullName).trim().split(/\s+/); if (p.length > 1 && p[1]) return p[0] + " " + p[1].charAt(0).toUpperCase() + "."; return p[0]; }
+let globalSellers = []; let globalScItems = []; let adminScItemsGlobal = []; let selectedScItem = null; let myReports = []; let myPointsHistory = []; let myDisplayPointsHistory = []; let myScHistory = []; let myKpiDetails = []; let allEmployeesData = []; let myMoneyFinesHistory = [];
+function isCurrentMonth(dateStr) { if (!dateStr) return true; let d = new Date(); let m = ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); return String(dateStr).includes(m); }
+function getMonthName(dateStr) { if(!dateStr) return "Неизвестно"; let parts = dateStr.split('.'); if(parts.length < 2) return dateStr; let m = parseInt(parts[0], 10); let months = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]; return (months[m-1] || parts[0]) + " " + (parts[1].length === 4 ? parts[1] : parts[2] || ""); }
+function parseCustomDate(dStr) { if (!dStr) return 0; let parts = String(dStr).split(' '); let dParts = parts[0].split('.'); if (dParts.length !== 3) return 0; let timeParts = parts[1] ? parts[1].split(':') : [0, 0]; return new Date(dParts[2], dParts[1] - 1, dParts[0], timeParts[0] || 0, timeParts[1] || 0).getTime(); }
 
-function setPlanDates(type, val = null) {
-    let endD = new Date(); let startD = new Date();
-    if (type === 'single') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, parts[2]); endD = new Date(parts[0], parts[1] - 1, parts[2]); } }
-    else if (type === 'today') { } else if (type === 'yesterday') { startD.setDate(startD.getDate() - 1); endD.setDate(endD.getDate() - 1); } 
-    else if (type === 'month') { if (val) { let parts = val.split('-'); startD = new Date(parts[0], parts[1] - 1, 1); endD = new Date(parts[0], parts[1], 0); } else { startD.setDate(1); } } 
-    else if (type === 'all') { startD = new Date(2024, 0, 1); }
-    document.getElementById('plan-filter-start').value = formatDateLocal(startD); document.getElementById('plan-filter-end').value = formatDateLocal(endD);
-    loadPlanHistory();
-}
-
-async function loadPlanHistory(isSilent = false) {
-    let startD = document.getElementById("plan-filter-start").value; let endD = document.getElementById("plan-filter-end").value;
-    if (!isSilent) showToast("Загрузка периода...", false, 9999);
-    const { data: plansData, error } = await supabaseClient.from('store_plans').select('*').gte('date', startD).lte('date', endD).order('date', { ascending: false });
-    if (error) { if (!isSilent) showToast("Ошибка базы: " + error.message, true); return; }
-    if (!plansData || plansData.length === 0) { if (!isSilent) showToast("За этот период данных нет", true); document.getElementById("plan-render-area").innerHTML = "<p style='text-align:center;color:gray;font-size:13px; padding:20px 0;'>Нет записей в базе за эти даты</p>"; return; }
-    document.getElementById("toast").classList.remove("show");
-    let aggregatedGroups = JSON.parse(JSON.stringify(plansData[0].plan_data.groups || [])); let aggTotalPlan = parseFloat(String(plansData[0].plan_data.totalPlan || "0").replace(/\s/g, '').replace(',', '.')) || 0;
-    let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
-    if (plansData.length > 1) {
-        aggregatedGroups.forEach(g => { g.fact = 0; g.factEd = 0; g.ed = 0; });
-        plansData.forEach(day => { let groups = day.plan_data.groups; if (groups) { groups.forEach((g, idx) => { if (aggregatedGroups[idx]) { aggregatedGroups[idx].fact += parse(g.fact); let e = parse(g.factEd || g.ed); aggregatedGroups[idx].factEd = (aggregatedGroups[idx].factEd || 0) + e; aggregatedGroups[idx].ed = aggregatedGroups[idx].factEd; } }); } });
-    }
-    let pData = calcPlanEngine({ groups: aggregatedGroups, totalPlan: aggTotalPlan }); renderPlanUI(pData);
+function groupAndRenderByMonth(itemsArray, renderItemFn) {
+    if (!itemsArray || itemsArray.length === 0) return "<p style='color:gray;text-align:center;font-size:13px;'>История пуста</p>";
+    let sortedArray = [...itemsArray].sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+    let grouped = {}; let currentMonthKey = ("0" + (new Date().getMonth() + 1)).slice(-2) + "." + new Date().getFullYear();
+    sortedArray.forEach(i => { let key = "Неизвестно"; let dStr = i.date || ""; let match = String(dStr).match(/\d{2}\.(\d{2}\.\d{4})/); if (match) key = match[1]; else if (String(dStr).match(/^\d{2}\.\d{4}$/)) key = dStr; if(!grouped[key]) grouped[key] = []; grouped[key].push(i); });
+    let html = ""; for(let m in grouped) { if (m !== currentMonthKey && m !== "Неизвестно") { html += `<div style="text-align:center; color:var(--text-color); opacity: 0.6; font-size:11px; font-weight:bold; margin: 15px 0 8px 0; border-bottom: 1px solid var(--border-color); padding-bottom: 4px;">${getMonthName(m)}</div>`; } grouped[m].forEach(i => { html += renderItemFn(i); }); } return html;
 }
 
 document.addEventListener("DOMContentLoaded", async () => {
@@ -450,7 +456,7 @@ function hideLoader() { const loader = document.getElementById("loader-screen");
 function showLoader() { const loader = document.getElementById("loader-screen"); loader.classList.remove("hidden"); setTimeout(() => loader.style.opacity = '1', 10); }
 function forceLogout() { if(pollingTimer) clearInterval(pollingTimer); clearMemory(); appState.token = null; appState.iin = null; document.getElementById("main-screen").style.opacity = '0'; setTimeout(() => { document.getElementById("main-screen").classList.add("hidden"); document.getElementById("auth-screen").classList.remove("hidden"); document.getElementById("auth-screen").style.opacity = '1'; document.getElementById("main-screen").style.opacity = '1'; document.getElementById("iin-input").value = ''; document.getElementById("iin-input").disabled = false; }, 600); }
 
-document.addEventListener('focusin', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') window.typingLockTime = Date.now(); }); document.addEventListener('input', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') window.typingLockTime = Date.now(); });
+window.typingLockTime = 0; document.addEventListener('focusin', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') window.typingLockTime = Date.now(); }); document.addEventListener('input', e => { if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') window.typingLockTime = Date.now(); });
 function isSensitiveState() { if (lastActiveTab === 'inbox') return true; let activeEl = document.activeElement; let isTyping = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT'); let hasUnsavedText = false; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { if(ta.value.length > 0) hasUnsavedText = true; }); let isRecentlyTyping = (Date.now() - window.typingLockTime) < 10000; let isScOpen = document.getElementById("form-sc") && !document.getElementById("form-sc").classList.contains("hidden"); let isTradeInOpen = document.getElementById("form-tradein") && !document.getElementById("form-tradein").classList.contains("hidden"); let isPointsOpen = document.getElementById("form-points") && !document.getElementById("form-points").classList.contains("hidden"); let isSwapOpen = document.getElementById("form-swap") && !document.getElementById("form-swap").classList.contains("hidden"); let isDetailsFormOpen = false; document.querySelectorAll('[id^="fine-form-"], [id^="remark-form-"]').forEach(el => { if (!el.classList.contains("hidden")) isDetailsFormOpen = true; }); return isTyping || isRecentlyTyping || hasUnsavedText || isScOpen || isTradeInOpen || isPointsOpen || isSwapOpen || isDetailsFormOpen; }
 
 function startPolling() {
@@ -469,6 +475,8 @@ async function manualLogin() {
   if (res.success) { appState.iin = res.iin; appState.token = res.token; appState.firstName = res.firstName; appState.currentAction = null; isUserPromoter = res.isPromoter; saveMemory("userIIN", appState.iin); saveMemory("userToken", appState.token); saveMemory("userName", appState.firstName); saveMemory("currentAction", ""); document.getElementById("toast").classList.remove("show"); document.getElementById("auth-screen").style.opacity = '0'; setTimeout(() => { document.getElementById("auth-screen").classList.add("hidden"); document.getElementById("main-screen").classList.remove("hidden"); document.getElementById("main-screen").style.opacity = '1'; document.getElementById("user-greeting").innerText = appState.firstName; loadDashboard(false); startPolling(); }, 600); } 
   else { elIin.disabled = false; elPass.disabled = false; document.getElementById("login-error").innerText = res.error; document.getElementById("toast").classList.remove("show"); }
 }
+
+function setKpiColor(val, elCircle, elText) { let color = "#27ae60"; if (val >= 100) color = "#1e8449"; else if (val >= 80 && val < 90) color = "#f39c12"; else if (val < 80) color = "#e74c3c"; if(elCircle) { let trackColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'; elCircle.style.background = `conic-gradient(${color} ${val > 100 ? 100 : val}%, ${trackColor} 0)`; } if(elText) elText.style.color = color; return color; }
 
 function switchTab(tab, direction = null) {
   let scroller = document.getElementById("scrollable-body"); if (scroller && lastActiveTab) savedScrollPos[lastActiveTab] = scroller.scrollTop;
@@ -506,7 +514,32 @@ async function triggerReturn() { vibrate(50); const actionToReturnFrom = appStat
 
 function getDeclension(action) { if (!action) return ""; if (action.startsWith("Перерыв")) return "Перерыва"; if (action === "Обед") return "Обеда"; if (action === "Полдник") return "Полдника"; return action.toLowerCase(); }
 function renderTimeUI() { const standardBtns = document.getElementById("standard-buttons"); const returnContainer = document.getElementById("return-button-container"); let actStr = String(appState.currentAction); if (appState.currentAction && actStr !== "null" && actStr !== "undefined" && actStr !== "") { document.getElementById("btn-return").disabled = false; standardBtns.classList.add("hidden"); returnContainer.classList.remove("hidden"); const declension = getDeclension(appState.currentAction); document.getElementById("return-text").innerText = "Вернуться с " + declension; document.getElementById("action-hint").innerText = "Ожидаем возвращения:"; } else { standardBtns.classList.remove("hidden"); returnContainer.classList.add("hidden"); } }
+function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace(',','.'))); if (isNaN(n)) return "баллов"; if (n % 1 !== 0) return "балла"; n = Math.floor(n) % 100; let n10 = n % 10; if (n >= 11 && n <= 19) return "баллов"; if (n10 === 1) return "балл"; if (n10 >= 2 && n10 <= 4) return "балла"; return "баллов"; }
+function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+window.dynamicPrefixColors = window.dynamicPrefixColors || {};
 
+function getSourceColor(src) { 
+    let originalSrc = String(src).trim();
+    // Если цвет для этой приставки был спарсен из таблицы, отдаем его везде!
+    if (window.dynamicPrefixColors[originalSrc]) return window.dynamicPrefixColors[originalSrc];
+    
+    let s = originalSrc.toLowerCase(); 
+    if(s.includes('сц')) return '#e67e22'; 
+    if(s.includes('trade-in')) return '#8e44ad'; 
+    if(s.includes('горячий')) return '#e84393'; 
+    if(s.includes('обмен')) return '#f39c12'; 
+    if(s.includes('исправл')) return '#3498db'; 
+    if(s.includes('мотивац')) return '#3390ec'; 
+    
+    let hash = 0; 
+    for(let i = 0; i < s.length; i++) {
+        hash = s.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = ['#e74c3c', '#1abc9c', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#d35400', '#c0392b', '#f39c12'];
+    return colors[Math.abs(hash) % colors.length] || '#7f8c8d'; 
+}
+
+function buildStandardRow(p) { let borderStyle = p.hasBorder ? `border-left: 2px solid ${p.typeColor};` : ''; let titleWeight = p.isBoldTitle ? 'bold' : 'normal'; let rightTopHtml = p.valText ? `<div class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap; flex-shrink:0;">${p.valText}</div>` : ''; let rightBottomHtml = p.nameText ? `<div style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px; flex-shrink:0; text-align:right;">${p.nameText}</div>` : ''; return `<div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; flex-direction: column; justify-content: center; ${borderStyle}"><div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;"><div style="color:var(--text-color); font-size:12px; font-weight:${titleWeight}; flex:1; min-width:0; white-space:normal; word-break:break-word; line-height:1.3;">${p.title}</div>${rightTopHtml}</div><div style="display: flex; justify-content: space-between; align-items: center;"><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;"><b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span></div>${rightBottomHtml}</div></div>`; }
 function initSmartDates() { const today = formatDateLocal(new Date()); document.querySelectorAll('.smart-date').forEach(el => { el.dataset.realdate = today; el.value = "Сегодня"; el.addEventListener('focus', function() { this.type = 'date'; this.value = this.dataset.realdate; if(this.showPicker) this.showPicker(); }); el.addEventListener('blur', function() { if(!this.value) this.value = today; this.dataset.realdate = this.value; if (this.value === today) { this.type = 'text'; this.value = "Сегодня"; } else { this.type = 'text'; const d = new Date(this.value); this.value = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } }); el.addEventListener('change', function() { this.blur(); }); }); }
 function initAutoScroll() { const scroller = document.getElementById("scroll-container"); let scrollDir = 1; let scrollTimer = setInterval(() => { if (!autoScrollAnimation || !scroller || scroller.closest('.hidden')) return; scroller.scrollLeft += 1 * scrollDir; if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 1) scrollDir = -1; else if (scroller.scrollLeft <= 0) scrollDir = 1; }, 40); if(scroller) { scroller.addEventListener('touchstart', () => autoScrollAnimation = false, {passive: true}); scroller.addEventListener('touchend', () => { setTimeout(()=>autoScrollAnimation=true, 2000); }, {passive: true}); } }
 
@@ -527,6 +560,183 @@ async function loadDashboard(isSilent = false) {
 
 function renderTradeInList() { let container = document.getElementById("tradein-list"); if (!container) return; container.innerHTML = tradeInModelsGlobal.map(m => { let isSel = (selectedTradeInModel === m); return `<div class="sc-item ${isSel ? 'selected' : ''}" onclick="selectTradeIn('${m}')"><div style="font-size:13px;">${m}</div></div>`; }).join(""); }
 function selectTradeIn(m) { selectedTradeInModel = m; renderTradeInList(); }
+function formatRemarkAuthor(name, role) { let r = String(role || "руководителя").toLowerCase(); let decl = "руководителя"; if (r.includes("директор")) decl = "директора"; else if (r.includes("супервайзер")) decl = "супервайзера"; else if (r.includes("управляющ")) decl = "управляющего"; else if (r.includes("админ")) decl = "администратора"; else if (r.includes("заведующий складом") || r.includes("зав. складом")) decl = "заведующего"; let parts = String(name).trim().split(/\s+/); let shortName = parts[0]; if (parts.length > 1 && parts[1]) shortName += " " + parts[1].charAt(0).toUpperCase() + "."; return `От ${decl} ${shortName}`; }
+function formatRemarkText(text, targetName = null) { if (!text) return ""; let str = String(text); let splitRegex = /\n\n>\s*(.*?)\n/i; let parts = str.split(splitRegex); if (parts.length >= 3) { let main = parts[0]; let authorLabel = parts[1]; let quote = parts.slice(2).join(""); return `${main}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${authorLabel}</b><br>${quote}</div>`; } let oldRegex = /(Ответ.*?:\s*)/i; let oldParts = str.split(oldRegex); if (oldParts.length >= 3) { return `${oldParts[0]}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${oldParts[1]}</b><br>${oldParts.slice(2).join("")}</div>`; } if (targetName) { let targetShort = targetName; let tParts = String(targetName).trim().split(/\s+/); if (tParts.length > 1 && tParts[1]) targetShort = tParts[0] + " " + tParts[1].charAt(0).toUpperCase() + "."; return `${str}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid gray; border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:gray; font-style:normal;">${targetShort}</b><br><span style="color:gray;">Ожидает ответа...</span></div>`; } return str; }
+
+function renderDashboardData(data, isSilent = false) {
+  if (!data) return; isUserPromoter = data.isPromoter || false; appState.role = data.role || "Продавец"; appState.dept = (data.info && data.info.dept) ? data.info.dept : "Цифра"; saveMemory("userRole", appState.role); saveMemory("userDept", appState.dept); 
+  let roleStr = String(appState.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); let isZavSklad = roleStr.includes("заведующий складом"); let isSeller = !isUserPromoter && !isDir && !isZavSklad; let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
+  
+  if (isZavSklad) {
+      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+      let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "none"; let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
+      if (window.currentAdminMainView === 'plan' || !window.currentAdminMainView) { window.currentAdminMainView = 'emps'; }
+      let match = roleStr.match(/заведующий складом\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('emps'); }
+  } 
+  else if (isDir) {
+      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
+      let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "";
+      let filteredAdminInbox = data.adminInbox ? data.adminInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const aBadge = document.getElementById("admin-badge"); if (filteredAdminInbox.length > 0) { if(aBadge) { aBadge.innerText = filteredAdminInbox.length; aBadge.classList.remove("hidden"); } if (filteredAdminInbox.length > appState.lastInboxCount) showPushNotification("Новая заявка!", "Появилась заявка в админке"); appState.lastInboxCount = filteredAdminInbox.length; } else { if(aBadge) aBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      let adminPlanList = document.getElementById("admin-plan-list"); if (adminPlanList) { let planFiltersExist = document.getElementById("plan-filter-start"); if (!planFiltersExist) { let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0)); adminPlanList.innerHTML = `<style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style><div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button><div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;"><input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;"><button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button></div><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button></div><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><div style="position:relative; width:44px; height:36px; flex-shrink:0;"><input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;">📅</button></div><button class="btn-green" style="margin:0; border-radius:8px; width:44px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="loadPlanHistory(false)">🔍</button></div></div><div id="plan-render-area"></div>`; setTimeout(() => loadPlanHistory(true), 100); } else { if (!isSensitiveState()) { loadPlanHistory(true); } } }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
+  } else {
+      if (isUserPromoter) { document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); let db = document.getElementById("desc-break"); if(db) db.innerText = "15 мин"; let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "1 час"; let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; if(dash) dash.classList.add("hidden"); } 
+      else { document.getElementById("nav-time-icon")?.classList.remove("hidden"); document.getElementById("nav-create-icon")?.classList.remove("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); let db = document.getElementById("desc-break"); if(db) db.innerText = "10 мин"; let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "40 мин"; let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; if (isSeller && document.querySelectorAll("#content-adm-main:not(.hidden)").length === 0 && document.querySelectorAll("#content-details:not(.hidden)").length === 0 && !isAnyFormActive) { if (dash && dash.classList.contains("hidden")) { dash.classList.remove("hidden"); dash.classList.remove("fade-in", "slide-up-fade"); dash.classList.add("slide-down-fade"); } } else { if(dash) dash.classList.add("hidden"); } }
+      document.getElementById("nav-adm-outs")?.classList.add("hidden"); document.getElementById("nav-adm-main")?.classList.add("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "Непрочитанные сообщения"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) switchTab('time');
+  }
+
+  let pAcc = document.getElementById("pt-acc"); if(pAcc) pAcc.innerText = data.info?.ptsAccrued ?? '-'; let pUse = document.getElementById("pt-use"); if(pUse) pUse.innerText = data.info?.ptsUsed ?? '-'; const remVal = parseFloat(String(data.info?.ptsLeft).replace(',','.')) || 0; const ptRemEl = document.getElementById("pt-rem"); if(ptRemEl) { ptRemEl.innerText = data.info?.ptsLeft ?? '-'; ptRemEl.style.color = remVal >= 0 ? "#27ae60" : "#e67e22"; } let pFin = document.getElementById("pt-fin"); if(pFin) pFin.innerText = data.info?.ptsFine ?? '-'; 
+  let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0; let kValEl = document.getElementById("kpi-val"); if(kValEl) kValEl.innerText = kpiValue + '%'; setKpiColor(kpiValue, document.getElementById("kpi-circle"), document.getElementById("kpi-val")); myKpiDetails = data.info?.kpiDetails || [];
+  let infoTabel = document.getElementById("info-tabel"); if(infoTabel) { infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div>`; }
+
+  myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.moneyFine && p.moneyFine !== "0" && p.moneyFine !== ""); myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек"); window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
+  let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear; let monthSc = myScHistory.filter(p => p && typeof p.date === 'string' && p.date.includes(monthSuffix)); let countSc = monthSc.filter(p => p && p.source && !String(p.source).toLowerCase().includes("trade-in")).length; let countTrade = monthSc.filter(p => p && p.source && String(p.source).toLowerCase().includes("trade-in")).length; 
+  let scEl = document.getElementById("info-sc-val"); if(scEl) { scEl.innerText = `${countSc} | ${countTrade}`; if (countSc + countTrade > 0) scEl.style.color = "#27ae60"; else scEl.style.color = "#e74c3c"; }
+
+  let hcCard = document.getElementById("hot-check-card");
+  if (hcCard) {
+      hcCard.innerHTML = ""; let hasContent = false;
+      if (data.hotChecks && data.hotChecks.length > 0) {
+          hasContent = true; let hcHtml = `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
+          for(let sub in groups) {
+              if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
+              let colsCount = Math.min(groups[sub].length, 4); hcHtml += `<div style="display: grid; grid-template-columns: repeat(${colsCount}, 1fr); gap: 6px; margin-bottom: 6px;">`;
+              groups[sub].forEach(btn => { 
+                  let combinedName = sub ? `${sub} ${btn.name}` : btn.name; let badgeHtml = ""; let ptsVal = parseFloat(String(btn.pts || "0").replace(',', '.')); let kpiBonus = parseFloat(String(btn.val || "0").replace(',', '.')); 
+                  if (ptsVal > 0 || kpiBonus > 0) { badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`; if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${kpiBonus}%</span>`; if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${ptsVal}</span>`; badgeHtml += `</div>`; } 
+                  hcHtml += `<div style="position:relative; display:flex; flex:1;"><button class="btn-green" style="padding:10px 4px; font-size:12px; margin:0; width:100%;" onclick="submitHotCheck('${combinedName}', '${btn.val}', '${btn.pts || 0}')">${btn.name}</button>${badgeHtml}</div>`; 
+              }); hcHtml += `</div>`;
+          } hcCard.innerHTML += hcHtml;
+      }
+      let promoLists = data.promoLists || [];
+      if (promoLists.length > 0) {
+          let promoHtml = "";
+          promoLists.forEach((list, lIdx) => {
+              let headerColor = list.listColor || "var(--text-color)";
+              
+              promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 14px 12px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative;">`;
+              // Применяем спарсенный цвет к заголовку списка
+              promoHtml += `<div style="font-size:14px; font-weight:bold; color:${headerColor}; margin-bottom: 14px;">${list.title}</div>`;
+              promoHtml += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
+              
+              list.items.forEach((item, iIdx) => {
+                  let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
+                  let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
+                  
+                  let rawName = item.name;
+                  let cleanName = item.cleanName || rawName;
+                  let link = "";
+                  let bracketIdx = rawName.indexOf('[');
+                  if (bracketIdx !== -1) {
+                      let metaStr = rawName.substring(bracketIdx);
+                      let urlMatch = metaStr.match(/https?:\/\/[^\s\]]+/);
+                      if (urlMatch) link = urlMatch[0];
+                  }
+
+                  if (item.currentCount !== null && item.currentCount <= 0) return;
+
+                  let badgeHtml = "";
+                  if (item.currentCount !== null || kpiBonus > 0 || ptsVal > 0) { 
+                      badgeHtml = `<div style="position:absolute; top:-8px; right:4px; display:flex; gap:3px; z-index: 5;">`; 
+                      if (item.currentCount !== null) badgeHtml += `<span id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">Ост: <span class="val">${item.currentCount}</span></span>`;
+                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">+${kpiBonus}%</span>`; 
+                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">+${ptsVal} б.</span>`; 
+                      badgeHtml += `</div>`; 
+                  }
+                  
+                  // Безопасный клик через div и stopPropagation, чтобы Telegram не дублировал открытие
+                  let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) { window.Telegram.WebApp.openLink('${link}'); } else { window.open('${link}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; font-size:12px; width:20px; height:20px; border-radius:5px; margin-right:8px; flex-shrink:0; font-weight:bold; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;">↗</div>` : '';
+                  
+                  // Текст товара: font-weight:normal и color:#555
+                  promoHtml += `
+                  <div id="promo-item-${lIdx}-${iIdx}" style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
+                      ${linkBtn}
+                      <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.06)); border-radius:10px; padding:8px 12px; display:flex; align-items:center; cursor:pointer; min-height:34px; box-sizing:border-box;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
+                          <span style="font-size:13px; font-weight:normal; color:#555; line-height:1.2; text-align:left;">${cleanName}</span>
+                      </div>
+                      ${badgeHtml}
+                  </div>`;
+              });
+              promoHtml += `</div></div>`;
+          }); 
+          
+          let promoContainer = document.getElementById("promo-lists-container");
+          if (!promoContainer) {
+              promoContainer = document.createElement("div");
+              promoContainer.id = "promo-lists-container";
+              hcCard.parentNode.insertBefore(promoContainer, hcCard.nextSibling);
+          }
+          promoContainer.innerHTML = promoHtml;
+      } else {
+          let promoContainer = document.getElementById("promo-lists-container");
+          if (promoContainer) promoContainer.innerHTML = "";
+      }
+      if (hasContent) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
+  }
+    
+  let savedReplies = {}; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { savedReplies[ta.id] = ta.value; });
+  let uInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; let inboxList = document.getElementById("inbox-list");
+  if(inboxList) {
+      inboxList.innerHTML = uInbox.map(r => { 
+          let rawDesc = String(r.details || ""); let approverName = ""; let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){} let match = rawDesc.match(/\n\[(.*?)\]$/); if (match) { approverName = formatShortName(match[1]); rawDesc = rawDesc.replace(/\n\[(.*?)\]$/, "").trim(); } if (metaObj.approver) approverName = formatShortName(metaObj.approver);
+          let selDateHtml = metaObj.date ? `<br><span style="color:gray; font-size:11px;">📅 Дата в заявке: <b>${metaObj.date}</b></span>` : ""; let desc = formatRemarkText(rawDesc); let authorStr = r.type === "Замечание" ? formatRemarkAuthor(r.authorName, r.authorRole) : `<b>От:</b> ${r.authorName}`; let d = r.date ? String(r.date) : "";
+          if (r.status === "rejected_notify_zav") return `<div class="req-item" id="req-${r.id}" style="border-left-color: #e74c3c;"><div class="req-title">❌ Штраф отклонен</div><div class="req-desc">Ваш запрос на штраф сотрудника <b>${r.targetName}</b> отклонен: <b>${approverName || 'Руководителем'}</b>.<br>Причина штрафа: ${desc}${selDateHtml}</div><div class="grid-btns" style="grid-template-columns: 1fr;"><button class="btn-gray" onclick="processReq('${r.id}', 'dismiss_notification')">Ознакомлен</button></div></div>`;
+          if (r.status === "approved_notify_zav") return `<div class="req-item" id="req-${r.id}" style="border-left-color: #27ae60;"><div class="req-title">✅ Штраф одобрен</div><div class="req-desc">Ваш запрос на штраф сотрудника <b>${r.targetName}</b> одобрен: <b>${approverName || 'Руководителем'}</b>.<br>Причина штрафа: ${desc}${selDateHtml}</div><div class="grid-btns" style="grid-template-columns: 1fr;"><button class="btn-gray" onclick="processReq('${r.id}', 'dismiss_notification')">Ознакомлен</button></div></div>`;
+          if (r.type === "Замечание" && (r.status === "approved" || r.status === "pending_user_reply" || r.status === "pending_admin_view_remark")) { if (r.targetIin === appState.iin && r.status === "pending_user_reply") { return `<div class="req-item" id="req-${r.id}" style="border-left-color: #f39c12;"><div class="req-title" style="color:#f39c12;">⚠️ Замечание <span style="float:right; color:gray; font-size:10px; font-weight:normal;">${d}</span></div><div class="req-desc" style="color:var(--text-color); font-size:13px;"><b style="color:#f39c12;">${authorStr}</b><br>${desc}${selDateHtml}</div><textarea id="remark-reply-${r.id}" placeholder="Ваша обратная связь..." style="box-sizing: border-box; width:100%; height:60px; margin-bottom:8px; border-radius:8px; padding:8px; border:1px solid var(--border-color); background:var(--bg-color); color:var(--text-color); font-family:inherit; resize:none;"></textarea><button class="btn-orange" onclick="processReq('${r.id}', 'reply_remark', document.getElementById('remark-reply-${r.id}').value)">Ответить</button></div>`; } else { return `<div class="req-item" id="req-${r.id}" style="border-left-color: #f39c12;"><div class="req-title" style="color:#f39c12;">⚠️ Замечание <span style="float:right; color:gray; font-size:10px; font-weight:normal;">${d}</span></div><div class="req-desc" style="color:var(--text-color); font-size:13px;"><b style="color:#f39c12;">${authorStr}</b><br><b>${r.targetName}</b> — ${desc}${selDateHtml}</div><div class="grid-btns" style="grid-template-columns: 1fr;"><button class="btn-gray" onclick="processReq('${r.id}', 'dismiss_notification')">Просмотрено</button></div></div>`; } }
+          if (r.status === "rejected_notify_user") return `<div class="req-item" id="req-${r.id}" style="border-left-color: #e74c3c;"><div class="req-title">❌ Запрос отклонен</div><div class="req-desc">Ваш запрос на <b>${r.type || 'запрос'}</b> был отклонен: <b>${approverName || 'Руководителем'}</b>.<br><b>Детали:</b> ${desc}${selDateHtml}</div><div class="grid-btns" style="grid-template-columns: 1fr;"><button class="btn-gray" onclick="processReq('${r.id}', 'dismiss_rejection')">Ознакомлен</button></div></div>`; 
+          if (r.status === "notify_user_fine") { let authorDetails = formatRemarkAuthor(r.authorName, r.authorRole); return `<div class="req-item" id="req-${r.id}" style="border-left-color: #e74c3c;"><div class="req-title" style="color: #e74c3c;">⚠️ Вам выписан штраф <span style="float:right; color:gray; font-size:10px; font-weight:normal;">${d}</span></div><div class="req-desc"><b style="color:#e74c3c;">${authorDetails}</b><br><b>Причина:</b> ${desc}<br>Баллы: <b style="color:#e74c3c;">${metaObj.amount || 0}</b> | Сумма: <b style="color:#e74c3c;">${metaObj.moneyAmount || 0} ₸</b>${selDateHtml}</div><div class="grid-btns" style="grid-template-columns: 1fr;"><button class="btn-gray" onclick="processReq('${r.id}', 'dismiss_notification')">Ознакомлен</button></div></div>`; }
+          return `<div class="req-item" id="req-${r.id}"><div class="req-title">Обмен сменами</div><div class="req-desc">${r.authorName || 'Коллега'} просит поменяться.<br><b>${desc}</b>${selDateHtml}</div><div class="grid-btns"><button class="btn-red" onclick="processReq('${r.id}', 'reject_user')">Отклонить</button><button class="btn-green" onclick="processReq('${r.id}', 'approve_user')">Одобрить</button></div></div>`; 
+      }).join("") || "<p style='color:gray;text-align:center;font-size:13px;'>Уведомлений нет</p>";
+  }
+  Object.keys(savedReplies).forEach(id => { let ta = document.getElementById(id); if (ta) ta.value = savedReplies[id]; });
+  let uHistory = data.userHistory || []; uHistory = uHistory.filter(r => !(r.type === "Запрос на штраф" && r.targetIin === appState.iin)); let uHistList = document.getElementById("user-history-list");
+  if (uHistList) {
+      if (!document.getElementById("user-hist-panel")) { let panelDiv = document.createElement("div"); panelDiv.id = "user-hist-panel"; panelDiv.innerHTML = generateDatePanelHTML('user-hist', 'window.triggerUserHistReload'); uHistList.parentNode.insertBefore(panelDiv, uHistList); window.triggerUserHistReload = function(type, val) { if(type) setPanelDates(type, val, 'user-hist', () => { let dStr = localStorage.getItem("dashData_" + appState.iin); if(dStr) renderDashboardData(JSON.parse(dStr), true); }); }; }
+      let usD = document.getElementById("user-hist-start").value; let ueD = document.getElementById("user-hist-end").value; let usTime = new Date(usD).getTime(); let ueTime = new Date(ueD).getTime() + 86400000;
+      let filteredUHistory = uHistory.filter(r => { let rd = parseCustomDate(r.date); return rd >= usTime && rd <= ueTime; });
+      uHistList.innerHTML = groupAndRenderByMonth(filteredUHistory, r => {
+          let stText = "Просмотрен"; let stColor = "#95a5a6"; if (r.status.includes("approved")) { stText = "Одобрен"; stColor = "#27ae60"; } else if (r.status.includes("rejected")) { stText = "Отклонен"; stColor = "#e74c3c"; } if (r.type === "Исправление смены") { if (r.status.includes("approved")) stText = "Исправлен"; else if (r.status.includes("rejected")) stText = "Отклонен"; }
+          let rawDesc = String(r.details || ""); let approverName = ""; let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){} let match = rawDesc.match(/\n\[(.*?)\]$/); if (match) { approverName = formatShortName(match[1]); rawDesc = rawDesc.replace(/\n\[(.*?)\]$/, "").trim(); } if (metaObj.approver) approverName = formatShortName(metaObj.approver); if (!approverName && r.approver) approverName = formatShortName(r.approver);
+          let selDateHtml = metaObj.date ? `<br><span style="color:gray; font-size:11px;">📅 Дата в заявке: <b>${metaObj.date}</b></span>` : ""; let desc = r.type === "Обмен сменами" ? `Сменщик: ${r.targetName || ''}<br>${rawDesc}` : rawDesc; desc = formatRemarkText(desc, r.type === 'Замечание' ? r.targetName : null); let finalDescHtml = r.type === "Замечание" ? `<b>${r.targetName}</b> — ${desc}` : `<b>Детали:</b> ${desc}${selDateHtml}`; let authorStr = r.type === "Замечание" || r.type === "Запрос на штраф" ? `<b style="color:#f39c12;">${formatRemarkAuthor(r.authorName, r.authorRole)}</b>` : `<b>От:</b> ${r.authorName || ''}`;
+          if (r.type === "Уведомление о штрафе") { stColor = "#e74c3c"; stText = "Ознакомлен"; desc = `<b>Причина:</b> ${metaObj.reason || desc}<br>Баллы: <b style="color:#e74c3c;">${metaObj.amount}</b> | Сумма: <b style="color:#e74c3c;">${metaObj.moneyAmount} ₸</b>`; authorStr = `<b style="color:#e74c3c;">${formatRemarkAuthor(r.authorName, r.authorRole)}</b>`; finalDescHtml = desc + selDateHtml; r.type = "Штраф"; } else if (r.type === "Запрос на штраф") { desc = `Нарушитель: <b>${r.targetName}</b><br>Причина: ${metaObj.reason || desc}<br>Баллы: <b style="color:#e74c3c;">${metaObj.amount}</b> | Сумма: <b style="color:#e74c3c;">${metaObj.moneyAmount} ₸</b>`; finalDescHtml = `<b>Детали:</b> ${desc}${selDateHtml}`; }
+          let approverLabel = approverName ? `<span style="color:gray; font-size:10px; font-weight:normal;">${approverName}</span>` : ''; let titleColor = getSourceColor(r.type); if (r.type === "Продажа СЦ/Фокус" && String(r.details).toLowerCase().includes("фокус")) titleColor = '#e74c3c';
+          return `<div class="req-item" style="border-left-color: ${stColor}; opacity: 0.9;"><div class="req-title" style="color:${titleColor};">${r.type || 'Запрос'} <span style="font-size:12px; font-weight:normal; color:gray; float:right;">${r.date || ''}</span></div><div class="req-desc" style="color:var(--text-color);">${authorStr}<br>${finalDescHtml}<br><div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;"><b style="color:${stColor}">Статус: ${stText}</b>${approverLabel}</div></div></div>`; 
+      });
+  }
+  let aInbox = data.adminInbox ? data.adminInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; let adminList = document.getElementById("admin-list");
+  if(adminList) {
+      adminList.innerHTML = aInbox.map(r => { 
+          let btns = `<div class="grid-btns"><button class="btn-red" onclick="processReq('${r.id}', 'reject_admin')">Отклонить</button><button class="btn-green" onclick="processReq('${r.id}', 'approve_admin')">Подтвердить</button></div>`; 
+          let rawDesc = String(r.details || ""); let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){} let match = rawDesc.match(/\n\[(.*?)\]$/); if (match) rawDesc = rawDesc.replace(/\n\[(.*?)\]$/, "").trim();
+          let selDateHtml = metaObj.date ? `<br><span style="color:gray; font-size:11px;">📅 Дата в заявке: <b>${metaObj.date}</b></span>` : ""; let desc = r.type === "Обмен сменами" ? `Сменщик: ${r.targetName || ''}<br>${rawDesc}` : rawDesc; desc = formatRemarkText(desc);
+          if (r.type === "Запрос на штраф") { desc = `Нарушитель: <b>${r.targetName}</b><br>Причина: ${metaObj.reason || desc}<br>Баллы: <b style="color:#e74c3c;">${metaObj.amount}</b> | Сумма: <b style="color:#e74c3c;">${metaObj.moneyAmount} ₸</b>`; } if (r.type === "Замечание") { desc = `<b>${r.targetName}</b> — ${desc}`; btns = `<div class="grid-btns" style="grid-template-columns: 1fr;"><button class="btn-gray" onclick="processReq('${r.id}', 'dismiss_notification')">Просмотрено</button></div>`; }
+          let authorStr = r.type === "Замечание" ? `<b style="color:#f39c12;">${formatRemarkAuthor(r.authorName, r.authorRole)}</b>` : `<b>От:</b> ${r.adminDisplayName || r.authorName || ''}`; let finalDescHtml = r.type === "Замечание" ? desc + selDateHtml : `<b>Детали:</b> ${desc}${selDateHtml}`; let titleColor = getSourceColor(r.type); if (r.type === "Продажа СЦ/Фокус" && String(r.details).toLowerCase().includes("фокус")) titleColor = '#e74c3c';
+          return `<div class="req-item admin" id="req-${r.id}"><div class="req-title" style="color:${titleColor};">${r.type || 'Запрос'} <span style="font-size:12px; font-weight:normal; color:gray; float:right;">${r.date || ''}</span></div><div class="req-desc" style="color:var(--text-color);">${authorStr}<br>${finalDescHtml}</div>${btns}</div>` 
+      }).join("") || "<p style='color:gray;text-align:center;font-size:13px;'>Новых запросов нет</p>";
+  }
+  window.adminHistoryGlobal = data.adminHistory || []; if(isDir && typeof renderAdminHistory === "function") renderAdminHistory();
+  adminScItemsGlobal = data.adminScItems || []; globalSellers = data.sellers || []; globalScItems = data.scItems || []; allEmployeesData = data.adminEmployees || []; tradeInModelsGlobal = data.tradeInModels || []; 
+  if ((isDir || isZavSklad) && typeof renderAdminEmps === "function") renderAdminEmps(currentEmpDept, null);
+}
+
+function generateHorizontalGrid(dataObj) { if (!dataObj.headers || dataObj.headers.length === 0) return "<div style='padding:8px;text-align:center;color:gray;font-size:12px;'>Нет данных</div>"; let gridCols = `repeat(${dataObj.headers.length}, 1fr)`; let html = `<div class="grid-details-container inner-block"><div class="grid-details-title" style="margin-bottom: 6px;">${dataObj.title}</div><div class="grid-details-box" style="grid-template-columns: ${gridCols}; gap:3px;">`; dataObj.headers.forEach(h => { html += `<div class="grid-details-header">${h || '-'}</div>`; }); dataObj.values.forEach(v => { let displayVal = '-'; if (v === '✔') displayVal = '✅'; else if (v === '✖') displayVal = '❌'; else if (v === 'ПР') displayVal = '<span style="color:#e74c3c;font-weight:bold;">ПР</span>'; else if (v !== '' && v !== '-') displayVal = '<span style="color:#f39c12;font-weight:bold;">'+v+'</span>'; else displayVal = v || '-'; html += `<div class="grid-details-value" style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:4px 0; display:flex; align-items:center; justify-content:center; min-height:28px; width:100%; box-sizing:border-box;">${displayVal}</div>`; }); html += `</div></div>`; return html; }
+
+function renderHistoryItem(i, isCompact = false) { 
+    let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
+    let rawNum = parseFloat(String(i.val).replace(',', '.').replace('+', '')) || 0; let valStr = String(rawNum).replace('.', ',');
+    if (rawNum > 0 && !String(i.type).toLowerCase().includes('штраф')) { valStr = '+' + valStr; } else if (rawNum < 0) { valStr = '-' + Math.abs(rawNum).toString().replace('.', ','); }
+    let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
+    let srcColor = getSourceColor(i.source); let finalType = i.source; let finalColor = srcColor;
+    if (String(i.type).toLowerCase() === "начисление") { finalColor = "#27ae60"; } else if (String(i.type).toLowerCase().includes('использ')) { finalColor = "#f39c12"; finalType = "Мотивация"; } else if (String(i.type).toLowerCase().includes('штраф')) { finalColor = "#e74c3c"; finalType = "Штраф"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { finalColor = "#27ae60"; finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
+    let rightText = isDirOrZav ? formatShortName(String(i.type).toLowerCase().includes('штраф') ? i.source : i.approver) : "";
+    return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
+}
+
+function renderMoneyFineItem(i) { let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); let moneyVal = i.moneyFine ? String(i.moneyFine).replace('.',',') : "0"; let formatted = formatNumberWithSpaces(moneyVal); let issuerHtml = (i.source && isDirOrZav) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${formatShortName(i.source)}</span>` : ''; return `<div class="req-item" style="border-left-color: #e74c3c; border-left-width: 2px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;"><div style="flex:1;"><b style="font-size:12px; color:#e74c3c; display:inline-block; margin-bottom:3px;">Штраф</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div><span style="color:gray;font-size:10px;">${i.date}</span></div>${issuerHtml}</div></div><span class="detail-fine" style="margin-left:10px;">${formatted} ₸</span></div>`; }
 
 function openDetails(type) {
   let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-kpi-circle-container").innerHTML = ""; let listHtml = "";
@@ -586,6 +796,23 @@ function closeDetails() { switchTab('adm-main'); }
 function toggleAdminMain(view) { window.currentAdminMainView = view; document.getElementById("admin-plan-list").classList.add("hidden"); document.getElementById("admin-sc-list").classList.add("hidden"); document.getElementById("admin-emp-container").classList.add("hidden"); document.getElementById("admin-plan-list").classList.remove("fade-in"); document.getElementById("admin-sc-list").classList.remove("fade-in"); document.getElementById("admin-emp-container").classList.remove("fade-in"); document.getElementById("btn-adm-plan").classList.remove('active-flt'); document.getElementById("btn-adm-sc").classList.remove('active-flt'); document.getElementById("btn-adm-emp").classList.remove('active-flt'); if(view === 'plan') { document.getElementById("admin-plan-list").classList.remove("hidden"); document.getElementById("admin-plan-list").classList.add("fade-in"); document.getElementById("btn-adm-plan").classList.add("active-flt"); } else if(view === 'sc') { document.getElementById("admin-sc-list").classList.remove("hidden"); document.getElementById("admin-sc-list").classList.add("fade-in"); document.getElementById("btn-adm-sc").classList.add("active-flt"); renderAdminScItems(currentAdminScDept, document.getElementById(`flt-${currentAdminScDept.toLowerCase()}`)); } else { document.getElementById("admin-emp-container").classList.remove("hidden"); document.getElementById("admin-emp-container").classList.add("fade-in"); document.getElementById("btn-adm-emp").classList.add("active-flt"); renderAdminEmps(currentEmpDept, document.getElementById(`flt-emp-${currentEmpDept.toLowerCase()}`)); } }
 function markAsSeen(id, el) { let stored = {}; try { stored = JSON.parse(localStorage.getItem("seenH_" + appState.iin) || "{}"); } catch(e){} stored[id] = true; localStorage.setItem("seenH_" + appState.iin, JSON.stringify(stored)); let badge = el.querySelector('.new-badge'); if (badge) badge.style.display = 'none'; el.style.opacity = '0.9'; el.style.boxShadow = 'none'; }
 
+let currentHistFilter = 'all';
+function renderAdminHistory(filterType) {
+  if(filterType) currentHistFilter = filterType; ['all', 'sales', 'pts', 'viol'].forEach(f => { let el = document.getElementById('flt-hist-' + f); if(el) el.classList.remove('active-flt'); }); let activeEl = document.getElementById('flt-hist-' + currentHistFilter); if(activeEl) activeEl.classList.add('active-flt');
+  let listContainer = document.getElementById("admin-history-list"); if (!document.getElementById("admin-hist-panel")) { let panelDiv = document.createElement("div"); panelDiv.id = "admin-hist-panel"; panelDiv.innerHTML = generateDatePanelHTML('admin-hist', 'window.triggerAdminHistReload'); listContainer.parentNode.insertBefore(panelDiv, listContainer); window.triggerAdminHistReload = function(type, val) { if(type) setPanelDates(type, val, 'admin-hist', () => renderAdminHistory(currentHistFilter)); else renderAdminHistory(currentHistFilter); }; }
+  let startD = document.getElementById("admin-hist-start").value; let endD = document.getElementById("admin-hist-end").value; let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000;
+  let aHist = window.adminHistoryGlobal || []; aHist = aHist.filter(r => { let rd = parseCustomDate(r.date); return rd >= startTime && rd <= endTime; });
+  if (currentHistFilter === 'sales') { aHist = aHist.filter(r => ["Продажа СЦ/Фокус", "Продажа Trade-In", "Горячий чек"].includes(r.type)); } else if (currentHistFilter === 'pts') { aHist = aHist.filter(r => r.type === "Баллы мотивации"); } else if (currentHistFilter === 'viol') { aHist = aHist.filter(r => r.type === "Замечание" || r.type === "Штраф" || r.type === "Запрос на штраф"); }
+  listContainer.innerHTML = groupAndRenderByMonth(aHist, r => {
+    let stColor = r.status === "approved" || r.status === "approved_notify_zav" ? "#27ae60" : (r.status === "rejected" || r.status === "rejected_by_user" || r.status === "rejected_notify_user" || r.status === "rejected_notify_zav" ? "#e74c3c" : "#95a5a6"); let stText = r.status === "approved" || r.status === "approved_notify_zav" ? "Одобрен" : (String(r.status).includes("rejected") ? "Отклонен" : "Просмотрен"); if(r.status === "rejected_by_user") stText = "Отклонен сменщиком"; if (r.type === "Исправление смены") { if (r.status.includes("approved")) stText = "Исправлен"; else if (r.status.includes("rejected")) stText = "Отклонен"; }
+    let rawDesc = String(r.details || ""); let approverName = ""; let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){} let match = rawDesc.match(/\n\[(.*?)\]$/); if (match) { approverName = formatShortName(match[1]); rawDesc = rawDesc.replace(/\n\[(.*?)\]$/, "").trim(); } if (metaObj.approver) approverName = formatShortName(metaObj.approver); if (!approverName && r.approver) approverName = formatShortName(r.approver);
+    let selDateHtml = metaObj.date ? `<br><span style="color:gray; font-size:11px;">📅 Дата в заявке: <b>${metaObj.date}</b></span>` : ""; let desc = r.type === "Обмен сменами" ? `Сменщик: ${r.targetName || ''}<br>${rawDesc}` : rawDesc; desc = formatRemarkText(desc, r.type === 'Замечание' ? r.targetName : null); let finalDescHtml = r.type === "Замечание" ? `<b>${r.targetName}</b> — ${desc}` : `<b>Детали:</b> ${desc}${selDateHtml}`; let authorStr = r.type === "Замечание" || r.type === "Запрос на штраф" ? `<b style="color:#f39c12;">${formatRemarkAuthor(r.authorName, r.authorRole)}</b>` : `<b>От:</b> ${r.authorName || ''}`;
+    if (r.type === "Уведомление о штрафе") { stColor = "#e74c3c"; stText = "Ознакомлен"; desc = `<b>Причина:</b> ${metaObj.reason || desc}<br>Баллы: <b style="color:#e74c3c;">${metaObj.amount}</b> | Сумма: <b style="color:#e74c3c;">${metaObj.moneyAmount} ₸</b>`; authorStr = `<b style="color:#e74c3c;">${formatRemarkAuthor(r.authorName, r.authorRole)}</b>`; finalDescHtml = desc + selDateHtml; r.type = "Штраф"; } else if (r.type === "Запрос на штраф") { desc = `Нарушитель: <b>${r.targetName}</b><br>Причина: ${metaObj.reason || desc}<br>Баллы: <b style="color:#e74c3c;">${metaObj.amount}</b> | Сумма: <b style="color:#e74c3c;">${metaObj.moneyAmount} ₸</b>`; finalDescHtml = `<b>Детали:</b> ${desc}${selDateHtml}`; }
+    let approverLabel = approverName ? `<span style="color:gray; font-size:10px; font-weight:normal;">${approverName}</span>` : ''; let titleColor = getSourceColor(r.type); if (r.type === "Продажа СЦ/Фокус" && String(r.details).toLowerCase().includes("фокус")) titleColor = '#e74c3c';
+    return `<div class="req-item" style="border-left-color: ${stColor}; opacity: 0.9;"><div class="req-title" style="color:${titleColor};">${r.type || 'Запрос'} <span style="font-size:12px; font-weight:normal; color:gray; float:right;">${r.date || ''}</span></div><div class="req-desc" style="color:var(--text-color);">${authorStr}<br>${finalDescHtml}<br><div style="display:flex; justify-content:space-between; align-items:center; margin-top:4px;"><b style="color:${stColor}">Статус: ${stText}</b>${approverLabel}</div></div></div>`; 
+  });
+}
+
 function renderAdminOuts() {
   let list = globalActiveOuts || []; const now = Date.now();
   document.getElementById('admin-outs-list').innerHTML = list.map(out => { 
@@ -606,7 +833,27 @@ function renderAdminEmps(dept, btnElement) {
    }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
 }
 
-function switchScAdminTab(tabType) { currentAdminScTabType = tabType; document.getElementById('tab-sc-active').classList.remove('active-flt'); document.getElementById('tab-sc-sold').classList.remove('active-flt'); document.getElementById('tab-sc-' + tabType).classList.add('active-flt'); renderAdminScItems(currentAdminScDept, null); }
+let currentAdminScTabType = 'active'; function switchScAdminTab(tabType) { currentAdminScTabType = tabType; document.getElementById('tab-sc-active').classList.remove('active-flt'); document.getElementById('tab-sc-sold').classList.remove('active-flt'); document.getElementById('tab-sc-' + tabType).classList.add('active-flt'); renderAdminScItems(currentAdminScDept, null); }
+
+function renderAdminScItems(dept, btnElement) {
+   dept = dept || currentAdminScDept; currentAdminScDept = dept; 
+   if (btnElement) { document.getElementById('flt-cifra').classList.remove('active-flt'); document.getElementById('flt-mbt').classList.remove('active-flt'); document.getElementById('flt-kbt').classList.remove('active-flt'); document.getElementById('flt-focus').classList.remove('active-flt'); btnElement.classList.add('active-flt'); }
+   let container = document.getElementById("admin-sc-container"); let searchInput = document.getElementById("admin-sc-search"); let searchQ = searchInput ? searchInput.value.toLowerCase() : ""; container.innerHTML = ""; 
+   if (currentAdminScTabType === 'active') { 
+       let filtered = adminScItemsGlobal.filter(i => (dept === "Фокус" ? i.type === "Фокус" : (i.dept === dept && i.type === "СЦ"))); if (searchQ) filtered = filtered.filter(i => i.name.toLowerCase().includes(searchQ)); if (filtered.length === 0) { container.innerHTML = "<p style='text-align:center; color:gray; padding:15px; font-size:12px;'>Пусто</p>"; return; }
+       if (dept === "Фокус") { 
+           let groups = {"Цифра": [], "МБТ": [], "КБТ": []}; filtered.forEach(i => { if(groups[i.dept]) groups[i.dept].push(i); });
+           for (const [dName, items] of Object.entries(groups)) { if (items.length === 0) continue; let headerText = items[0].focusHeader || `${dName} Фокус`; let html = `<div class="inner-block card" style="margin-bottom:8px; padding:8px; background: var(--card-bg);"><div style="font-size:13px; font-weight:bold; color:var(--text-color); margin-bottom:6px;">${headerText}</div>`; items.forEach((i, idx) => { let ptNoun = formatPointsNoun(i.pts); html += `<div class="sc-item" onclick="this.classList.toggle('selected')" style="padding:10px; border-bottom:1px solid rgba(130, 130, 130, 0.35); display:flex; justify-content:space-between; margin-bottom:4px;"><div><div style="font-size:12px; margin-bottom:2px;"><b>${idx+1}.</b> ${i.name}</div><div class="type-label" style="font-size:10px; color:#e74c3c; font-weight:bold;">Фокус — ${String(i.pts).replace('.',',')} ${ptNoun}</div></div></div>`; }); html += `</div>`; container.innerHTML += html; }
+       } else { 
+           let html = `<div class="card" style="padding: 6px;">`; filtered.forEach((i, idx) => { let docBtn = i.docUrl ? `<a href="${i.docUrl}" target="_blank" style="text-decoration:none; background:var(--inner-bg); font-size:18px; padding:4px 8px; border-radius:8px; display:inline-block; transition:0.6s;" onclick="event.stopPropagation()">📄</a>` : ''; html += `<div class="sc-item" onclick="this.classList.toggle('selected')" style="padding:10px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><div><div style="font-size:12px; margin-bottom:2px;"><b>${idx+1}.</b> ${i.name}</div><div class="type-label" style="font-size:10px; color:#e67e22; font-weight:bold;">СЦ${i.discount ? `<span style="color:#e74c3c; margin-left:10px;">-${i.discount.replace(/%/g, '% ')}</span>` : ''}</div></div><div>${docBtn}</div></div>`; }); html += `</div>`; container.innerHTML = html;
+       }
+   } else { 
+       let historyArray = window.adminHistoryGlobal || []; let sold = historyArray.filter(r => r.status === "approved" && r.type === "Продажа СЦ/Фокус");
+       if (dept === "Фокус") { sold = sold.filter(r => { try { let m = JSON.parse(r.meta); return m.type === "Фокус"; } catch(e) { return r.details.toLowerCase().includes("фокус"); } }); } else { sold = sold.filter(r => { try { let m = JSON.parse(r.meta); return m.dept === dept && m.type !== "Фокус"; } catch(e) { return false; } }); }
+       if (searchQ) sold = sold.filter(r => r.details.toLowerCase().includes(searchQ) || r.authorName.toLowerCase().includes(searchQ)); if (sold.length === 0) { container.innerHTML = "<p style='text-align:center; color:gray; padding:15px; font-size:12px;'>Нет проданных товаров</p>"; return; }
+       container.innerHTML = groupAndRenderByMonth(sold, r => { const isFocus = dept === "Фокус"; const tagColor = isFocus ? "#f39c12" : "#3390ec"; let metaObj = {}; try { metaObj = JSON.parse(r.meta); } catch(e){} let displayAct = r.actUrl || metaObj.docUrl || ""; let displayDisc = r.discount || metaObj.discount || "0%"; let rawDetails = String(r.details || ""); let match = rawDetails.match(/\n\[(.*?)\]$/); let approverName = ""; if (match) { approverName = formatShortName(match[1]); rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } let actHtml = displayAct ? `📄 <a href="${displayAct}" target="_blank" style="color:#3390ec; text-decoration:none; font-weight:bold;" onclick="event.stopPropagation()">Акт товара</a>` : (isFocus ? '' : '<span style="color:gray; font-size:10px;">(Акт не прикреплен)</span>'); let approverHtml = approverName ? `<div style="margin-top:6px; font-size:10px; color:gray; text-align:right;">Одобрил: ${approverName}</div>` : ''; return `<div class="inner-block sc-item card" onclick="this.classList.toggle('selected')" style="padding:10px; margin-bottom:8px; border-left: 3px solid ${tagColor}; cursor: pointer; background: var(--card-bg);"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="type-label" style="font-size:9px; font-weight:bold; color:${tagColor};">${isFocus ? 'ФОКУС' : 'СЦ'}</span><span style="font-size:9px; color:gray;">${r.date}</span></div><div style="font-size:12px; font-weight:bold; margin-bottom:4px;">${rawDetails}</div><div style="font-size:11px; line-height:1.4;">👤 <span style="color:gray;">Продавец:</span> <b>${r.authorName}</b><br>${displayDisc !== "0%" ? `🏷️ <span style="color:gray;">Скидка:</span> <b style="color:#e74c3c;">${displayDisc}</b><br>` : ''}${actHtml}</div>${approverHtml}</div>`; });
+   }
+}
 
 function switchScDept(dept) { currentScTabDept = dept; document.getElementById('sc-tab-cifra').classList.remove('active-flt'); document.getElementById('sc-tab-mbt').classList.remove('active-flt'); document.getElementById('sc-tab-kbt').classList.remove('active-flt'); let tabId = 'sc-tab-cifra'; if (dept === 'МБТ') tabId = 'sc-tab-mbt'; if (dept === 'КБТ') tabId = 'sc-tab-kbt'; document.getElementById(tabId).classList.add('active-flt'); renderScItems(); }
 
@@ -637,12 +884,18 @@ function renderScItems() {
 }
 
 function openScDoc() { if (selectedScItem && selectedScItem.docUrl) { if (tg && tg.openLink) tg.openLink(selectedScItem.docUrl); else window.open(selectedScItem.docUrl, '_blank'); } }
+function showToast(msg, isError = false, duration = 3000) { const t = document.getElementById("toast"); t.innerText = msg; t.style.background = isError ? "#e74c3c" : "#34495e"; t.classList.add("show"); if (duration !== 9999) setTimeout(() => t.classList.remove("show"), duration); }
+async function executeSubmit(type, details, targetIin = null, meta = "", customMsg = null) { vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitRequest', { token: appState.token, type: type, details: details, targetIin: targetIin, metadata: meta }); if(res.success) { showToast(customMsg || "Запрос успешно отправлен!"); closeForm(); loadDashboard(true); } else showToast("Ошибка: " + res.error, true); }
+
 function submitScForm() { if(!selectedScItem) return showToast("Выберите товар из списка", true); let scDateVal = document.getElementById("sc-date").dataset.realdate; let dStr = scDateVal; if(dStr==="Сегодня") { dStr = formatDateLocal(new Date()); } else { let d = new Date(dStr); dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } selectedScItem.date = dStr; executeSubmit("Продажа СЦ/Фокус", selectedScItem.name, null, JSON.stringify(selectedScItem)); }
 function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
 function submitPoints() { const act = document.getElementById("fp-action").value; const time = document.getElementById("fp-time").value; const dateVal = document.getElementById("fp-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr }); executeSubmit("Баллы мотивации", `${act} на ${time}`, null, meta); }
 function submitFixShift() { const shiftStr = document.getElementById("fs-fix-shift").value; if (!shiftStr) return showToast("Выберите новую смену", true); const dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); executeSubmit("Исправление смены", shiftStr, null, dStr, "Запрос на исправление отправлен"); }
 function submitSwap() { const select = document.getElementById("fs-target"); const targetIin = select.value; if(!targetIin) return showToast("Выберите сменщика", true); const dateVal = document.getElementById("fs-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); const shiftStr = document.getElementById("fs-shift").value; const targetName = select.options[select.selectedIndex].text; const details = `Дата: ${dStr}, Смена: ${shiftStr}`; executeSubmit("Обмен сменами", details, targetIin, "", "Запрос отправлен: " + targetName); }
+function submitHotCheck(typeText, valText, ptsText) { let promptMsg = `Вы подтверждаете продажу: ${typeText}?`; let dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let metaStr = JSON.stringify({ date: dStr, bonus: valText, pts: ptsText }); if (typeof tg !== 'undefined' && tg && tg.showPopup) { try { tg.showPopup({ title: 'Горячий чек', message: promptMsg, buttons: [{id: 'yes', type: 'ok', text: 'Да'}, {type: 'cancel', text: 'Отмена'}] }, function(btnId) { if (btnId === 'yes') executeSubmit("Горячий чек", typeText, null, metaStr); }); } catch(e) { if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); } } else { if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); } }
+
 async function processReq(id, action, replyText = "") { vibrate(50); showToast("Обработка...", false, 9999); processedReqIds.add(String(id)); let el = document.getElementById("req-" + id); if (el) { el.style.display = 'none'; } let res = await callBackend('processRequest', { token: appState.token, reqId: id, reqAction: action, replyText: replyText }); if(res.success) { showToast(res.msg); loadDashboard(true); } else { showToast(res.error, true); loadDashboard(true); } }
+document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && document.activeElement && document.activeElement.tagName === 'INPUT') { document.activeElement.blur(); } });
 
 function openAdminPlanScDetails() {
     let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-title").innerText = "СЦ | BRZY (План)"; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
@@ -668,3 +921,37 @@ function renderEmpScDetailsData(iin) {
     if (sales.length > 0) { listHtml += groupAndRenderByMonth(sales, i => { let rawDetails = i.reason || ""; let match = rawDetails.match(/\n\[(.*?)\]$/); if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } return buildStandardRow({ title: rawDetails, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, nameText: emp.name, hasBorder: false }); }); } else { listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; }
     listHtml += "</div>"; document.getElementById("emp-sc-render-area").innerHTML = listHtml;
 }
+
+window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefixType) {
+    let promptMsg = `Вы подтверждаете продажу: ${typeText}?`;
+    
+    // Форматируем дату строго в 01.01.2000
+    let d = new Date();
+    let formattedDate = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();
+    
+    let metaStr = JSON.stringify({ date: formattedDate, bonus: valText, pts: ptsText, type: prefixType });
+    
+    let exec = () => {
+        let cntEl = document.querySelector(`#count-${lIdx}-${iIdx} .val`);
+        if (cntEl) {
+            let cur = parseInt(cntEl.innerText) || 0;
+            if (cur > 1) {
+                cntEl.innerText = cur - 1;
+            } else {
+                document.getElementById(`promo-item-${lIdx}-${iIdx}`).style.display = 'none';
+            }
+        }
+        
+        // Отправляем prefixType (например, "Фокус" или любую другую) как тип запроса
+        executeSubmit(prefixType, typeText, null, metaStr);
+    };
+    
+    if (typeof tg !== 'undefined' && tg && tg.showPopup) {
+        try { 
+            tg.showPopup({ title: prefixType, message: promptMsg, buttons: [{id: 'yes', type: 'ok', text: 'Да'}, {type: 'cancel', text: 'Отмена'}] }, 
+            function(btnId) { if (btnId === 'yes') exec(); }); 
+        } catch(e) { if (confirm(promptMsg)) exec(); }
+    } else {
+        if (confirm(promptMsg)) exec();
+    }
+};
