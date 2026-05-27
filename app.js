@@ -238,20 +238,50 @@ async function callBackend(actionName, payloadData = {}) {
               let currentSub = ""; let activePromoList = null; localData.promoLists = []; freshHotChecks = [];
               rows.forEach(r => {
                   let btnName = String(r[nameCol] || "").trim(); if (!btnName) return;
-                  let rawVal = String(r[kpiCol] || "").trim(); let btnPts = String(r[ptsCol] || "0").replace('%', '').replace(',', '.').trim();
+                  let rawVal = String(r[kpiCol] || "").trim(); 
+                  let rawPts = String(r[ptsCol] || "").trim();
+                  
                   if (btnName.startsWith("_")) {
-                      let title = btnName.substring(1).trim(); let prefix = ""; let defKpi = "0";
-                      if (rawVal.startsWith("_")) { let spaceIdx = rawVal.indexOf(" "); if (spaceIdx !== -1) { prefix = rawVal.substring(1, spaceIdx).trim(); defKpi = rawVal.substring(spaceIdx).replace('%', '').replace(',', '.').trim(); } else { prefix = rawVal.substring(1).trim(); } } else { defKpi = rawVal.replace('%', '').replace(',', '.').trim(); }
-                      activePromoList = { title: title, prefix: prefix, defKpi: defKpi, items: [] };
+                      let title = btnName.substring(1).trim(); 
+                      let prefix = ""; let defKpi = "0"; let listColor = "var(--text-color)";
+                      
+                      // Парсинг префикса и дефолтного KPI
+                      if (rawVal.startsWith("_")) { 
+                          let spaceIdx = rawVal.indexOf(" "); 
+                          if (spaceIdx !== -1) { 
+                              prefix = rawVal.substring(1, spaceIdx).trim(); 
+                              defKpi = rawVal.substring(spaceIdx).replace('%', '').replace(',', '.').trim(); 
+                          } else { 
+                              prefix = rawVal.substring(1).trim(); 
+                          } 
+                      } else { 
+                          defKpi = rawVal.replace('%', '').replace(',', '.').trim(); 
+                      }
+                      
+                      // Парсинг цвета заголовка из колонки PTS (если начинается с _#)
+                      if (rawPts.startsWith("_#")) {
+                          let spaceIdx = rawPts.indexOf(" ");
+                          if (spaceIdx !== -1) {
+                              listColor = rawPts.substring(1, spaceIdx).trim();
+                          } else {
+                              listColor = rawPts.substring(1).trim();
+                          }
+                      }
+                      
+                      activePromoList = { title: title, prefix: prefix, defKpi: defKpi, listColor: listColor, items: [] };
                       localData.promoLists.push(activePromoList);
                   } else if (btnName.includes("*")) { 
                       activePromoList = null; let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
+                      let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
                       freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); 
                   } else { 
                       if (activePromoList) { 
-                          let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi; 
+                          let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); 
+                          if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi; 
                           
-                          // Парсим имя и базовый остаток
+                          // Строго берем балл текущей строки, без смешиваний
+                          let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
+                          
                           let cleanName = btnName; let count = null;
                           let bracketIdx = btnName.indexOf('[');
                           if (bracketIdx !== -1) {
@@ -261,7 +291,7 @@ async function callBackend(actionName, payloadData = {}) {
                               if (countMatch) count = parseInt(countMatch[1]) || 0;
                           }
                           
-                          // Динамическое вычитание одобренных продаж из остатка
+                          // Вычитание одобренных
                           if (count !== null && allReqs) {
                               let approvedCount = allReqs.filter(req => 
                                   (req.status === 'approved' || req.status === 'approved_notify_zav') && 
@@ -556,8 +586,11 @@ function renderDashboardData(data, isSilent = false) {
       if (promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
+              // Применяем спарсенный цвет к заголовку
+              let headerColor = list.listColor || "var(--text-color)";
+              
               promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 14px 12px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative;">`;
-              promoHtml += `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom: 14px;">${list.title}</div>`;
+              promoHtml += `<div style="font-size:14px; font-weight:bold; color:${headerColor}; margin-bottom: 14px;">${list.title}</div>`;
               promoHtml += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
               
               list.items.forEach((item, iIdx) => {
@@ -574,10 +607,8 @@ function renderDashboardData(data, isSilent = false) {
                       if (urlMatch) link = urlMatch[0];
                   }
 
-                  // Скрываем позицию, если актуальный остаток равен 0
                   if (item.currentCount !== null && item.currentCount <= 0) return;
 
-                  // Верстка бейджей в углу карточки товара (как у горячих чеков)
                   let badgeHtml = "";
                   if (item.currentCount !== null || kpiBonus > 0 || ptsVal > 0) { 
                       badgeHtml = `<div style="position:absolute; top:-8px; right:4px; display:flex; gap:3px; z-index: 5;">`; 
@@ -587,14 +618,15 @@ function renderDashboardData(data, isSilent = false) {
                       badgeHtml += `</div>`; 
                   }
                   
-                  // Компактная кнопка ссылки (сужена в 2.5 раза, строго ин-апп/браузер открытие)
-                  let linkBtn = link ? `<a href="${link}" onclick="event.stopPropagation(); if(window.Telegram && window.Telegram.WebApp) { window.Telegram.WebApp.openLink('${link}', {try_browser: true}); } else { window.open('${link}', '_blank'); } return false;" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; font-size:12px; width:20px; height:20px; border-radius:5px; text-decoration:none; margin-right:8px; flex-shrink:0; font-weight:bold; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05);">↗</a>` : '';
+                  // Заменено на <div>, чтобы не было двойного открытия (браузер + логика приложения)
+                  let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) { window.Telegram.WebApp.openLink('${link}', {try_browser: true}); } else { window.open('${link}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; font-size:12px; width:20px; height:20px; border-radius:5px; margin-right:8px; flex-shrink:0; font-weight:bold; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;">↗</div>` : '';
                   
+                  // Текст товара теперь не жирный и темно-серый (color: #555)
                   promoHtml += `
                   <div id="promo-item-${lIdx}-${iIdx}" style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
                       ${linkBtn}
                       <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.06)); border-radius:10px; padding:8px 12px; display:flex; align-items:center; cursor:pointer; min-height:34px; box-sizing:border-box;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
-                          <span style="font-size:13px; font-weight:bold; color:var(--text-color); line-height:1.2; text-align:left;">${cleanName}</span>
+                          <span style="font-size:13px; font-weight:normal; color:#555; line-height:1.2; text-align:left;">${cleanName}</span>
                       </div>
                       ${badgeHtml}
                   </div>`;
