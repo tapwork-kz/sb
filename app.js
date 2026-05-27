@@ -177,10 +177,36 @@ async function callBackend(actionName, payloadData = {}) {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
                   if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
-                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In" || metaObj.type) {
-                  let isTradeIn = reqType === "Продажа Trade-In"; let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); 
-                  await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: 3, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
-                  if ((reqType === "Продажа СЦ/Фокус" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
+                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In") { 
+                      let isTradeIn = reqType === "Продажа Trade-In"; 
+                      let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); 
+                      let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); 
+                      
+                      // Динамический бонус KPI (ранее было захардкожено на 3)
+                      let kpiBonus = isTradeIn ? 3 : (parseFloat(metaObj.bonus) || 0);
+                      
+                      await supabaseClient.from('user_details').insert([{ 
+                          iin: req.author_iin, 
+                          type: reqType, 
+                          category: earnSourceType, 
+                          action_text: req.details, 
+                          points_motivation: pts, 
+                          kpi_change: kpiBonus, 
+                          manager_iin: appState.iin 
+                      }]); 
+                      
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
+                      
+                      if (reqType === "Продажа СЦ/Фокус" && metaObj.row && metaObj.dept) { 
+                          const todayStr = formatDateLocal(new Date()); 
+                          const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); 
+                          if (scData && scData.items_data) { 
+                              let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); 
+                              await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); 
+                          } 
+                          fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); 
+                      }
+                  }
               }
                   else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
@@ -238,30 +264,52 @@ async function callBackend(actionName, payloadData = {}) {
               let currentSub = ""; let activePromoList = null; localData.promoLists = []; freshHotChecks = [];
               rows.forEach(r => {
                   let btnName = String(r[nameCol] || "").trim(); if (!btnName) return;
-                  let rawVal = String(r[kpiCol] || "").trim(); let btnPts = String(r[ptsCol] || "0").replace('%', '').replace(',', '.').trim();
+                  let rawVal = String(r[kpiCol] || "").trim(); 
+                  let rawPts = String(r[ptsCol] || "").trim();
+                  
                   if (btnName.startsWith("_")) {
-                      let title = btnName.substring(1).trim(); let prefix = ""; let defKpi = "0";
-                      if (rawVal.startsWith("_")) { let spaceIdx = rawVal.indexOf(" "); if (spaceIdx !== -1) { prefix = rawVal.substring(1, spaceIdx).trim(); defKpi = rawVal.substring(spaceIdx).replace('%', '').replace(',', '.').trim(); } else { prefix = rawVal.substring(1).trim(); } } else { defKpi = rawVal.replace('%', '').replace(',', '.').trim(); }
-                      activePromoList = { title: title, prefix: prefix, defKpi: defKpi, items: [] };
+                      let title = btnName.substring(1).trim(); 
+                      let customColor = "var(--text-color)";
+                      
+                      // Вытягиваем дефолтный KPI, убирая лишние символы (_ %)
+                      let defKpi = rawVal.replace(/[^\d.,-]/g, '').replace(',', '.').trim() || "0";
+                      let defPts = "0";
+                      
+                      // Если в колонке PTS указан цвет (например _#3fa3e0)
+                      if (rawPts.startsWith("_#")) {
+                          customColor = rawPts.substring(1).trim(); 
+                      } else {
+                          defPts = rawPts.replace(/[^\d.,-]/g, '').replace(',', '.').trim() || "0";
+                      }
+                      
+                      activePromoList = { title: title, type: title, color: customColor, defKpi: defKpi, defPts: defPts, items: [] };
                       localData.promoLists.push(activePromoList);
                   } else if (btnName.includes("*")) { 
-                      activePromoList = null; let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
+                      activePromoList = null; 
+                      let btnVal = rawVal.replace(/[^\d.,-]/g, '').replace(',', '.').trim();
+                      let btnPts = rawPts.replace(/[^\d.,-]/g, '').replace(',', '.').trim();
                       freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); 
                   } else { 
                       if (activePromoList) { 
-                          let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi; 
+                          let btnVal = rawVal.replace(/[^\d.,-]/g, '').replace(',', '.').trim(); 
+                          let btnPtsStr = rawPts.replace(/[^\d.,-]/g, '').replace(',', '.').trim();
                           
-                          // Парсим имя и базовый остаток
-                          let cleanName = btnName; let count = null;
+                          // Жесткая привязка дефолтов конкретного списка, если ячейка пустая
+                          if (!btnVal || btnVal === "0" || btnVal === "") btnVal = activePromoList.defKpi;
+                          if (!btnPtsStr || btnPtsStr === "0" || btnPtsStr === "") btnPtsStr = activePromoList.defPts;
+                          
+                          let cleanName = btnName; let count = null; let link = "";
                           let bracketIdx = btnName.indexOf('[');
                           if (bracketIdx !== -1) {
                               cleanName = btnName.substring(0, bracketIdx).trim();
                               let metaStr = btnName.substring(bracketIdx);
                               let countMatch = metaStr.match(/\[(\d+),/);
                               if (countMatch) count = parseInt(countMatch[1]) || 0;
+                              let urlMatch = metaStr.match(/https?:\/\/[^\s\]]+/);
+                              if (urlMatch) link = urlMatch[0];
                           }
                           
-                          // Динамическое вычитание одобренных продаж из остатка
+                          // Динамическое вычитание проданных (одобренных) остатков на фронте
                           if (count !== null && allReqs) {
                               let approvedCount = allReqs.filter(req => 
                                   (req.status === 'approved' || req.status === 'approved_notify_zav') && 
@@ -270,7 +318,7 @@ async function callBackend(actionName, payloadData = {}) {
                               count = Math.max(0, count - approvedCount);
                           }
                           
-                          activePromoList.items.push({ name: btnName, cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts }); 
+                          activePromoList.items.push({ name: btnName, cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPtsStr, link: link }); 
                       } 
                       else { currentSub = btnName; }
                   }
@@ -557,27 +605,21 @@ function renderDashboardData(data, isSilent = false) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 14px 12px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative;">`;
-              promoHtml += `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom: 14px;">${list.title}</div>`;
+              // Подставляем цвет заголовка
+              promoHtml += `<div style="font-size:14px; font-weight:bold; color:${list.color}; margin-bottom: 14px;">${list.title}</div>`;
               promoHtml += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
               
               list.items.forEach((item, iIdx) => {
                   let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
                   let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
                   
-                  let rawName = item.name;
-                  let cleanName = item.cleanName || rawName;
-                  let link = "";
-                  let bracketIdx = rawName.indexOf('[');
-                  if (bracketIdx !== -1) {
-                      let metaStr = rawName.substring(bracketIdx);
-                      let urlMatch = metaStr.match(/https?:\/\/[^\s\]]+/);
-                      if (urlMatch) link = urlMatch[0];
-                  }
+                  let cleanName = item.cleanName;
+                  let link = item.link;
 
-                  // Скрываем позицию, если актуальный остаток равен 0
+                  // Если остаток кончился, не рендерим позицию вообще
                   if (item.currentCount !== null && item.currentCount <= 0) return;
 
-                  // Верстка бейджей в углу карточки товара (как у горячих чеков)
+                  // Бейджи строго в углу
                   let badgeHtml = "";
                   if (item.currentCount !== null || kpiBonus > 0 || ptsVal > 0) { 
                       badgeHtml = `<div style="position:absolute; top:-8px; right:4px; display:flex; gap:3px; z-index: 5;">`; 
@@ -587,14 +629,14 @@ function renderDashboardData(data, isSilent = false) {
                       badgeHtml += `</div>`; 
                   }
                   
-                  // Компактная кнопка ссылки (сужена в 2.5 раза, строго ин-апп/браузер открытие)
-                  let linkBtn = link ? `<a href="${link}" onclick="event.stopPropagation(); if(window.Telegram && window.Telegram.WebApp) { window.Telegram.WebApp.openLink('${link}', {try_browser: true}); } else { window.open('${link}', '_blank'); } return false;" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; font-size:12px; width:20px; height:20px; border-radius:5px; text-decoration:none; margin-right:8px; flex-shrink:0; font-weight:bold; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05);">↗</a>` : '';
+                  // Ссылка переделана в <div> с отсечением событий + открытие в браузере
+                  let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp) { window.Telegram.WebApp.openLink('${link}'); } else { window.open('${link}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; font-size:12px; width:20px; height:20px; border-radius:5px; margin-right:8px; flex-shrink:0; font-weight:bold; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;">↗</div>` : '';
                   
                   promoHtml += `
                   <div id="promo-item-${lIdx}-${iIdx}" style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
                       ${linkBtn}
-                      <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.06)); border-radius:10px; padding:8px 12px; display:flex; align-items:center; cursor:pointer; min-height:34px; box-sizing:border-box;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
-                          <span style="font-size:13px; font-weight:bold; color:var(--text-color); line-height:1.2; text-align:left;">${cleanName}</span>
+                      <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.06)); border-radius:10px; padding:8px 12px; display:flex; align-items:center; cursor:pointer; min-height:34px; box-sizing:border-box;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.type}')">
+                          <span style="font-size:13px; font-weight:normal; color:var(--desc-color); line-height:1.2; text-align:left;">${cleanName}</span>
                       </div>
                       ${badgeHtml}
                   </div>`;
