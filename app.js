@@ -432,8 +432,7 @@ function renderTimeUI() { const standardBtns = document.getElementById("standard
 function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace(',','.'))); if (isNaN(n)) return "баллов"; if (n % 1 !== 0) return "балла"; n = Math.floor(n) % 100; let n10 = n % 10; if (n >= 11 && n <= 19) return "баллов"; if (n10 === 1) return "балл"; if (n10 >= 2 && n10 <= 4) return "балла"; return "баллов"; }
 function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 function getSourceColor(src) { 
-    let s = String(src).toLowerCase(); 
-    if(s.includes('фокус')) return '#e74c3c'; 
+    let s = String(src).toLowerCase().trim(); 
     if(s.includes('сц')) return '#e67e22'; 
     if(s.includes('trade-in')) return '#8e44ad'; 
     if(s.includes('горячий')) return '#e84393'; 
@@ -441,9 +440,12 @@ function getSourceColor(src) {
     if(s.includes('исправл')) return '#3498db'; 
     if(s.includes('мотивац')) return '#3390ec'; 
     
-    // Автоматическая генерация цвета для новых приставок (по хэшу строки)
-    let hash = 0; for(let i=0; i<s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
-    const colors = ['#1abc9c', '#3498db', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50', '#f1c40f', '#e67e22', '#d35400', '#c0392b'];
+    // Универсальная генерация цвета для любой приставки (Фокус, Акция и т.д.)
+    let hash = 0; 
+    for(let i = 0; i < s.length; i++) {
+        hash = s.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    const colors = ['#e74c3c', '#1abc9c', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#d35400', '#c0392b', '#f39c12'];
     return colors[Math.abs(hash) % colors.length] || '#7f8c8d'; 
 }
 
@@ -525,11 +527,11 @@ function renderDashboardData(data, isSilent = false) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 8px; padding: 12px; border: 1px solid var(--border-color); background: var(--card-bg);">`;
-              promoHtml += `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom: 16px; display:flex; justify-content:space-between; align-items:center;">
+              promoHtml += `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
                   <span>${list.title}</span>
                   <span style="font-size:10px; color:white; background:${getSourceColor(list.prefix)}; padding:4px 8px; border-radius:12px;">${list.prefix}</span>
               </div>`;
-              promoHtml += `<div style="display: flex; flex-direction: column; gap: 14px;">`;
+              promoHtml += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
               
               list.items.forEach((item, iIdx) => {
                   let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
@@ -548,30 +550,37 @@ function renderDashboardData(data, isSilent = false) {
                       if (urlMatch) link = urlMatch[0];
                   }
 
-                  // Все бейджи собираем в единую абсолютную шапку (в верхнем правом углу рамки)
-                  let badgesHtml = `<div style="position:absolute; top:-10px; right:-8px; display:flex; gap:2px; z-index:5;">`;
-                  if (count) badgesHtml += `<span id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">Ост: <span class="val">${count}</span></span>`;
-                  if (kpiBonus > 0) badgesHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${kpiBonus}%</span>`; 
-                  if (ptsVal > 0) badgesHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${ptsVal}</span>`; 
-                  badgesHtml += `</div>`;
+                  // Бейджи над кнопкой (шапка)
+                  let badgeHtml = "";
+                  if (ptsVal > 0 || kpiBonus > 0) { 
+                      badgeHtml = `<div style="display:flex; gap:4px; margin-bottom:4px; font-size:10px;">`; 
+                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-weight:bold; padding:2px 6px; border-radius:8px;">+${kpiBonus}%</span>`; 
+                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-weight:bold; padding:2px 6px; border-radius:8px;">+${ptsVal} б.</span>`; 
+                      badgeHtml += `</div>`; 
+                  }
                   
                   // Кнопка-ссылка вынесена за рамку
-                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:var(--inner-bg); color:var(--btn-color); font-size:16px; width:34px; height:34px; border-radius:8px; text-decoration:none; margin-right:12px; flex-shrink:0; border:1px solid rgba(150,150,150,0.2);">🌐</a>` : '';
+                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:var(--inner-bg); color:var(--btn-color); font-size:14px; width:30px; height:30px; border-radius:8px; text-decoration:none; margin-right:8px; flex-shrink:0; border:1px solid rgba(150,150,150,0.2);">🌐</a>` : '';
+                  // Бейдж оставшегося количества
+                  let countBadge = count ? `<div id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; margin-left:8px; flex-shrink:0;">Ост: <span class="val">${count}</span></div>` : '';
                   
+                  // Компактный блок
                   promoHtml += `
-                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; align-items:center;">
+                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; align-items:flex-start; margin-bottom:8px;">
                       ${linkBtn}
-                      <div style="position:relative; display:inline-flex; max-width:calc(100% - 46px);">
-                          <div style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; padding:8px 12px; cursor:pointer; width:max-content; box-sizing:border-box;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
-                              <span style="font-size:12px; font-weight:bold; color:var(--text-color);">${cleanName}</span>
+                      <div style="display:flex; flex-direction:column; max-width:calc(100% - 38px);">
+                          ${badgeHtml}
+                          <div style="display:inline-flex; align-items:center; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; padding:6px 10px; width:max-content; max-width:100%; box-sizing:border-box; cursor:pointer;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
+                              <span style="font-size:12px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${cleanName}</span>
+                              ${countBadge}
                           </div>
-                          ${badgesHtml}
                       </div>
                   </div>`;
               });
               promoHtml += `</div></div>`;
           }); 
           
+          // Безопасное добавление без дублирования списков
           let promoContainer = document.getElementById("promo-lists-container");
           if (!promoContainer) {
               promoContainer = document.createElement("div");
@@ -829,14 +838,11 @@ function renderEmpScDetailsData(iin) {
     if (sales.length > 0) { listHtml += groupAndRenderByMonth(sales, i => { let rawDetails = i.reason || ""; let match = rawDetails.match(/\n\[(.*?)\]$/); if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } return buildStandardRow({ title: rawDetails, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, nameText: emp.name, hasBorder: false }); }); } else { listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; }
     listHtml += "</div>"; document.getElementById("emp-sc-render-area").innerHTML = listHtml;
 }
+
 window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefixType) {
     let promptMsg = `Вы подтверждаете продажу: ${typeText}?`;
-    
-    // Форматируем дату в привычный формат DD.MM.YYYY
-    let d = new Date();
-    let dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();
-    
-    let metaStr = JSON.stringify({ date: dStr, bonus: valText, pts: ptsText, type: prefixType });
+    // Записываем prefixType (например "Фокус") как категорию в БД
+    let metaStr = JSON.stringify({ date: formatDateLocal(new Date()), bonus: valText, pts: ptsText, type: prefixType });
     
     let exec = () => {
         // Уменьшаем счетчик
@@ -849,10 +855,9 @@ window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefi
                 document.getElementById(`promo-item-${lIdx}-${iIdx}`).style.display = 'none';
             }
         }
-        
-        // Первый аргумент — это type для таблицы requests.
-        // Передаем динамический prefixType (то, что пришло из БД как приставка)
-        executeSubmit(prefixType, typeText, null, metaStr);
+        // Используем тип "Продажа СЦ/Фокус" чтобы бэкенд правильно считал номенклатуру
+        // В истории это будет выглядеть как: Заголовок "Фокус", Деталь "Утюг BRAUN..."
+        executeSubmit("Продажа СЦ/Фокус", typeText, null, metaStr);
     };
     
     if (typeof tg !== 'undefined' && tg && tg.showPopup) {
