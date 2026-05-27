@@ -426,7 +426,14 @@ function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace
 function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 function getSourceColor(src) { let s = String(src).toLowerCase(); if(s.includes('фокус')) return '#e74c3c'; if(s.includes('сц')) return '#e67e22'; if(s.includes('trade-in')) return '#8e44ad'; if(s.includes('горячий')) return '#e84393'; if(s.includes('обмен')) return '#f39c12'; if(s.includes('исправл')) return '#3498db'; if(s.includes('мотивац')) return '#3390ec'; return '#7f8c8d'; }
 
-function buildStandardRow(p) { let borderStyle = p.hasBorder ? `border-left: 2px solid ${p.typeColor};` : ''; let titleWeight = p.isBoldTitle ? 'bold' : 'normal'; let rightTopHtml = p.valText ? `<div class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap; flex-shrink:0;">${p.valText}</div>` : ''; let rightBottomHtml = p.nameText ? `<div style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px; flex-shrink:0; text-align:right;">${p.nameText}</div>` : ''; return `<div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; flex-direction: column; justify-content: center; ${borderStyle}"><div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;"><div style="color:var(--text-color); font-size:12px; font-weight:${titleWeight}; flex:1; min-width:0; white-space:normal; word-break:break-word; line-height:1.3;">${p.title}</div>${rightTopHtml}</div><div style="display: flex; justify-content: space-between; align-items: center;"><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;"><b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span></div>${rightBottomHtml}</div></div>`; }
+function buildStandardRow(p) { 
+    let bColor = p.borderColor || p.typeColor;
+    let borderStyle = p.hasBorder ? `border-left: 2px solid ${bColor};` : ''; 
+    let titleWeight = p.isBoldTitle ? 'bold' : 'normal'; 
+    let rightTopHtml = p.valText ? `<div class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap; flex-shrink:0;">${p.valText}</div>` : ''; 
+    let rightBottomHtml = p.nameText ? `<div style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px; flex-shrink:0; text-align:right;">${p.nameText}</div>` : ''; 
+    return `<div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; flex-direction: column; justify-content: center; ${borderStyle}"><div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;"><div style="color:var(--text-color); font-size:12px; font-weight:${titleWeight}; flex:1; min-width:0; white-space:normal; word-break:break-word; line-height:1.3;">${p.title}</div>${rightTopHtml}</div><div style="display: flex; justify-content: space-between; align-items: center;"><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;"><b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span></div>${rightBottomHtml}</div></div>`; 
+}
 function initSmartDates() { const today = formatDateLocal(new Date()); document.querySelectorAll('.smart-date').forEach(el => { el.dataset.realdate = today; el.value = "Сегодня"; el.addEventListener('focus', function() { this.type = 'date'; this.value = this.dataset.realdate; if(this.showPicker) this.showPicker(); }); el.addEventListener('blur', function() { if(!this.value) this.value = today; this.dataset.realdate = this.value; if (this.value === today) { this.type = 'text'; this.value = "Сегодня"; } else { this.type = 'text'; const d = new Date(this.value); this.value = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } }); el.addEventListener('change', function() { this.blur(); }); }); }
 function initAutoScroll() { const scroller = document.getElementById("scroll-container"); let scrollDir = 1; let scrollTimer = setInterval(() => { if (!autoScrollAnimation || !scroller || scroller.closest('.hidden')) return; scroller.scrollLeft += 1 * scrollDir; if (scroller.scrollLeft + scroller.clientWidth >= scroller.scrollWidth - 1) scrollDir = -1; else if (scroller.scrollLeft <= 0) scrollDir = 1; }, 40); if(scroller) { scroller.addEventListener('touchstart', () => autoScrollAnimation = false, {passive: true}); scroller.addEventListener('touchend', () => { setTimeout(()=>autoScrollAnimation=true, 2000); }, {passive: true}); } }
 
@@ -526,27 +533,30 @@ function renderDashboardData(data, isSilent = false) {
       if (promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach(list => {
-              promoHtml += `<div class="inner-block card" style="margin-top: 12px; padding: 12px; background: var(--card-bg); border: 1px solid var(--border-color);"><h3 style="margin-bottom: 10px; font-size: 14px; color: #f39c12;">${list.title}</h3>`;
-              let colsCount = Math.min(list.items.length, 4); 
-              promoHtml += `<div style="display: grid; grid-template-columns: repeat(${colsCount}, 1fr); gap: 6px;">`;
+              promoHtml += `<div class="inner-block card" style="margin-top: 12px; padding: 12px; background: var(--card-bg); border: 1px solid var(--border-color);"><h3 style="margin-bottom: 10px; font-size: 14px; color: var(--text-color);">${list.title}</h3>`;
+              promoHtml += `<div style="display: flex; flex-direction: column; gap: 6px;">`;
               
               list.items.forEach(item => {
                   let badgeHtml = ""; let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
                   if (ptsVal > 0 || kpiBonus > 0) { 
-                      badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`; 
-                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${kpiBonus}%</span>`; 
-                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${ptsVal}</span>`; 
+                      badgeHtml = `<div style="display:flex; gap:4px; margin-left:8px; flex-shrink:0;">`; 
+                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:6px;">+${kpiBonus}%</span>`; 
+                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:6px;">+${ptsVal}</span>`; 
                       badgeHtml += `</div>`; 
                   }
                   
-                  let combinedName = item.name;
-                  let displayContent = `<div style="text-align:center; width:100%;">${item.name}</div>`;
-                  if (list.prefix) {
-                      displayContent = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><span style="flex:1; text-align:left;">${item.name}</span><span style="font-size:9px; color:gray; font-weight:bold; margin-left:4px;">${list.prefix}</span></div>`;
-                      combinedName = `${list.prefix} ${item.name}`;
+                  let parsed = item.name.match(/(.*?)\s*\[(\d+),\s*.*?(\bhttps?:\/\/[^\s\]\[]+)/i);
+                  let dNameText = item.name; let linkBtn = "";
+                  if (parsed) { 
+                      dNameText = parsed[1].trim(); 
+                      let link = parsed[3]; 
+                      linkBtn = `<button style="background:var(--inner-bg); border:1px solid var(--border-color); border-radius:6px; padding:4px 8px; margin-right:8px; font-size:14px; cursor:pointer;" onclick="event.stopPropagation(); window.open('${link}', '_blank')">🔗</button>`;
                   }
                   
-                  promoHtml += `<div style="position:relative; display:flex; flex:1;"><button class="btn-gray" style="padding:10px 4px; font-size:12px; margin:0; width:100%; display:flex; align-items:center;" onclick="submitPromoAction('${list.title}', '${combinedName}', '${item.val}', '${item.pts || 0}')">${displayContent}</button>${badgeHtml}</div>`;
+                  let combinedName = list.prefix ? `${list.prefix} ${item.name}` : item.name;
+                  let displayContent = `<div style="display:flex; align-items:center; flex:1; text-align:left; font-size:13px;">${linkBtn}<span style="white-space:normal; line-height:1.2;">${dNameText}</span></div>`;
+                  
+                  promoHtml += `<div style="display:flex; align-items:center; justify-content:space-between; padding:8px; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px;"><div style="display:flex; flex:1; align-items:center; cursor:pointer;" onclick="submitPromoAction('${list.title}', '${combinedName.replace(/"/g, '&quot;')}', '${item.val}', '${item.pts || 0}')">${displayContent}</div>${badgeHtml}</div>`;
               }); 
               promoHtml += `</div></div>`;
           }); 
@@ -607,9 +617,14 @@ function renderHistoryItem(i, isCompact = false) {
     if (rawNum > 0 && !String(i.type).toLowerCase().includes('штраф')) { valStr = '+' + valStr; } else if (rawNum < 0) { valStr = '-' + Math.abs(rawNum).toString().replace('.', ','); }
     let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
     let srcColor = getSourceColor(i.source); let finalType = i.source; let finalColor = srcColor; 
-    if (String(i.type).toLowerCase().includes('использ')) { finalType = "Мотивация"; finalColor = "#f39c12"; } else if (String(i.type).toLowerCase().includes('штраф')) { finalType = "Штраф"; finalColor = "#e74c3c"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
+    let borderColor = rawNum > 0 ? "#27ae60" : (rawNum < 0 ? "#f39c12" : "#95a5a6"); // Зеленый для плюса, желтый/красный для минуса
+
+    if (String(i.type).toLowerCase().includes('использ')) { finalType = "Мотивация"; finalColor = "#f39c12"; borderColor = "#f39c12"; } 
+    else if (String(i.type).toLowerCase().includes('штраф')) { finalType = "Штраф"; finalColor = "#e74c3c"; borderColor = "#e74c3c"; } 
+    else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; borderColor = "#27ae60"; }
+    
     let rightText = isDirOrZav ? formatShortName(String(i.type).toLowerCase().includes('штраф') ? i.source : i.approver) : "";
-    return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
+    return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, borderColor: borderColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
 }
 
 function renderMoneyFineItem(i) { let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); let moneyVal = i.moneyFine ? String(i.moneyFine).replace('.',',') : "0"; let formatted = formatNumberWithSpaces(moneyVal); let issuerHtml = (i.source && isDirOrZav) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${formatShortName(i.source)}</span>` : ''; return `<div class="req-item" style="border-left-color: #e74c3c; border-left-width: 2px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;"><div style="flex:1;"><b style="font-size:12px; color:#e74c3c; display:inline-block; margin-bottom:3px;">Штраф</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div><span style="color:gray;font-size:10px;">${i.date}</span></div>${issuerHtml}</div></div><span class="detail-fine" style="margin-left:10px;">${formatted} ₸</span></div>`; }
@@ -801,14 +816,18 @@ function renderScItems() {
       let selClass = isSelected ? " selected" : "";
       
       let parsed = i.name.match(/(.*?)\s*\[(\d+),\s*.*?(\bhttps?:\/\/[^\s\]\[]+)/i);
-      let dNameText = i.name; let qtyHtml = ""; let linkHtml = "";
-      if (parsed) { dNameText = parsed[1].trim(); let qty = parsed[2]; let link = parsed[3]; qtyHtml = `<span style="background:var(--btn-color); color:white; padding:2px 6px; border-radius:4px; font-size:10px; margin-left:6px;">Осталось: ${qty}</span>`; linkHtml = `<a href="${link}" target="_blank" style="margin-left:6px; font-size:16px; text-decoration:none;" onclick="event.stopPropagation()">🔗</a>`; }
+      let dNameText = i.name; let linkHtml = "";
+      if (parsed) { 
+          dNameText = parsed[1].trim(); 
+          let link = parsed[3]; 
+          linkHtml = `<button style="background:var(--inner-bg); border:1px solid var(--border-color); border-radius:6px; padding:4px 8px; margin-right:8px; font-size:14px; cursor:pointer;" onclick="event.stopPropagation(); window.open('${link}', '_blank')">🔗</button>`; 
+      }
 
       if (i.type === 'Фокус') {
           let ptNoun = formatPointsNoun(i.pts); let ptsText = `${String(i.pts).replace('.', ',')} ${ptNoun}`;
-          focusHtml += `<div class="sc-item${selClass}" onclick="selectScItemRow(${i.row}, '${i.type}', '${i.dept}')" style="padding:10px; border-bottom:1px solid rgba(130, 130, 130, 0.35); display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><div><div style="font-size:12px; margin-bottom:4px; display:flex; align-items:center;"><span>${dNameText}</span>${qtyHtml}${linkHtml}</div><div class="type-label" style="font-size:10px; color:#e74c3c; font-weight:bold;">${ptsText}</div></div></div>`;
+          focusHtml += `<div class="sc-item${selClass}" onclick="selectScItemRow(${i.row}, '${i.type}', '${i.dept}')" style="padding:10px; border-bottom:1px solid rgba(130, 130, 130, 0.35); display:flex; flex-direction:column; margin-bottom:4px;"><div style="display:flex; align-items:center; margin-bottom:6px;">${linkHtml}<span style="font-size:13px; font-weight:bold; line-height:1.2;">${dNameText}</span></div><div class="type-label" style="font-size:10px; color:#e74c3c; font-weight:bold;">${ptsText}</div></div>`;
       } else {
-          scHtml += `<div class="sc-item${selClass}" onclick="selectScItemRow(${i.row}, '${i.type}', '${i.dept}')" style="margin-bottom:4px;"><div><div style="margin-bottom:4px; font-size:13px;">${i.name}</div><div style="display:flex; justify-content:space-between; align-items:center;"><div class="type-label" style="font-size:10px; color:#e67e22; font-weight:bold;">СЦ — 2 балла</div>${i.discount ? `<div style="font-weight:bold; color:#e74c3c; font-size:11px;">-${i.discount.replace(/%/g, '% ')}</div>` : ''}</div></div></div>`;
+          scHtml += `<div class="sc-item${selClass}" onclick="selectScItemRow(${i.row}, '${i.type}', '${i.dept}')" style="margin-bottom:4px; padding:10px;"><div><div style="margin-bottom:6px; font-size:13px; font-weight:bold;">${i.name}</div><div style="display:flex; justify-content:space-between; align-items:center;"><div class="type-label" style="font-size:10px; color:#e67e22; font-weight:bold;">СЦ — 2 балла</div>${i.discount ? `<div style="font-weight:bold; color:#e74c3c; font-size:11px;">-${i.discount.replace(/%/g, '% ')}</div>` : ''}</div></div></div>`;
       }
   });
 
