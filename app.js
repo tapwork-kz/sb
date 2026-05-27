@@ -526,10 +526,10 @@ function renderDashboardData(data, isSilent = false) {
       if (promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
-              promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 8px; padding: 12px; border: 1px solid var(--border-color); background: var(--card-bg);">`;
-              promoHtml += `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
-                  <span>${list.title}</span>
-                  <span style="font-size:10px; color:white; background:${getSourceColor(list.prefix)}; padding:4px 8px; border-radius:12px;">${list.prefix}</span>
+              promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 16px 12px; border: none; background: var(--card-bg); box-shadow: 0 2px 10px rgba(0,0,0,0.03);">`;
+              // Динамический заголовок без хардкода
+              promoHtml += `<div style="font-size:16px; font-weight:bold; color:var(--text-color); margin-bottom: 16px;">
+                  ${list.title}
               </div>`;
               promoHtml += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
               
@@ -537,7 +537,6 @@ function renderDashboardData(data, isSilent = false) {
                   let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
                   let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
                   
-                  // Парсинг количества и ссылки
                   let rawName = item.name;
                   let cleanName = rawName; let count = ""; let link = "";
                   let bracketIdx = rawName.indexOf('[');
@@ -550,29 +549,25 @@ function renderDashboardData(data, isSilent = false) {
                       if (urlMatch) link = urlMatch[0];
                   }
 
-                  // Бейджи над кнопкой (шапка)
-                  let badgeHtml = "";
-                  if (ptsVal > 0 || kpiBonus > 0) { 
-                      badgeHtml = `<div style="display:flex; gap:4px; margin-bottom:4px; font-size:10px;">`; 
-                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-weight:bold; padding:2px 6px; border-radius:8px;">+${kpiBonus}%</span>`; 
-                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-weight:bold; padding:2px 6px; border-radius:8px;">+${ptsVal} б.</span>`; 
-                      badgeHtml += `</div>`; 
-                  }
+                  // Формируем бейджи в шапке (Ост, KPI, Баллы)
+                  let badgesHtml = "";
+                  if (count) badgesHtml += `<span id="count-${lIdx}-${iIdx}" style="background:#e67e22; color:white; font-size:11px; font-weight:bold; padding:4px 10px; border-radius:12px;">Ост: <span class="val">${count}</span></span>`;
+                  if (kpiBonus > 0) badgesHtml += `<span style="background:#4a90e2; color:white; font-size:11px; font-weight:bold; padding:4px 10px; border-radius:12px;">+${kpiBonus}%</span>`;
+                  if (ptsVal > 0) badgesHtml += `<span style="background:#e74c3c; color:white; font-size:11px; font-weight:bold; padding:4px 10px; border-radius:12px;">+${ptsVal} б.</span>`;
                   
-                  // Кнопка-ссылка вынесена за рамку
-                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:var(--inner-bg); color:var(--btn-color); font-size:14px; width:30px; height:30px; border-radius:8px; text-decoration:none; margin-right:8px; flex-shrink:0; border:1px solid rgba(150,150,150,0.2);">🌐</a>` : '';
-                  // Бейдж оставшегося количества
-                  let countBadge = count ? `<div id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; margin-left:8px; flex-shrink:0;">Ост: <span class="val">${count}</span></div>` : '';
+                  // Контейнер бейджей (выровнен по правому краю)
+                  let badgesRow = badgesHtml ? `<div style="display:flex; justify-content:flex-end; gap:6px; margin-bottom:4px; padding-right:4px;">${badgesHtml}</div>` : "";
                   
-                  // Компактный блок
+                  // Кнопка ссылки слева (как на фото)
+                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:rgba(243, 156, 18, 0.1); color:#e67e22; font-size:20px; width:48px; border-radius:10px; text-decoration:none; margin-right:10px; flex-shrink:0; border:1px solid rgba(243, 156, 18, 0.3);">↗</a>` : '';
+                  
                   promoHtml += `
-                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; align-items:flex-start; margin-bottom:8px;">
-                      ${linkBtn}
-                      <div style="display:flex; flex-direction:column; max-width:calc(100% - 38px);">
-                          ${badgeHtml}
-                          <div style="display:inline-flex; align-items:center; background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; padding:6px 10px; width:max-content; max-width:100%; box-sizing:border-box; cursor:pointer;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
-                              <span style="font-size:12px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${cleanName}</span>
-                              ${countBadge}
+                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; flex-direction:column; margin-bottom:12px;">
+                      ${badgesRow}
+                      <div style="display:flex; align-items:stretch;">
+                          ${linkBtn}
+                          <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.1)); border-radius:12px; padding:14px 16px; display:flex; align-items:center; cursor:pointer;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
+                              <span style="font-size:14px; font-weight:bold; color:var(--text-color);">${cleanName}</span>
                           </div>
                       </div>
                   </div>`;
@@ -580,7 +575,6 @@ function renderDashboardData(data, isSilent = false) {
               promoHtml += `</div></div>`;
           }); 
           
-          // Безопасное добавление без дублирования списков
           let promoContainer = document.getElementById("promo-lists-container");
           if (!promoContainer) {
               promoContainer = document.createElement("div");
@@ -841,11 +835,14 @@ function renderEmpScDetailsData(iin) {
 
 window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefixType) {
     let promptMsg = `Вы подтверждаете продажу: ${typeText}?`;
-    // Записываем prefixType (например "Фокус") как категорию в БД
-    let metaStr = JSON.stringify({ date: formatDateLocal(new Date()), bonus: valText, pts: ptsText, type: prefixType });
+    
+    // Форматируем дату строго в 01.01.2000
+    let d = new Date();
+    let formattedDate = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();
+    
+    let metaStr = JSON.stringify({ date: formattedDate, bonus: valText, pts: ptsText, type: prefixType });
     
     let exec = () => {
-        // Уменьшаем счетчик
         let cntEl = document.querySelector(`#count-${lIdx}-${iIdx} .val`);
         if (cntEl) {
             let cur = parseInt(cntEl.innerText) || 0;
@@ -855,9 +852,9 @@ window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefi
                 document.getElementById(`promo-item-${lIdx}-${iIdx}`).style.display = 'none';
             }
         }
-        // Используем тип "Продажа СЦ/Фокус" чтобы бэкенд правильно считал номенклатуру
-        // В истории это будет выглядеть как: Заголовок "Фокус", Деталь "Утюг BRAUN..."
-        executeSubmit("Продажа СЦ/Фокус", typeText, null, metaStr);
+        
+        // Отправляем prefixType (например, "Фокус" или любую другую) как тип запроса
+        executeSubmit(prefixType, typeText, null, metaStr);
     };
     
     if (typeof tg !== 'undefined' && tg && tg.showPopup) {
