@@ -177,11 +177,17 @@ async function callBackend(actionName, payloadData = {}) {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
                   if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
-                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In" || metaObj.type) {
-                  let isTradeIn = reqType === "Продажа Trade-In"; let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); 
-                  await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: 3, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
-                  if ((reqType === "Продажа СЦ/Фокус" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
-              }
+                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In" || metaObj.type || reqType === metaObj.type) { 
+                      let earnSourceType = (reqType === "Продажа Trade-In") ? "Trade-In" : (metaObj.type || reqType); 
+                      let pts = (reqType === "Продажа Trade-In") ? 1 : (parseFloat(metaObj.pts) || 0); 
+                      // Берем реальный процент из меты, а не захардкоженные 3%
+                      let bonus = metaObj.bonus ? parseFloat(metaObj.bonus) : (reqType === "Продажа СЦ/Фокус" ? 3 : 0);
+                      
+                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: bonus, manager_iin: appState.iin }]); 
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
+                      
+                      if ((reqType === "Продажа СЦ/Фокус" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
+                  }
                   else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
               }
@@ -245,7 +251,6 @@ async function callBackend(actionName, payloadData = {}) {
                       let title = btnName.substring(1).trim(); 
                       let prefix = ""; let defKpi = "0"; let listColor = "var(--text-color)";
                       
-                      // Парсинг префикса и дефолтного KPI
                       if (rawVal.startsWith("_")) { 
                           let spaceIdx = rawVal.indexOf(" "); 
                           if (spaceIdx !== -1) { 
@@ -258,7 +263,7 @@ async function callBackend(actionName, payloadData = {}) {
                           defKpi = rawVal.replace('%', '').replace(',', '.').trim(); 
                       }
                       
-                      // Парсинг цвета заголовка из колонки PTS (если начинается с _#)
+                      // Парсим цвет из колонки PTS и сохраняем глобально для всех карточек
                       if (rawPts.startsWith("_#")) {
                           let spaceIdx = rawPts.indexOf(" ");
                           if (spaceIdx !== -1) {
@@ -266,6 +271,7 @@ async function callBackend(actionName, payloadData = {}) {
                           } else {
                               listColor = rawPts.substring(1).trim();
                           }
+                          if (prefix) window.dynamicPrefixColors[prefix] = listColor;
                       }
                       
                       activePromoList = { title: title, prefix: prefix, defKpi: defKpi, listColor: listColor, items: [] };
@@ -278,8 +284,6 @@ async function callBackend(actionName, payloadData = {}) {
                       if (activePromoList) { 
                           let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); 
                           if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi; 
-                          
-                          // Строго берем балл текущей строки, без смешиваний
                           let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
                           
                           let cleanName = btnName; let count = null;
@@ -291,11 +295,12 @@ async function callBackend(actionName, payloadData = {}) {
                               if (countMatch) count = parseInt(countMatch[1]) || 0;
                           }
                           
-                          // Вычитание одобренных
                           if (count !== null && allReqs) {
+                              // Строгая фильтрация по ПРИСТАВКЕ, чтобы списки не воровали значения друг у друга
                               let approvedCount = allReqs.filter(req => 
                                   (req.status === 'approved' || req.status === 'approved_notify_zav') && 
-                                  String(req.details).trim() === cleanName
+                                  String(req.details).trim() === cleanName &&
+                                  (req.type === activePromoList.prefix || (req.metadata && req.metadata.type === activePromoList.prefix) || (req.meta && req.meta.includes(`"type":"${activePromoList.prefix}"`)))
                               ).length;
                               count = Math.max(0, count - approvedCount);
                           }
@@ -491,8 +496,14 @@ function getDeclension(action) { if (!action) return ""; if (action.startsWith("
 function renderTimeUI() { const standardBtns = document.getElementById("standard-buttons"); const returnContainer = document.getElementById("return-button-container"); let actStr = String(appState.currentAction); if (appState.currentAction && actStr !== "null" && actStr !== "undefined" && actStr !== "") { document.getElementById("btn-return").disabled = false; standardBtns.classList.add("hidden"); returnContainer.classList.remove("hidden"); const declension = getDeclension(appState.currentAction); document.getElementById("return-text").innerText = "Вернуться с " + declension; document.getElementById("action-hint").innerText = "Ожидаем возвращения:"; } else { standardBtns.classList.remove("hidden"); returnContainer.classList.add("hidden"); } }
 function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace(',','.'))); if (isNaN(n)) return "баллов"; if (n % 1 !== 0) return "балла"; n = Math.floor(n) % 100; let n10 = n % 10; if (n >= 11 && n <= 19) return "баллов"; if (n10 === 1) return "балл"; if (n10 >= 2 && n10 <= 4) return "балла"; return "баллов"; }
 function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
+window.dynamicPrefixColors = window.dynamicPrefixColors || {};
+
 function getSourceColor(src) { 
-    let s = String(src).toLowerCase().trim(); 
+    let originalSrc = String(src).trim();
+    // Если цвет для этой приставки был спарсен из таблицы, отдаем его везде!
+    if (window.dynamicPrefixColors[originalSrc]) return window.dynamicPrefixColors[originalSrc];
+    
+    let s = originalSrc.toLowerCase(); 
     if(s.includes('сц')) return '#e67e22'; 
     if(s.includes('trade-in')) return '#8e44ad'; 
     if(s.includes('горячий')) return '#e84393'; 
@@ -500,7 +511,6 @@ function getSourceColor(src) {
     if(s.includes('исправл')) return '#3498db'; 
     if(s.includes('мотивац')) return '#3390ec'; 
     
-    // Универсальная генерация цвета для любой приставки (Фокус, Акция и т.д.)
     let hash = 0; 
     for(let i = 0; i < s.length; i++) {
         hash = s.charCodeAt(i) + ((hash << 5) - hash);
@@ -586,10 +596,10 @@ function renderDashboardData(data, isSilent = false) {
       if (promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
-              // Применяем спарсенный цвет к заголовку
               let headerColor = list.listColor || "var(--text-color)";
               
               promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 14px 12px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative;">`;
+              // Применяем спарсенный цвет к заголовку списка
               promoHtml += `<div style="font-size:14px; font-weight:bold; color:${headerColor}; margin-bottom: 14px;">${list.title}</div>`;
               promoHtml += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
               
@@ -618,10 +628,10 @@ function renderDashboardData(data, isSilent = false) {
                       badgeHtml += `</div>`; 
                   }
                   
-                  // Заменено на <div>, чтобы не было двойного открытия (браузер + логика приложения)
-                  let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) { window.Telegram.WebApp.openLink('${link}', {try_browser: true}); } else { window.open('${link}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; font-size:12px; width:20px; height:20px; border-radius:5px; margin-right:8px; flex-shrink:0; font-weight:bold; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;">↗</div>` : '';
+                  // Безопасный клик через div и stopPropagation, чтобы Telegram не дублировал открытие
+                  let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) { window.Telegram.WebApp.openLink('${link}'); } else { window.open('${link}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; font-size:12px; width:20px; height:20px; border-radius:5px; margin-right:8px; flex-shrink:0; font-weight:bold; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;">↗</div>` : '';
                   
-                  // Текст товара теперь не жирный и темно-серый (color: #555)
+                  // Текст товара: font-weight:normal и color:#555
                   promoHtml += `
                   <div id="promo-item-${lIdx}-${iIdx}" style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
                       ${linkBtn}
