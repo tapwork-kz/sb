@@ -701,10 +701,27 @@ function renderAdminOuts() {
 }
 
 function renderAdminEmps(dept, btnElement) {
-   currentEmpDept = dept; if (btnElement) { document.getElementById('flt-emp-cifra').classList.remove('active-flt'); document.getElementById('flt-emp-mbt').classList.remove('active-flt'); document.getElementById('flt-emp-kbt').classList.remove('active-flt'); btnElement.classList.add('active-flt'); }
-   let container = document.getElementById("admin-emp-list"); let filtered = allEmployeesData.filter(e => e.dept.toLowerCase().includes(dept.toLowerCase())); let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
+   currentEmpDept = dept; 
+   if (btnElement) { 
+       document.getElementById('flt-emp-cifra').classList.remove('active-flt'); 
+       document.getElementById('flt-emp-mbt').classList.remove('active-flt'); 
+       document.getElementById('flt-emp-kbt').classList.remove('active-flt'); 
+       btnElement.classList.add('active-flt'); 
+   }
+   let container = document.getElementById("admin-emp-list"); 
+   let filtered = allEmployeesData.filter(e => e.dept.toLowerCase().includes(dept.toLowerCase())); 
+   let currentMonth = new Date().getMonth() + 1; 
+   let currentYear = new Date().getFullYear(); 
+   let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
+   
    container.innerHTML = filtered.map(e => { 
-       let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix)); let curMonthSc = monthScHist.filter(p => !p.source.toLowerCase().includes"trade-in")).length; let curMonthTrade = monthScHist.filter(p => p.source.toLowerCase().includes("trade-in")).length; let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
+       let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
+       
+       // ИСПРАВЛЕНО: добавлена скобка в .includes("trade-in")
+       let curMonthSc = monthScHist.filter(p => !p.source.toLowerCase().includes("trade-in")).length; 
+       let curMonthTrade = monthScHist.filter(p => p.source.toLowerCase().includes("trade-in")).length; 
+       
+       let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
        return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус BRZY: <b style="color:var(--btn-color);">${curMonthTrade}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
    }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
 }
