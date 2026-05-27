@@ -177,9 +177,11 @@ async function callBackend(actionName, payloadData = {}) {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
                   if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
-                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In") { let isTradeIn = reqType === "Продажа Trade-In"; let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: 3, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
-                      if (reqType === "Продажа СЦ/Фокус" && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
-                  }
+                  else if (reqType === "Продажа СЦ/Фокус" || reqType === "Продажа Trade-In" || metaObj.type) {
+                  let isTradeIn = reqType === "Продажа Trade-In"; let earnSourceType = isTradeIn ? "Trade-In" : (metaObj.type || reqType); let pts = isTradeIn ? 1 : (parseFloat(metaObj.pts) || 0); 
+                  await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: 3, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
+                  if ((reqType === "Продажа СЦ/Фокус" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
+              }
                   else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
               }
@@ -246,7 +248,30 @@ async function callBackend(actionName, payloadData = {}) {
                       activePromoList = null; let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
                       freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); 
                   } else { 
-                      if (activePromoList) { let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi; activePromoList.items.push({ name: btnName, val: btnVal, pts: btnPts }); } 
+                      if (activePromoList) { 
+                          let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi; 
+                          
+                          // Парсим имя и базовый остаток
+                          let cleanName = btnName; let count = null;
+                          let bracketIdx = btnName.indexOf('[');
+                          if (bracketIdx !== -1) {
+                              cleanName = btnName.substring(0, bracketIdx).trim();
+                              let metaStr = btnName.substring(bracketIdx);
+                              let countMatch = metaStr.match(/\[(\d+),/);
+                              if (countMatch) count = parseInt(countMatch[1]) || 0;
+                          }
+                          
+                          // Динамическое вычитание одобренных продаж из остатка
+                          if (count !== null && allReqs) {
+                              let approvedCount = allReqs.filter(req => 
+                                  (req.status === 'approved' || req.status === 'approved_notify_zav') && 
+                                  String(req.details).trim() === cleanName
+                              ).length;
+                              count = Math.max(0, count - approvedCount);
+                          }
+                          
+                          activePromoList.items.push({ name: btnName, cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts }); 
+                      } 
                       else { currentSub = btnName; }
                   }
               });
@@ -283,22 +308,27 @@ async function callBackend(actionName, payloadData = {}) {
           allUserDetails.forEach(ud => {
               let d = new Date(ud.created_at); let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
               let ptsMotivation = parseFloat(ud.points_motivation) || 0; let kpiChange = parseFloat(ud.kpi_change) || 0; let managerName = ud.manager_iin ? (userMap[ud.manager_iin]?.full_name || ud.manager_iin) : "";
+              
+              let dynamicType = ud.category || ud.type;
+              let cleanActionText = ud.action_text || "";
+              // Удаляем приставку типа из начала строки, если она там присутствует
+              if (dynamicType && cleanActionText.startsWith(dynamicType + " ")) {
+                  cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
+              }
+
               if (ptsMotivation !== 0 || ud.type === "Штраф") {
-                  let histItem = { date: dateStr, type: ud.type, source: ud.category || ud.type, reason: ud.action_text || "", val: ptsMotivation > 0 ? "+" + ptsMotivation : ptsMotivation, approver: managerName, moneyFine: ud.fine_money || 0, kpiChange: kpiChange };
-                  if (ud.type === "Продажа СЦ/Фокус" || ud.type === "Продажа Trade-In") { histItem.type = "Начисление"; histItem.source = ud.category || (ud.type === "Продажа Trade-In" ? "Trade-In" : "СЦ"); histItem.val = "+" + ptsMotivation; } else if (ud.type === "Использование") { histItem.type = "Использование"; histItem.source = "Мотивация"; } else if (ud.type === "Штраф") { histItem.type = "Штраф"; histItem.source = managerName; } else if (ud.type === "Горячий чек") { 
-    histItem.type = "Начисление"; 
-    histItem.source = "Горячий чек"; 
-    // Вытягиваем приставку как источник, если она есть
-    let firstWord = String(ud.action_text).split(' ')[0];
-    if(firstWord && firstWord !== "Горячий" && ud.action_text.includes(firstWord + ' ')) { histItem.source = firstWord; }
-    histItem.val = "+" + ptsMotivation; 
-}
+                  let histItem = { date: dateStr, type: ud.type, source: dynamicType, reason: cleanActionText, val: ptsMotivation > 0 ? "+" + ptsMotivation : ptsMotivation, approver: managerName, moneyFine: ud.fine_money || 0, kpiChange: kpiChange };
+                  if (ud.type === "Продажа СЦ/Фокус" || ud.type === "Продажа Trade-In" || ud.type === dynamicType) { histItem.type = "Начисление"; histItem.source = dynamicType; histItem.val = "+" + ptsMotivation; } else if (ud.type === "Использование") { histItem.type = "Использование"; histItem.source = "Мотивация"; } else if (ud.type === "Штраф") { histItem.type = "Штраф"; histItem.source = managerName; } else if (ud.type === "Горячий чек") { 
+                      histItem.type = "Начисление"; histItem.source = "Горячий чек"; 
+                      let firstWord = String(cleanActionText).split(' ')[0];
+                      if(firstWord && firstWord !== "Горячий" && cleanActionText.includes(firstWord + ' ')) { histItem.source = firstWord; }
+                      histItem.val = "+" + ptsMotivation; 
+                  }
                   if (ud.iin === appState.iin) { myPtsHistory.push(histItem); }
                   if (empMap[ud.iin]) { empMap[ud.iin].ptsHistory.push(histItem); if (histItem.type === "Начисление") { empMap[ud.iin].pts.acc += ptsMotivation; if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; else empMap[ud.iin].sales.sc++; } if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); }
               }
               if (kpiChange !== 0) {
-                  let kName = ud.action_text || ud.type; let kSource = ud.category || (ud.type.includes("Trade-In") ? "Trade-In" : ud.type);
-                  if (ud.type.includes("СЦ/Фокус")) kSource = ud.category || "СЦ"; if (ud.type === "Горячий чек") { kName = ud.action_text; kSource = "Горячий чек"; }
+                  let kName = cleanActionText || ud.type; let kSource = dynamicType;
                   let kpiItem = { name: kName, source: kSource, val: kpiChange, date: dateStr };
                   if (ud.iin === appState.iin) { if (!localData.info.kpiDetails) localData.info.kpiDetails = []; localData.info.kpiDetails.push(kpiItem); myKpiChanges += kpiChange; }
                   if (empMap[ud.iin]) { empMap[ud.iin].kpi += kpiChange; if (ud.iin !== appState.iin) empMap[ud.iin].kpiDetails.push(kpiItem); }
@@ -526,50 +556,47 @@ function renderDashboardData(data, isSilent = false) {
       if (promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
-              promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 16px 12px; border: none; background: var(--card-bg); box-shadow: 0 2px 10px rgba(0,0,0,0.03);">`;
-              // Динамический заголовок без хардкода
-              promoHtml += `<div style="font-size:16px; font-weight:bold; color:var(--text-color); margin-bottom: 16px;">
-                  ${list.title}
-              </div>`;
-              promoHtml += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+              promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 14px 12px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative;">`;
+              promoHtml += `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom: 14px;">${list.title}</div>`;
+              promoHtml += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
               
               list.items.forEach((item, iIdx) => {
                   let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
                   let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
                   
                   let rawName = item.name;
-                  let cleanName = rawName; let count = ""; let link = "";
+                  let cleanName = item.cleanName || rawName;
+                  let link = "";
                   let bracketIdx = rawName.indexOf('[');
                   if (bracketIdx !== -1) {
-                      cleanName = rawName.substring(0, bracketIdx).trim();
                       let metaStr = rawName.substring(bracketIdx);
-                      let countMatch = metaStr.match(/\[(\d+),/);
-                      if (countMatch) count = countMatch[1];
                       let urlMatch = metaStr.match(/https?:\/\/[^\s\]]+/);
                       if (urlMatch) link = urlMatch[0];
                   }
 
-                  // Формируем бейджи в шапке (Ост, KPI, Баллы)
-                  let badgesHtml = "";
-                  if (count) badgesHtml += `<span id="count-${lIdx}-${iIdx}" style="background:#e67e22; color:white; font-size:11px; font-weight:bold; padding:4px 10px; border-radius:12px;">Ост: <span class="val">${count}</span></span>`;
-                  if (kpiBonus > 0) badgesHtml += `<span style="background:#4a90e2; color:white; font-size:11px; font-weight:bold; padding:4px 10px; border-radius:12px;">+${kpiBonus}%</span>`;
-                  if (ptsVal > 0) badgesHtml += `<span style="background:#e74c3c; color:white; font-size:11px; font-weight:bold; padding:4px 10px; border-radius:12px;">+${ptsVal} б.</span>`;
+                  // Скрываем позицию, если актуальный остаток равен 0
+                  if (item.currentCount !== null && item.currentCount <= 0) return;
+
+                  // Верстка бейджей в углу карточки товара (как у горячих чеков)
+                  let badgeHtml = "";
+                  if (item.currentCount !== null || kpiBonus > 0 || ptsVal > 0) { 
+                      badgeHtml = `<div style="position:absolute; top:-8px; right:4px; display:flex; gap:3px; z-index: 5;">`; 
+                      if (item.currentCount !== null) badgeHtml += `<span id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">Ост: <span class="val">${item.currentCount}</span></span>`;
+                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">+${kpiBonus}%</span>`; 
+                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">+${ptsVal} б.</span>`; 
+                      badgeHtml += `</div>`; 
+                  }
                   
-                  // Контейнер бейджей (выровнен по правому краю)
-                  let badgesRow = badgesHtml ? `<div style="display:flex; justify-content:flex-end; gap:6px; margin-bottom:4px; padding-right:4px;">${badgesHtml}</div>` : "";
-                  
-                  // Кнопка ссылки слева (как на фото)
-                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:rgba(243, 156, 18, 0.1); color:#e67e22; font-size:20px; width:48px; border-radius:10px; text-decoration:none; margin-right:10px; flex-shrink:0; border:1px solid rgba(243, 156, 18, 0.3);">↗</a>` : '';
+                  // Компактная кнопка ссылки (сужена в 2.5 раза, строго ин-апп/браузер открытие)
+                  let linkBtn = link ? `<a href="${link}" onclick="event.stopPropagation(); if(window.Telegram && window.Telegram.WebApp) { window.Telegram.WebApp.openLink('${link}', {try_browser: true}); } else { window.open('${link}', '_blank'); } return false;" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; font-size:12px; width:20px; height:20px; border-radius:5px; text-decoration:none; margin-right:8px; flex-shrink:0; font-weight:bold; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05);">↗</a>` : '';
                   
                   promoHtml += `
-                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; flex-direction:column; margin-bottom:12px;">
-                      ${badgesRow}
-                      <div style="display:flex; align-items:stretch;">
-                          ${linkBtn}
-                          <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.1)); border-radius:12px; padding:14px 16px; display:flex; align-items:center; cursor:pointer;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
-                              <span style="font-size:14px; font-weight:bold; color:var(--text-color);">${cleanName}</span>
-                          </div>
+                  <div id="promo-item-${lIdx}-${iIdx}" style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
+                      ${linkBtn}
+                      <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.06)); border-radius:10px; padding:8px 12px; display:flex; align-items:center; cursor:pointer; min-height:34px; box-sizing:border-box;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
+                          <span style="font-size:13px; font-weight:bold; color:var(--text-color); line-height:1.2; text-align:left;">${cleanName}</span>
                       </div>
+                      ${badgeHtml}
                   </div>`;
               });
               promoHtml += `</div></div>`;
