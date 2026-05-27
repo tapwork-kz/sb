@@ -432,19 +432,19 @@ function renderTimeUI() { const standardBtns = document.getElementById("standard
 function formatPointsNoun(num) { let n = Math.abs(parseFloat(String(num).replace(',','.'))); if (isNaN(n)) return "баллов"; if (n % 1 !== 0) return "балла"; n = Math.floor(n) % 100; let n10 = n % 10; if (n >= 11 && n <= 19) return "баллов"; if (n10 === 1) return "балл"; if (n10 >= 2 && n10 <= 4) return "балла"; return "баллов"; }
 function formatNumberWithSpaces(x) { if (!x) return "0"; return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 function getSourceColor(src) { 
-    let s = String(src).toLowerCase().trim(); 
+    let s = String(src).toLowerCase(); 
+    if(s.includes('фокус')) return '#e74c3c'; 
     if(s.includes('сц')) return '#e67e22'; 
     if(s.includes('trade-in')) return '#8e44ad'; 
     if(s.includes('горячий')) return '#e84393'; 
     if(s.includes('обмен')) return '#f39c12'; 
     if(s.includes('исправл')) return '#3498db'; 
     if(s.includes('мотивац')) return '#3390ec'; 
-    if(s.includes('фокус')) return '#f39c12'; // Строго оранжевый
     
-    let hash = 0; 
-    for(let i = 0; i < s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
-    const colors = ['#f39c12', '#e67e22', '#d35400', '#e74c3c', '#27ae60', '#16a085', '#2980b9']; 
-    return colors[Math.abs(hash) % colors.length] || '#f39c12'; 
+    // Автоматическая генерация цвета для новых приставок (по хэшу строки)
+    let hash = 0; for(let i=0; i<s.length; i++) hash = s.charCodeAt(i) + ((hash << 5) - hash);
+    const colors = ['#1abc9c', '#3498db', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#2c3e50', '#f1c40f', '#e67e22', '#d35400', '#c0392b'];
+    return colors[Math.abs(hash) % colors.length] || '#7f8c8d'; 
 }
 
 function buildStandardRow(p) { let borderStyle = p.hasBorder ? `border-left: 2px solid ${p.typeColor};` : ''; let titleWeight = p.isBoldTitle ? 'bold' : 'normal'; let rightTopHtml = p.valText ? `<div class="${p.valClass}" style="margin-left:10px; font-weight:bold; white-space:nowrap; flex-shrink:0;">${p.valText}</div>` : ''; let rightBottomHtml = p.nameText ? `<div style="color:gray; font-size:10px; white-space:nowrap; margin-left:8px; flex-shrink:0; text-align:right;">${p.nameText}</div>` : ''; return `<div style="padding: 12px; border-bottom: 1px solid rgba(150,150,150,0.1); background: transparent; display: flex; flex-direction: column; justify-content: center; ${borderStyle}"><div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 4px;"><div style="color:var(--text-color); font-size:12px; font-weight:${titleWeight}; flex:1; min-width:0; white-space:normal; word-break:break-word; line-height:1.3;">${p.title}</div>${rightTopHtml}</div><div style="display: flex; justify-content: space-between; align-items: center;"><div style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex:1; min-width:0;"><b style="color:${p.typeColor}; font-size:10px;">${p.typeText}</b><span style="color:gray; font-size:10px;"> • ${p.dateText}</span></div>${rightBottomHtml}</div></div>`; }
@@ -525,11 +525,11 @@ function renderDashboardData(data, isSilent = false) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 8px; padding: 12px; border: 1px solid var(--border-color); background: var(--card-bg);">`;
-              promoHtml += `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom: 12px; display:flex; justify-content:space-between; align-items:center;">
+              promoHtml += `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom: 16px; display:flex; justify-content:space-between; align-items:center;">
                   <span>${list.title}</span>
                   <span style="font-size:10px; color:white; background:${getSourceColor(list.prefix)}; padding:4px 8px; border-radius:12px;">${list.prefix}</span>
               </div>`;
-              promoHtml += `<div style="display: flex; flex-direction: column; gap: 8px;">`;
+              promoHtml += `<div style="display: flex; flex-direction: column; gap: 14px;">`;
               
               list.items.forEach((item, iIdx) => {
                   let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
@@ -548,34 +548,30 @@ function renderDashboardData(data, isSilent = false) {
                       if (urlMatch) link = urlMatch[0];
                   }
 
-                  // Бейджи в шапке кнопки (абсолютное позиционирование как в горячих чеках)
-                  let badgeHtml = "";
-                  if (ptsVal > 0 || kpiBonus > 0) { 
-                      badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`; 
-                      if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${kpiBonus}%</span>`; 
-                      if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${ptsVal}</span>`; 
-                      badgeHtml += `</div>`; 
-                  }
+                  // Все бейджи собираем в единую абсолютную шапку (в верхнем правом углу рамки)
+                  let badgesHtml = `<div style="position:absolute; top:-10px; right:-8px; display:flex; gap:2px; z-index:5;">`;
+                  if (count) badgesHtml += `<span id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">Ост: <span class="val">${count}</span></span>`;
+                  if (kpiBonus > 0) badgesHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${kpiBonus}%</span>`; 
+                  if (ptsVal > 0) badgesHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${ptsVal}</span>`; 
+                  badgesHtml += `</div>`;
                   
-                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:var(--inner-bg); color:var(--btn-color); font-size:16px; width:36px; height:36px; border-radius:8px; text-decoration:none; margin-right:8px; flex-shrink:0; border:1px solid rgba(150,150,150,0.2);">🌐</a>` : '';
-                  let countBadge = count ? `<span id="count-${lIdx}-${iIdx}" style="background:#f39c12; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; margin-left:6px; white-space:nowrap;">Ост: <span class="val">${count}</span></span>` : '';
+                  // Кнопка-ссылка вынесена за рамку
+                  let linkBtn = link ? `<a href="${link}" target="_blank" style="display:flex; align-items:center; justify-content:center; background:var(--inner-bg); color:var(--btn-color); font-size:16px; width:34px; height:34px; border-radius:8px; text-decoration:none; margin-right:12px; flex-shrink:0; border:1px solid rgba(150,150,150,0.2);">🌐</a>` : '';
                   
                   promoHtml += `
-                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; align-items:center; margin-bottom:12px;">
+                  <div id="promo-item-${lIdx}-${iIdx}" style="display:flex; align-items:center;">
                       ${linkBtn}
-                      <div style="position:relative; display:flex; flex:1; align-items:center;">
-                          <button class="btn-gray" style="margin:0; width:100%; text-align:left; font-size:13px; padding:10px; border:1px solid var(--border-color); background:var(--card-bg); border-radius:8px; display:flex; align-items:center; justify-content:space-between;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
-                              <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${cleanName}</span>
-                              ${countBadge}
-                          </button>
-                          ${badgeHtml}
+                      <div style="position:relative; display:inline-flex; max-width:calc(100% - 46px);">
+                          <div style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:8px; padding:8px 12px; cursor:pointer; width:max-content; box-sizing:border-box;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
+                              <span style="font-size:12px; font-weight:bold; color:var(--text-color);">${cleanName}</span>
+                          </div>
+                          ${badgesHtml}
                       </div>
                   </div>`;
               });
               promoHtml += `</div></div>`;
           }); 
           
-          // Безопасное добавление без дублирования списков
           let promoContainer = document.getElementById("promo-lists-container");
           if (!promoContainer) {
               promoContainer = document.createElement("div");
@@ -833,11 +829,14 @@ function renderEmpScDetailsData(iin) {
     if (sales.length > 0) { listHtml += groupAndRenderByMonth(sales, i => { let rawDetails = i.reason || ""; let match = rawDetails.match(/\n\[(.*?)\]$/); if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } return buildStandardRow({ title: rawDetails, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, nameText: emp.name, hasBorder: false }); }); } else { listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; }
     listHtml += "</div>"; document.getElementById("emp-sc-render-area").innerHTML = listHtml;
 }
-
 window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefixType) {
     let promptMsg = `Вы подтверждаете продажу: ${typeText}?`;
-    // Записываем prefixType (например "Фокус") как категорию в БД
-    let metaStr = JSON.stringify({ date: formatDateLocal(new Date()), bonus: valText, pts: ptsText, type: prefixType });
+    
+    // Форматируем дату в привычный формат DD.MM.YYYY
+    let d = new Date();
+    let dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();
+    
+    let metaStr = JSON.stringify({ date: dStr, bonus: valText, pts: ptsText, type: prefixType });
     
     let exec = () => {
         // Уменьшаем счетчик
@@ -850,9 +849,10 @@ window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefi
                 document.getElementById(`promo-item-${lIdx}-${iIdx}`).style.display = 'none';
             }
         }
-        // Используем тип "Продажа СЦ/Фокус" чтобы бэкенд правильно считал номенклатуру
-        // В истории это будет выглядеть как: Заголовок "Фокус", Деталь "Утюг BRAUN..."
-        executeSubmit("Продажа СЦ/Фокус", typeText, null, metaStr);
+        
+        // Первый аргумент — это type для таблицы requests.
+        // Передаем динамический prefixType (то, что пришло из БД как приставка)
+        executeSubmit(prefixType, typeText, null, metaStr);
     };
     
     if (typeof tg !== 'undefined' && tg && tg.showPopup) {
