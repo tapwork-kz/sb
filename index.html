@@ -13,12 +13,20 @@
   <meta name="apple-mobile-web-app-title" content="TapWork">
   <link rel="apple-touch-icon" href="icon.png">
 
-  <!-- Подключение внешнего файла стилей -->
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
+
   <link rel="stylesheet" href="styles.css">
 
-  <!-- Внешние библиотеки -->
   <script src="https://telegram.org/js/telegram-web-app.js"></script>
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+  
+  <style>
+    /* Небольшая корректировка для центрирования новых иконок в меню */
+    .material-symbols-rounded {
+      font-size: 24px;
+      vertical-align: middle;
+    }
+  </style>
 </head>
 <body style="display: flex; flex-direction: column;">
   <div id="toast">Уведомление</div>
@@ -38,12 +46,12 @@
     <div class="fixed-header glass">
       <div class="header-container"><h2 id="user-greeting" style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;"></h2>
         <div class="top-icons" id="main-tabs">
-          <div id="nav-time-icon" class="icon-btn active-tab hidden" onclick="switchTab('time');">⏱️</div>
-          <div id="nav-create-icon" class="icon-btn hidden" onclick="switchTab('create');">📤</div>
-          <div id="nav-adm-outs" class="icon-btn hidden" onclick="switchTab('adm-outs');">⏱️</div>
-          <div id="nav-adm-main" class="icon-btn hidden" onclick="switchTab('adm-main');">📥</div>
-          <div id="inbox-icon" class="icon-btn hidden" onclick="switchTab('inbox');">📩<span id="user-badge" class="badge hidden"></span></div>
-          <div id="nav-adm-inbox" class="icon-btn hidden" onclick="switchTab('adm-inbox');">📩<span id="admin-badge" class="badge hidden"></span></div>
+          <div id="nav-time-icon" class="icon-btn active-tab hidden" onclick="switchTab('time');"><span class="material-symbols-rounded">timer</span></div>
+          <div id="nav-create-icon" class="icon-btn hidden" onclick="switchTab('create');"><span class="material-symbols-rounded">add_box</span></div>
+          <div id="nav-adm-outs" class="icon-btn hidden" onclick="switchTab('adm-outs');"><span class="material-symbols-rounded">pending_actions</span></div>
+          <div id="nav-adm-main" class="icon-btn hidden" onclick="switchTab('adm-main');"><span class="material-symbols-rounded">dashboard</span></div>
+          <div id="inbox-icon" class="icon-btn hidden" onclick="switchTab('inbox');"><span class="material-symbols-rounded">inbox</span><span id="user-badge" class="badge hidden"></span></div>
+          <div id="nav-adm-inbox" class="icon-btn hidden" onclick="switchTab('adm-inbox');"><span class="material-symbols-rounded">mark_email_unread</span><span id="admin-badge" class="badge hidden"></span></div>
         </div>
       </div>
       <div class="banner-wrapper hidden fade-in" id="info-dashboard">
@@ -67,13 +75,13 @@
       </div>
       <div id="content-create" class="hidden">
         <div id="menu-list">
-          <button onclick="openForm('sc')">Продажа СЦ / Фокус</button><button onclick="openForm('tradein')">Продажа Trade-In</button><button onclick="openForm('points')">Баллы мотивации</button><button onclick="openForm('swap')" class="btn-orange">Обмен сменами</button>
+          <button onclick="openForm('sc')">Продажа СЦ / Дефект</button><button onclick="openForm('tradein')">Продажа Trade-In</button><button onclick="openForm('points')">Баллы мотивации</button><button onclick="openForm('swap')" class="btn-orange">Обмен сменами</button>
           <div id="hot-check-card" class="card hidden" style="margin-top: 15px;"></div>
         </div>
         <div id="form-sc" class="card form-dark hidden" style="padding: 0; background: transparent; border: none; box-shadow: none;">
            <div class="sticky-header glass" style="margin-top:0; padding-bottom: 10px;">
              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
-                <div style="display:flex; align-items:center;"><h3 style="margin:0; font-size: 15px;">Продажа СЦ/Фокус</h3><div id="btn-act-doc" onclick="openScDoc()" style="font-size:18px; padding:6px; margin-left:8px; line-height:1; background:rgba(150,150,150,0.1); border-radius:8px; opacity:0; pointer-events:none; transition:0.6s; cursor:pointer;">📄</div></div>
+                <div style="display:flex; align-items:center;"><h3 style="margin:0; font-size: 15px;">Продажа СЦ/Дефект</h3><div id="btn-act-doc" onclick="openScDoc()" style="font-size:18px; padding:6px; margin-left:8px; line-height:1; background:rgba(150,150,150,0.1); border-radius:8px; opacity:0; pointer-events:none; transition:0.6s; cursor:pointer;"><span class="material-symbols-rounded">description</span></div></div>
                 <input type="text" id="sc-date" class="smart-date" data-realdate="" style="height:30px; width:115px; margin:0; transition: all 0.3s ease; font-size:13px; background:var(--card-bg); border:1px solid var(--btn-color); color:var(--btn-color) !important; border-radius:8px;">
              </div>
              <div style="display:flex; gap:6px;" id="sc-dept-tabs">
@@ -158,7 +166,6 @@
       </div>
     </div>
 
-  <!-- Подключение нашего вынесенного файла скриптов -->
   <script src="app.js"></script>
 </body>
 </html>
