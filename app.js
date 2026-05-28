@@ -764,6 +764,32 @@ let vacContainer = document.getElementById("vacation-list-container");
               return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-color);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:12px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="text-align:right; flex-shrink:0;"><div style="font-size:11px; font-weight:bold; margin-bottom:2px;">${v.details}</div><div style="font-size:9px; font-weight:bold; color:${stColor}; background:var(--inner-bg); display:inline-block; padding:2px 6px; border-radius:4px;">${stText}</div></div></div>`; 
           }).join(""); 
       }
+      let adminVacContainer = document.getElementById("admin-vacation-list");
+  if (adminVacContainer) {
+      let vList = data.vacations || [];
+      let activeVacs = vList.filter(v => {
+          // Показываем в админке только ОДОБРЕННЫЕ отпуска
+          if (v.status !== "approved" && v.status !== "approved_notify_zav") return false;
+          try {
+              let m = JSON.parse(v.meta);
+              let now = new Date(); now.setHours(0,0,0,0);
+              let s = new Date(m.startDate); s.setHours(0,0,0,0);
+              let e = new Date(m.endDate); e.setHours(23,59,59,999);
+              return now >= s && now <= e; // Проверка: текущая дата внутри периода отпуска
+          } catch(err) { return false; }
+      });
+      
+      if (activeVacs.length === 0) {
+          adminVacContainer.innerHTML = "<p style='color:gray; font-size:13px; text-align:center;'>Нет сотрудников в отпуске</p>";
+      } else {
+          adminVacContainer.innerHTML = activeVacs.map(v => {
+              let deptHtml = v.authorDept ? `<div style="font-size:10px; color:gray; margin-top:2px;">${v.authorDept}</div>` : '';
+              let meta = JSON.parse(v.meta);
+              let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}`; };
+              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="font-size:11px; font-weight:bold; color:#f39c12; background:rgba(243, 156, 18, 0.1); padding:4px 8px; border-radius:6px; flex-shrink:0;">До ${formatD(meta.endDate)}</div></div>`;
+          }).join("");
+      }
+  }
   }
 }
 
