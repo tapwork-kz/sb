@@ -862,7 +862,7 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
 function renderAdminOuts() {
   let list = globalActiveOuts || []; const now = Date.now();
   
-  // 1. Обычные статусы отсутствия (перерывы, обеды)
+  // 1. Обычные отсутствия (обед, перерыв)
   let outsHtml = list.map(out => { 
       let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
       if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
@@ -873,23 +873,20 @@ function renderAdminOuts() {
   
   if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
   
-  // 2. Отдельный блок для отпусков (Текущие и предстоящие)
+  // 2. Блок отпусков (отображается до даты окончания отпуска)
   let vacHtml = "";
   let activeVacations = [];
-  
   (window.adminVacationsGlobal || []).forEach(v => {
       let metaObj = {}; try { metaObj = JSON.parse(v.meta); } catch(e){}
-      // Оставляем в списке, пока дата окончания отпуска не прошла (проверяем по миллисекундам)
       if (metaObj.endDate) {
-          let endTime = new Date(metaObj.endDate).getTime() + 86400000; // До конца указанных суток
-          if (now <= endTime) {
-              activeVacations.push({ ...v, metaObj });
-          }
+          let endTime = new Date(metaObj.endDate).getTime() + 86400000;
+          // Показываем в списке, пока текущее время меньше даты конца
+          if (now <= endTime) activeVacations.push({ ...v, metaObj });
       }
   });
   
   if (activeVacations.length > 0) {
-      vacHtml = `<div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:15px;"><div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:10px; display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> Отпуска (Заявки и Утвержденные):</div>`;
+      vacHtml = `<div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:15px;"><div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:10px; display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> Отпуска:</div>`;
       vacHtml += activeVacations.map(v => {
           let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
           let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
@@ -899,7 +896,6 @@ function renderAdminOuts() {
       vacHtml += `</div>`;
   }
   
-  // Склеиваем оба списка и отправляем в контейнер админа
   document.getElementById('admin-outs-list').innerHTML = outsHtml + vacHtml;
 }
 
