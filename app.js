@@ -862,7 +862,7 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
 function renderAdminOuts() {
   let list = globalActiveOuts || []; const now = Date.now();
   
-  // 1. Обычные отсутствия (обед, перерыв)
+  // 1. Обычные статусы отсутствия (перерывы, обеды)
   let outsHtml = list.map(out => { 
       let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
       if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
@@ -872,31 +872,36 @@ function renderAdminOuts() {
   }).join("");
   
   if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
-  
-  // 2. Блок отпусков (отображается до даты окончания отпуска)
+  document.getElementById('admin-outs-list').innerHTML = outsHtml;
+
+  // 2. Отдельный список для отпусков
   let vacHtml = "";
   let activeVacations = [];
+  
   (window.adminVacationsGlobal || []).forEach(v => {
       let metaObj = {}; try { metaObj = JSON.parse(v.meta); } catch(e){}
       if (metaObj.endDate) {
           let endTime = new Date(metaObj.endDate).getTime() + 86400000;
-          // Показываем в списке, пока текущее время меньше даты конца
-          if (now <= endTime) activeVacations.push({ ...v, metaObj });
+          if (now <= endTime) {
+              activeVacations.push({ ...v, metaObj });
+          }
       }
   });
   
-  if (activeVacations.length > 0) {
-      vacHtml = `<div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:15px;"><div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:10px; display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> Отпуска:</div>`;
-      vacHtml += activeVacations.map(v => {
+  let vacContainer = document.getElementById('admin-vac-container');
+  let vacList = document.getElementById('admin-vac-list');
+  
+  if (activeVacations.length > 0 && vacContainer && vacList) {
+      vacContainer.style.display = 'block';
+      vacList.innerHTML = activeVacations.map(v => {
           let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
           let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
           let deptHtml = v.authorDept ? `<div style="font-size:10px; color:gray;">${v.authorDept}</div>` : '';
           return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="text-align:right; flex-shrink:0;"><div style="font-size:12px; font-weight:bold; margin-bottom:2px;">${v.details}</div><div style="font-size:9px; font-weight:bold; color:${stColor}; background:var(--inner-bg); display:inline-block; padding:2px 6px; border-radius:4px;">${stText}</div></div></div>`;
       }).join("");
-      vacHtml += `</div>`;
+  } else if (vacContainer) {
+      vacContainer.style.display = 'none'; // Скрываем блок, если отпусков нет
   }
-  
-  document.getElementById('admin-outs-list').innerHTML = outsHtml + vacHtml;
 }
 
 function renderAdminEmps(dept, btnElement) {
