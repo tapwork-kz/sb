@@ -77,7 +77,7 @@
       </div>
       <div id="content-create" class="hidden">
         <div id="menu-list">
-          <button onclick="openForm('sc')">Продажа СЦ / Дефект</button><button onclick="openForm('tradein')">Продажа Trade-In</button><button onclick="openForm('points')">Баллы мотивации</button><button onclick="openForm('swap')" class="btn-orange">Обмен сменами</button>
+          <button onclick="openForm('sc')">Продажа СЦ / Дефект</button><button onclick="openForm('tradein')">Продажа Trade-In</button><button onclick="openForm('points')">Баллы мотивации</button><button onclick="openForm('swap')" class="btn-orange">Рабочая смена</button>
           <div id="hot-check-card" class="card hidden" style="margin-top: 15px;"></div>
         </div>
         <div id="form-sc" class="card form-dark hidden" style="padding: 0; background: transparent; border: none; box-shadow: none;">
@@ -100,7 +100,42 @@
         </div>
         <div id="form-tradein" class="card form-dark hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><h3 style="margin:0; font-size:15px;">Продажа Trade-In</h3><input type="text" id="ft-date" class="smart-date" data-realdate="" style="height:30px; width:115px; margin:0; transition: all 0.3s ease; font-size:13px; background:var(--card-bg); border:1px solid var(--btn-color); color:var(--btn-color) !important; border-radius:8px;"></div><div style="font-size:13px; margin-bottom:8px; color:gray;">Выберите модель из списка:</div><div class="sc-list-container" id="tradein-list" style="max-height:300px;"></div><div class="grid-btns" style="margin-top: 15px;"><button class="btn-gray" onclick="closeForm()">Отмена</button><button onclick="submitTradeIn()">Отправить</button></div></div>
         <div id="form-points" class="card form-dark hidden"><h3 style="font-size:15px;">Баллы мотивации</h3><div id="fp-balance-notice"></div><select id="fp-action"><option value="Придти позже">Придти позже</option><option value="Уйти раньше">Уйти раньше</option></select><select id="fp-time"><option value="30 мин">30 мин</option><option value="1 час">1 час</option><option value="2 часа">2 часа</option><option value="3 часа">3 часа</option></select><p id="fp-date-label" style="margin: 12px 0 6px; font-size: 13px; color:gray;">Укажите дату:</p><input type="text" id="fp-date" class="smart-date" data-realdate=""><div class="grid-btns" style="margin-top: 15px;"><button class="btn-gray" onclick="closeForm()">Отмена</button><button id="fp-submit-btn" onclick="submitPoints()">Отправить</button></div></div>
-        <div id="form-swap" class="card form-dark hidden"><div class="inner-block" style="border:1px dashed var(--btn-color); margin-bottom:15px;"><h3 style="margin:0; font-size:14px;">Исправить смену за сегодня</h3><select id="fs-fix-shift"><option value="" disabled selected>Выберите правильную смену</option><option value="09:00 - 19:00">09:00 - 19:00</option><option value="12:00 - 22:00">12:00 - 22:00</option></select><button class="btn-green" onclick="submitFixShift()" style="margin-top:10px; font-size:13px; padding:10px;">Отправить исправление</button></div><h3 style="padding-top:10px; border-top:1px solid var(--border-color); font-size:15px;">Обмен сменами</h3><select id="fs-target" onchange="checkSwapFields()"></select><div id="fs-extra" class="hidden"><p style="margin: 10px 0 6px; font-size: 13px; font-weight: bold; color:var(--form-title-color);">Укажите вашу новую смену:</p><input type="text" id="fs-date" class="smart-date" data-realdate=""><select id="fs-shift"><option value="09:00 - 19:00">09:00 - 19:00</option><option value="12:00 - 22:00">12:00 - 22:00</option></select></div><div class="grid-btns" style="margin-top: 15px;"><button class="btn-gray" onclick="closeForm()">Отмена</button><button onclick="submitSwap()">Запросить обмен</button></div></div>
+        <div id="form-swap" class="card form-dark hidden">
+  <div class="inner-block" style="border:1px dashed var(--btn-color); margin-bottom:15px;">
+    <h3 style="margin:0; font-size:14px;">Исправить смену за сегодня</h3>
+    <select id="fs-fix-shift"><option value="" disabled selected>Выберите правильную смену</option><option value="09:00 - 19:00">09:00 - 19:00</option><option value="12:00 - 22:00">12:00 - 22:00</option></select>
+    <button class="btn-green" onclick="submitFixShift()" style="margin-top:10px; font-size:13px; padding:10px;">Отправить исправление</button>
+  </div>
+  
+  <h3 style="padding-top:10px; border-top:1px solid var(--border-color); font-size:15px;">Обмен сменами</h3>
+  <select id="fs-target" onchange="checkSwapFields()"></select>
+  <div id="fs-extra" class="hidden">
+    <p style="margin: 10px 0 6px; font-size: 13px; font-weight: bold; color:var(--form-title-color);">Укажите вашу новую смену:</p>
+    <input type="text" id="fs-date" class="smart-date" data-realdate="">
+    <select id="fs-shift"><option value="09:00 - 19:00">09:00 - 19:00</option><option value="12:00 - 22:00">12:00 - 22:00</option></select>
+    <button onclick="submitSwap()" style="margin-top:10px; width:100%; font-size:13px; padding:10px;">Запросить обмен</button>
+  </div>
+
+  <h3 style="padding-top:15px; margin-top:15px; border-top:1px solid var(--border-color); font-size:15px;">Заявка в отпуск</h3>
+  <div style="display:flex; gap:8px; margin-bottom:10px;">
+    <div style="flex:1;">
+       <div style="font-size:11px; color:gray; margin-bottom:4px;">Начало:</div>
+       <input type="date" id="vac-start" style="width:100%; height:36px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-color); font-family:inherit;">
+    </div>
+    <div style="flex:1;">
+       <div style="font-size:11px; color:gray; margin-bottom:4px;">Конец:</div>
+       <input type="date" id="vac-end" style="width:100%; height:36px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-color); font-family:inherit;">
+    </div>
+  </div>
+  <button class="btn-green" onclick="submitVacation()" style="margin-bottom:15px; width:100%; font-size:13px; padding:10px;">Отправить заявку в отпуск</button>
+  
+  <div style="font-size:13px; font-weight:bold; margin-bottom:8px; color:var(--text-color);">График отпусков:</div>
+  <div id="vacation-list-container" style="max-height:200px; overflow-y:auto; padding:4px;"></div>
+  
+  <div class="grid-btns" style="margin-top: 15px;">
+    <button class="btn-gray" onclick="closeForm()" style="grid-column: 1 / -1;">Закрыть окно</button>
+  </div>
+</div>
       </div>
       <div id="content-inbox" class="hidden">
         <div class="sticky-header glass" style="margin-top:0; margin-bottom: 12px;"><h3 style="margin:0; color:var(--btn-color); text-align:center; font-size: 15px;">Входящие</h3></div>
