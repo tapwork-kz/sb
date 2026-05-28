@@ -1,92 +1,407 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <base target="_top">
-  <meta charset="utf-8">
-  <title>TapWork</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-  
-  <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#f4f4f5">
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="default">
-  <meta name="apple-mobile-web-app-title" content="TapWork">
-  <link rel="apple-touch-icon" href="icon.png">
+// app.js
+import { api, supabase } from './api.js';
+import { renderUserInbox, renderActiveOuts, setKpiColor } from './ui.js';
+import { 
+    getMemory, saveMemory, clearMemory, 
+    showToast, showPushNotification, requestNotificationPermission, vibrate, safeIin
+} from './utils.js';
 
-  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Rounded:opsz,wght,FILL,GRAD@24,400,1,0" rel="stylesheet" />
-  <link rel="stylesheet" href="styles.css">
+// === ГЛОБАЛЬНОЕ СОСТОЯНИЕ ===
+let appState = {
+    token: getMemory("userToken"),
+    iin: getMemory("userIIN"),
+    firstName: getMemory("userName") || "",
+    currentAction: getMemory("currentAction"),
+    role: getMemory("userRole") || "Продавец",
+    dept: getMemory("userDept") || "Цифра",
+    lastInboxCount: 0
+};
 
-  <script src="https://telegram.org/js/telegram-web-app.js"></script>
-  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
-  
-  <style>
-    /* Небольшая корректировка для центрирования новых иконок в меню */
-    .material-symbols-rounded {
-      font-size: 24px;
-      vertical-align: middle;
+let pollingTimer = null;
+let lastActiveTab = 'time';
+let globalActiveOuts = [];
+let processedReqIds = new Set();
+let isUserPromoter = false;
+
+// Инициализация Telegram WebApp
+const tg = window.Telegram ? window.Telegram.WebApp : null;
+if (tg) { tg.expand(); }
+
+// === ИНИЦИАЛИЗАЦИЯ И СЛУШАТЕЛИ ===
+document.addEventListener("DOMContentLoaded", async () => {
+    requestNotificationPermission();
+    setupEventDelegation();
+
+    if (appState.iin && appState.token) {
+        document.getElementById("auth-screen").classList.add("hidden");
+        document.getElementById("main-screen").classList.remove("hidden");
+        if (appState.firstName) document.getElementById("user-greeting").innerText = appState.firstName;
+        
+        await loadDashboard(false);
+        startPolling();
+    } else {
+        hideLoader();
+        document.getElementById("auth-screen").classList.remove("hidden");
     }
-  </style>
-</head>
-<body style="display: flex; flex-direction: column;">
-  <div id="toast">Уведомление</div>
-  <div id="loader-screen"><p style="color: gray; font-size: 16px; font-style: italic;">Идентификация...</p></div>
-  
-  <div id="auth-screen" class="hidden scrollable-content" style="max-width: 400px; margin: 0 auto; text-align:center; transition: opacity 0.6s ease;">
-    <h2 style="margin-top:20px;">Вход в систему</h2>
-    <p style="color:gray; font-size:14px;">Введите ваши данные</p>
+});
+
+function setupEventDelegation() {
+    document.addEventListener('click', async (e) => {
+        // 1. Навигация по табам
+        const tabBtn = e.target.closest('.icon-btn[data-tab]');
+        if (tabBtn) {
+            switchTab(tabBtn.dataset.tab);
+            return;
+        }
+
+        // 2. Обработка действий с уведомлениями (ответить, просмотрено и т.д.)
+        const reqBtn = e.target.closest('button[data-action]');
+        if (reqBtn && !reqBtn.id.startsWith('btn-')) {
+            const action = reqBtn.dataset.action;
+            const id = reqBtn.dataset.id;
+            let replyText = "";
+            if (action === 'reply_remark') {
+                const ta = document.getElementById(`remark-reply-${id}`);
+                replyText = ta ? ta.value : "";
+                if (!replyText) return showToast("Введите текст ответа", true);
+            }
+            handleProcessReq(id, action, replyText);
+            return;
+        }
+
+        // 3. Открытие деталей
+        const detailsBtn = e.target.closest('.info-box');
+        if (detailsBtn && detailsBtn.id.startsWith('btn-details-')) {
+            const type = detailsBtn.id.replace('btn-details-', '');
+            // openDetails(type); // Раскомментировать, когда перенесете функцию openDetails в ui.js/app.js
+            return;
+        }
+
+        // 4. Кнопки учета времени (Перерыв, Обед, Полдник)
+        const timeBtn = e.target.closest('button[data-action]');
+        if (timeBtn && timeBtn.id.startsWith('btn-')) {
+            const action = timeBtn.dataset.action;
+            if (['Перерыв', 'Обед', 'Полдник'].includes(action)) {
+                handleTimeAction(action);
+            }
+            return;
+        }
+
+        // 5. Кнопка возврата с перерыва
+        if (e.target.closest('#btn-return')) {
+            handleTimeReturn();
+            return;
+        }
+
+        // 6. Кнопка логина
+        if (e.target.closest('#btn-login')) {
+            handleLogin();
+            return;
+        }
+
+        // 7. Строгий контроль открытия ссылок
+        const link = e.target.closest('a[href]');
+        if (link) {
+            e.preventDefault();
+            const url = link.getAttribute('href');
+            if (tg && tg.openLink) {
+                tg.openLink(url); // Строго во внутреннем браузере Telegram
+            } else {
+                window.open(url, '_blank', 'noopener,noreferrer'); // Строго в браузере
+            }
+        }
+    });
+}
+
+// === ЛОГИКА АВТОРИЗАЦИИ ===
+async function handleLogin() {
+    const elIin = document.getElementById("iin-input");
+    const elPass = document.getElementById("password-input");
+    const iinVal = elIin.value;
+    const passVal = elPass.value;
+
+    if (!iinVal || iinVal.length !== 12) return showToast("ИИН должен состоять из 12 цифр", true);
+    if (!passVal) return showToast("Введите пароль", true);
+
+    elIin.disabled = true;
+    elPass.disabled = true;
+    showToast("Авторизация...", false, 9999);
+
+    let res = await api.login(iinVal, passVal);
+
+    if (res.success) {
+        appState.iin = res.iin;
+        appState.token = res.token;
+        appState.firstName = res.firstName;
+        appState.role = res.role;
+        appState.dept = res.dept;
+        appState.currentAction = null;
+        isUserPromoter = res.isPromoter;
+
+        saveMemory("userIIN", appState.iin);
+        saveMemory("userToken", appState.token);
+        saveMemory("userName", appState.firstName);
+        saveMemory("userRole", appState.role);
+        saveMemory("userDept", appState.dept);
+        saveMemory("currentAction", "");
+
+        document.getElementById("toast").classList.remove("show");
+        document.getElementById("auth-screen").style.opacity = '0';
+        
+        setTimeout(() => {
+            document.getElementById("auth-screen").classList.add("hidden");
+            document.getElementById("main-screen").classList.remove("hidden");
+            document.getElementById("main-screen").style.opacity = '1';
+            document.getElementById("user-greeting").innerText = appState.firstName;
+            loadDashboard(false);
+            startPolling();
+        }, 600);
+    } else {
+        elIin.disabled = false;
+        elPass.disabled = false;
+        document.getElementById("login-error").innerText = res.error;
+        document.getElementById("toast").classList.remove("show");
+    }
+}
+
+function forceLogout() {
+    if(pollingTimer) clearInterval(pollingTimer);
+    clearMemory();
+    appState.token = null;
+    appState.iin = null;
+    document.getElementById("main-screen").style.opacity = '0';
+    setTimeout(() => {
+        document.getElementById("main-screen").classList.add("hidden");
+        document.getElementById("auth-screen").classList.remove("hidden");
+        document.getElementById("auth-screen").style.opacity = '1';
+        document.getElementById("main-screen").style.opacity = '1';
+        document.getElementById("iin-input").value = '';
+        document.getElementById("iin-input").disabled = false;
+    }, 600);
+}
+
+// === УПРАВЛЕНИЕ UI И ДАШБОРДОМ ===
+function hideLoader() {
+    const loader = document.getElementById("loader-screen");
+    loader.style.opacity = '0';
+    setTimeout(() => loader.classList.add("hidden"), 600);
+}
+
+function showLoader() {
+    const loader = document.getElementById("loader-screen");
+    loader.classList.remove("hidden");
+    setTimeout(() => loader.style.opacity = '1', 10);
+}
+
+function switchTab(tab) {
+    if (tab !== 'details') lastActiveTab = tab;
     
-    <input type="text" id="iin-input" placeholder="Введите ИИН (12 цифр)" inputmode="numeric">
-    <input type="password" id="password-input" placeholder="Введите пароль">
-    <button id="btn-login" class="btn-green" style="margin-top: 15px;">Войти</button>
-    <div id="login-error" style="color: #e74c3c; text-align:center; margin-top: 10px;"></div>
-  </div>
+    // Снимаем активность со всех кнопок
+    document.querySelectorAll('#main-tabs .icon-btn').forEach(btn => btn.classList.remove('active-tab'));
+    
+    // Активируем нужную
+    const activeBtn = document.querySelector(`.icon-btn[data-tab="${tab}"]`);
+    if (activeBtn) activeBtn.classList.add('active-tab');
 
-  <div id="main-screen" class="hidden" style="display:flex; flex-direction:column; height:100%; transition: opacity 0.6s ease;">
-    <div class="fixed-header glass">
-      <div class="header-container"><h2 id="user-greeting" style="margin: 0; font-size: 22px; font-weight: 800; letter-spacing: -0.5px;"></h2>
-        <div class="top-icons" id="main-tabs">
-          <div id="nav-time-icon" class="icon-btn active-tab hidden" data-tab="time"><span class="material-symbols-rounded">timer</span></div>
-          <div id="nav-create-icon" class="icon-btn hidden" data-tab="create"><span class="material-symbols-rounded">add_box</span></div>
-          <div id="nav-adm-outs" class="icon-btn hidden" data-tab="adm-outs"><span class="material-symbols-rounded">pending_actions</span></div>
-          <div id="nav-adm-main" class="icon-btn hidden" data-tab="adm-main"><span class="material-symbols-rounded">dashboard</span></div>
-          <div id="inbox-icon" class="icon-btn hidden" data-tab="inbox"><span class="material-symbols-rounded">inbox</span><span id="user-badge" class="badge hidden"></span></div>
-          <div id="nav-adm-inbox" class="icon-btn hidden" data-tab="adm-inbox"><span class="material-symbols-rounded">mark_email_unread</span><span id="admin-badge" class="badge hidden"></span></div>
-        </div>
-      </div>
-      <div class="banner-wrapper hidden fade-in" id="info-dashboard">
-        <div class="info-wrapper">
-          <div class="scrollable-blocks" id="scroll-container">
-            <div class="info-box" id="btn-details-sc"><div class="info-box-title">СЦ | Brzy</div><div class="info-box-value" id="info-sc-val">- | -</div></div>
-            <div class="info-box pts-box" id="btn-details-points"><div class="info-box-title">Мои баллы</div><div class="pts-grid" style="display:flex; gap:3px; margin-top:4px; width:100%; justify-content:space-between;"><div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1;"><div style="font-size:8px; color:gray;">Нач.</div><div style="font-size:12px; font-weight:bold; color:#4d4d4d;" id="pt-acc">-</div></div><div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1;"><div style="font-size:8px; color:gray;">Исп.</div><div style="font-size:12px; font-weight:bold; color:#4d4d4d;" id="pt-use">-</div></div><div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1; background:rgba(41, 128, 185, 0.1);"><div style="font-size:8px; color:gray;">Ост.</div><div style="font-size:12px; font-weight:bold; color:#27ae60;" id="pt-rem">-</div></div><div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1; background:rgba(231, 76, 60, 0.1);"><div style="font-size:8px; color:gray;">Штрф.</div><div style="font-size:12px; font-weight:bold; color:#e74c3c;" id="pt-fin">-</div></div></div></div>
-            <div class="info-box" id="btn-details-report"><div class="info-box-title">Мои отчеты</div><div class="info-box-value" style="font-size:12px; line-height: 24px;">См. детали</div></div>
-            <div class="info-box tabel-box" id="btn-details-tabel"><div class="info-box-title">Табель / Штрафы</div><div class="tabel-grid" id="info-tabel"></div></div>
-          </div>
-          <div class="info-box circle-box" id="btn-details-kpi"><div class="kpi-container" id="kpi-circle"><div class="kpi-inner"><span id="kpi-val" style="font-size:13px; font-weight:bold;">90%</span><span style="font-size:7px; color:gray; line-height:1; margin-top: 1px;">КФ. ЭФФ.</span></div></div></div>
-        </div>
-      </div>
-    </div> 
-    <div class="scrollable-content slide-up-fade" id="scrollable-body" style="padding-top: 5px;">
-      
-      <div id="content-time" class="hidden" style="max-width: 400px; margin: 0 auto; text-align:center;">
-        <p id="action-hint" style="margin-bottom: 12px; font-weight:bold; padding-top: 5px; font-size:15px;">Загрузка лимитов...</p>
-        <div id="standard-buttons">
-            <button id="btn-break" class="btn-break" data-action="Перерыв" disabled><span>Перерыв</span><span class="desc" id="desc-break">10 мин</span></button>
-            <button id="btn-lunch" class="btn-lunch" data-action="Обед" disabled><span>Обед</span><span class="desc" id="desc-lunch">40 мин</span></button>
-            <button id="btn-snack" class="btn-snack" data-action="Полдник" disabled><span>Полдник</span><span class="desc" id="desc-snack">30 мин</span></button>
-        </div>
-        <div id="return-button-container" class="hidden"><button id="btn-return" class="btn-return"><span id="return-text">Вернуться</span></button></div>
-        <div id="active-outs-container" class="active-outs-box hidden inner-block" style="background:var(--card-bg);"><div class="active-outs-title">В отсутствии:</div><div id="active-outs-list"></div></div>
-      </div>
-      
-      <div id="content-create" class="hidden">...</div>
-      <div id="content-inbox" class="hidden">...</div>
-      <div id="content-adm-outs" class="hidden">...</div>
-      <div id="content-adm-main" class="hidden">...</div>
-      <div id="content-adm-inbox" class="hidden">...</div>
-      <div id="content-details" class="hidden">...</div>
+    // Скрываем все экраны и показываем нужный
+    document.querySelectorAll('#scrollable-body > div').forEach(el => el.classList.add("hidden"));
+    
+    let targetEl = document.getElementById("content-" + tab);
+    if(targetEl) {
+        targetEl.classList.remove("hidden");
+        targetEl.classList.add('slide-up-fade');
+    }
+}
 
-    </div>
+// Главная функция загрузки данных моста API -> UI
+async function loadDashboard(isSilent = false) {
+    if (!isSilent) showLoader();
+    
+    let data = await api.getDashboardData(appState.iin);
+    if (!data) {
+        if (!isSilent) hideLoader();
+        return;
+    }
+    
+    if (data.authorized === false) {
+        forceLogout();
+        return;
+    }
 
-  <script type="module" src="app.js"></script>
-</body>
-</html>
+    renderDashboardUI(data);
+
+    let state = await api.startupCheck(appState.iin, appState.role);
+    if (state && state.authorized !== false) {
+        globalActiveOuts = state.activeOuts || [];
+        applyTimeLimits(state);
+    }
+    
+    if (!isSilent) hideLoader();
+}
+
+// Рендер конкретных кусков UI (вызывает функции из ui.js)
+function renderDashboardUI(data) {
+    // 1. Обновляем бейджи входящих
+    let uInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : [];
+    const uBadge = document.getElementById("user-badge");
+    
+    if (uInbox.length > 0) {
+        if(uBadge) {
+            uBadge.innerText = uInbox.length;
+            uBadge.classList.remove("hidden");
+        }
+        if (uInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое сообщение");
+        appState.lastInboxCount = uInbox.length;
+    } else {
+        if(uBadge) uBadge.classList.add("hidden");
+        appState.lastInboxCount = 0;
+    }
+
+    // 2. Рендерим списки через ui.js
+    renderUserInbox(uInbox, appState.iin, "inbox-list");
+    
+    // 3. Обновляем шапку (KPI, Баллы)
+    let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0;
+    let kValEl = document.getElementById("kpi-val");
+    if(kValEl) kValEl.innerText = kpiValue + '%';
+    setKpiColor(kpiValue, document.getElementById("kpi-circle"), document.getElementById("kpi-val"));
+    
+    let ptRemEl = document.getElementById("pt-rem");
+    if(ptRemEl) ptRemEl.innerText = data.info?.ptsLeft ?? '-';
+}
+
+// === УЧЕТ ВРЕМЕНИ ===
+function applyTimeLimits(state) {
+    if (!appState.currentAction) {
+        const btnBreak = document.getElementById("btn-break");
+        const btnLunch = document.getElementById("btn-lunch");
+        const btnSnack = document.getElementById("btn-snack");
+        
+        if(btnBreak) btnBreak.disabled = !state.canBreak;
+        if(btnLunch) btnLunch.disabled = !state.canLunch;
+        if(btnSnack) btnSnack.disabled = !state.canSnack;
+        
+        document.getElementById("action-hint").innerText = (state.canBreak || state.canLunch || state.canSnack) 
+            ? "Выберите действие:" 
+            : "Очередь заполнена или лимит исчерпан";
+    }
+    renderActiveOuts(globalActiveOuts, "active-outs-container", "active-outs-list");
+    renderTimeUI();
+}
+
+async function handleTimeAction(actionType) {
+    vibrate(50);
+    appState.currentAction = actionType;
+    saveMemory("currentAction", actionType);
+    renderTimeUI();
+    
+    let res = await api.recordAction({ 
+        iin: appState.iin, 
+        actionType: actionType, 
+        isReturn: false, 
+        isAutoReturn: false, 
+        exactRole: appState.role 
+    });
+    
+    if (res.success && res.savedAction) {
+        let state = await api.startupCheck(appState.iin, appState.role);
+        applyTimeLimits(state);
+    } else {
+        appState.currentAction = null;
+        saveMemory("currentAction", "");
+        renderTimeUI();
+        showToast("Ошибка: " + res.error, true);
+    }
+}
+
+async function handleTimeReturn() {
+    vibrate(50);
+    const actionToReturnFrom = appState.currentAction;
+    appState.currentAction = null;
+    saveMemory("currentAction", "");
+    renderTimeUI();
+    
+    document.getElementById("action-hint").innerText = "Фиксируем возвращение...";
+    
+    let res = await api.recordAction({ 
+        iin: appState.iin, 
+        actionType: actionToReturnFrom, 
+        isReturn: true, 
+        isAutoReturn: false, 
+        exactRole: appState.role 
+    });
+    
+    if (res.success) {
+        let state = await api.startupCheck(appState.iin, appState.role);
+        applyTimeLimits(state);
+    } else {
+        showToast("Ошибка возврата: " + res.error, true);
+    }
+}
+
+function renderTimeUI() {
+    const standardBtns = document.getElementById("standard-buttons");
+    const returnContainer = document.getElementById("return-button-container");
+    
+    if (appState.currentAction && appState.currentAction !== "null" && appState.currentAction !== "") {
+        document.getElementById("btn-return").disabled = false;
+        if(standardBtns) standardBtns.classList.add("hidden");
+        if(returnContainer) returnContainer.classList.remove("hidden");
+        document.getElementById("return-text").innerText = "Вернуться с " + appState.currentAction;
+        document.getElementById("action-hint").innerText = "Ожидаем возвращения:";
+    } else {
+        if(standardBtns) standardBtns.classList.remove("hidden");
+        if(returnContainer) returnContainer.classList.add("hidden");
+    }
+}
+
+// === ОБРАБОТКА ЗАЯВОК ===
+async function handleProcessReq(id, action, replyText = "") {
+    vibrate(50);
+    showToast("Обработка...", false, 9999);
+    processedReqIds.add(String(id));
+    
+    let el = document.getElementById("req-" + id);
+    if (el) el.style.display = 'none';
+    
+    let res = await api.processRequest({ 
+        reqId: id, 
+        reqAction: action, 
+        replyText: replyText, 
+        currentIin: appState.iin 
+    });
+    
+    if(res.success) {
+        showToast(res.msg);
+        loadDashboard(true);
+    } else {
+        showToast(res.error, true);
+        if (el) el.style.display = 'block'; // Возвращаем блок при ошибке
+    }
+}
+
+// === ФОНОВОЕ ОБНОВЛЕНИЕ ===
+function startPolling() {
+    if(pollingTimer) clearInterval(pollingTimer);
+    
+    // Подписка на изменения в реальном времени через Supabase
+    supabase.channel('public-changes')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'requests' }, () => {
+            if(appState.token && !document.hidden) loadDashboard(true);
+        })
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'time_tracking' }, async () => {
+            if(appState.token && !document.hidden) {
+                let state = await api.startupCheck(appState.iin, appState.role);
+                if(state) applyTimeLimits(state);
+            }
+        }).subscribe();
+
+    // Запасной поллинг каждые 30 секунд
+    pollingTimer = setInterval(async () => {
+        if(appState.token && !document.hidden) {
+            let state = await api.startupCheck(appState.iin, appState.role);
+            if(state) applyTimeLimits(state);
+            loadDashboard(true);
+        }
+    }, 30000);
+}
