@@ -1,49 +1,50 @@
 // state.js
 import { getMemory } from './utils.js';
 
+// Все изменяемые состояния теперь поля одного объекта appState
 export const appState = {
+  // данные входа
   token: getMemory("userToken"),
   iin: getMemory("userIIN"),
   firstName: getMemory("userName") || "",
   currentAction: getMemory("currentAction"),
   role: getMemory("userRole") || "Продавец",
   dept: getMemory("userDept") || "Цифра",
-  lastInboxCount: 0
+  lastInboxCount: 0,
+
+  // флаги и состояния UI
+  isUserPromoter: false,
+  lastActiveTab: 'time',
+  processedReqIds: new Set(),
+  currentAdminScDept: 'Цифра',
+  currentEmpDept: 'Цифра',
+  currentScTabDept: 'Цифра',
+  currentHistFilter: 'all',
+  currentAdminMainView: 'plan',
+  savedScrollPos: {},
+  window_nomListOpen: false,
+  activeOutsTimer: null,
+  pollingTimer: null,
+
+  // массивы данных
+  globalActiveOuts: [],
+  adminEmployeesGlobal: [],
+  adminHistoryGlobal: [],
+  allEmployeesData: [],
+  globalSellers: [],
+  globalScItems: [],
+  adminScItemsGlobal: [],
+  tradeInModelsGlobal: [],
+  selectedTradeInModel: null,
+  selectedScItem: null,
+
+  myReports: [],
+  myPointsHistory: [],
+  myDisplayPointsHistory: [],
+  myScHistory: [],
+  myKpiDetails: [],
+  myMoneyFinesHistory: [],
 };
 
-export let globalActiveOuts = [];
-export let adminEmployeesGlobal = [];
-export let adminHistoryGlobal = [];
-export let allEmployeesData = [];
-export let globalSellers = [];
-export let globalScItems = [];
-export let adminScItemsGlobal = [];
-export let tradeInModelsGlobal = [];
-export let selectedTradeInModel = null;
-export let selectedScItem = null;
-
-export let myReports = [];
-export let myPointsHistory = [];
-export let myDisplayPointsHistory = [];
-export let myScHistory = [];
-export let myKpiDetails = [];
-export let myMoneyFinesHistory = [];
-
-export let isUserPromoter = false;
-export let lastActiveTab = 'time';
-export let processedReqIds = new Set();
-export let currentAdminScDept = 'Цифра';
-export let currentEmpDept = 'Цифра';
-export let currentScTabDept = 'Цифра';
-export let currentHistFilter = 'all';
-export let currentAdminMainView = 'plan'; // будет переопределяться
-
-export let savedScrollPos = {};
-export let window_nomListOpen = false; // используется в renderPlanUI
-
-// для динамических цветов префиксов
+// Для совместимости с window.dynamicPrefixColors (если нужно)
 window.dynamicPrefixColors = window.dynamicPrefixColors || {};
-
-// Другие переменные, которые могут понадобиться глобально
-export let activeOutsTimer = null;
-export let pollingTimer = null;
