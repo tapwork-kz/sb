@@ -1,6 +1,6 @@
 // utils.js
 
-// === Работа с данными и хранилищем ===
+// === Хранилище (Кэш и Куки) ===
 export function saveMemory(key, value) { 
     try { localStorage.setItem(key, value); } catch(e){} 
     document.cookie = key + "=" + encodeURIComponent(value || "") + "; max-age=31536000; path=/"; 
@@ -22,22 +22,20 @@ export function clearMemory() {
     for (let c of cookies) document.cookie = c.split("=")[0] + "=; max-age=0; path=/"; 
 }
 
+// === Утилиты и Форматирование ===
 export function safeIin(val) { 
     if(val === undefined || val === null) return ""; 
     return String(val).trim().replace(/^0+/, ''); 
 }
 
-// === Форматирование текста и чисел ===
 export function fmtSum(val) { 
     if(!val) return "0"; 
     return String(Math.round(val)).replace(/\s/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " "); 
 }
 
-export function formatShortName(fullName) { 
-    if (!fullName) return ""; 
-    let p = String(fullName).trim().split(/\s+/); 
-    if (p.length > 1 && p[1]) return p[0] + " " + p[1].charAt(0).toUpperCase() + "."; 
-    return p[0]; 
+export function formatNumberWithSpaces(x) { 
+    if (!x) return "0"; 
+    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); 
 }
 
 export function formatPointsNoun(num) { 
@@ -52,12 +50,14 @@ export function formatPointsNoun(num) {
     return "баллов"; 
 }
 
-export function formatNumberWithSpaces(x) { 
-    if (!x) return "0"; 
-    return x.toString().replace(/\B(?=(\d{3})+(?!\d))/g, " "); 
+export function formatShortName(fullName) { 
+    if (!fullName) return ""; 
+    let p = String(fullName).trim().split(/\s+/); 
+    if (p.length > 1 && p[1]) return p[0] + " " + p[1].charAt(0).toUpperCase() + "."; 
+    return p[0]; 
 }
 
-// === Форматирование дат ===
+// === Работа с Датами ===
 export function formatDateLocal(d) { 
     if (!d) d = new Date(); 
     let y = d.getFullYear(); 
@@ -91,21 +91,18 @@ export function parseCustomDate(dStr) {
     return new Date(dParts[2], dParts[1] - 1, dParts[0], timeParts[0] || 0, timeParts[1] || 0).getTime(); 
 }
 
-// === UI Утилиты (Уведомления и Вибрация) ===
+// === Уведомления и Взаимодействие (UI/UX) ===
 export function requestNotificationPermission() { 
-    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") {
-        Notification.requestPermission(); 
-    }
+    if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") Notification.requestPermission(); 
 }
 
 export function showPushNotification(title, bodyText) { 
-    if ("Notification" in window && Notification.permission === "granted") {
-        new Notification(title, { body: bodyText, icon: "icon.png" }); 
-    }
+    if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: bodyText, icon: "icon.png" }); 
 }
 
 export function showToast(msg, isError = false, duration = 3000) { 
     const t = document.getElementById("toast"); 
+    if (!t) return;
     t.innerText = msg; 
     t.style.background = isError ? "#e74c3c" : "#34495e"; 
     t.classList.add("show"); 
@@ -113,64 +110,13 @@ export function showToast(msg, isError = false, duration = 3000) {
 }
 
 export function vibrate(ms = 50) { 
-    if (window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.HapticFeedback) {
-        window.Telegram.WebApp.HapticFeedback.impactOccurred('light'); 
-    } else if (navigator.vibrate) {
-        navigator.vibrate(ms); 
-    }
+    const tg = window.Telegram ? window.Telegram.WebApp : null;
+    if (tg && tg.HapticFeedback) tg.HapticFeedback.impactOccurred('light'); 
+    else if (navigator.vibrate) navigator.vibrate(ms); 
 }
 
-// === Дизайн и Цвета ===
+// === Цвета и Стилизация ===
 window.dynamicPrefixColors = window.dynamicPrefixColors || {};
-
-// === Форматирование замечаний ===
-
-export function formatRemarkAuthor(name, role) { 
-    let r = String(role || "руководителя").toLowerCase(); 
-    let decl = "руководителя"; 
-    
-    if (r.includes("директор")) decl = "директора"; 
-    else if (r.includes("супервайзер")) decl = "супервайзера"; 
-    else if (r.includes("управляющ")) decl = "управляющего"; 
-    else if (r.includes("админ")) decl = "администратора"; 
-    else if (r.includes("заведующий складом") || r.includes("зав. складом")) decl = "заведующего"; 
-    
-    let parts = String(name).trim().split(/\s+/); 
-    let shortName = parts[0]; 
-    if (parts.length > 1 && parts[1]) shortName += " " + parts[1].charAt(0).toUpperCase() + "."; 
-    
-    return `От ${decl} ${shortName}`; 
-}
-
-export function formatRemarkText(text, targetName = null) { 
-    if (!text) return ""; 
-    let str = String(text); 
-    let splitRegex = /\n\n>\s*(.*?)\n/i; 
-    let parts = str.split(splitRegex); 
-    
-    if (parts.length >= 3) { 
-        let main = parts[0]; 
-        let authorLabel = parts[1]; 
-        let quote = parts.slice(2).join(""); 
-        return `${main}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${authorLabel}</b><br>${quote}</div>`; 
-    } 
-    
-    let oldRegex = /(Ответ.*?:\s*)/i; 
-    let oldParts = str.split(oldRegex); 
-    
-    if (oldParts.length >= 3) { 
-        return `${oldParts[0]}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${oldParts[1]}</b><br>${oldParts.slice(2).join("")}</div>`; 
-    } 
-    
-    if (targetName) { 
-        let targetShort = targetName; 
-        let tParts = String(targetName).trim().split(/\s+/); 
-        if (tParts.length > 1 && tParts[1]) targetShort = tParts[0] + " " + tParts[1].charAt(0).toUpperCase() + "."; 
-        return `${str}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid gray; border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:gray; font-style:normal;">${targetShort}</b><br><span style="color:gray;">Ожидает ответа...</span></div>`; 
-    } 
-    
-    return str; 
-}
 
 export function getSourceColor(src) { 
     let originalSrc = String(src).trim();
@@ -190,4 +136,40 @@ export function getSourceColor(src) {
     }
     const colors = ['#e74c3c', '#1abc9c', '#9b59b6', '#34495e', '#16a085', '#27ae60', '#2980b9', '#8e44ad', '#d35400', '#c0392b', '#f39c12'];
     return colors[Math.abs(hash) % colors.length] || '#7f8c8d'; 
+}
+
+// === Форматирование замечаний ===
+export function formatRemarkAuthor(name, role) { 
+    let r = String(role || "руководителя").toLowerCase(); let decl = "руководителя"; 
+    if (r.includes("директор")) decl = "директора"; 
+    else if (r.includes("супервайзер")) decl = "супервайзера"; 
+    else if (r.includes("управляющ")) decl = "управляющего"; 
+    else if (r.includes("админ")) decl = "администратора"; 
+    else if (r.includes("заведующий складом") || r.includes("зав. складом")) decl = "заведующего"; 
+    let parts = String(name).trim().split(/\s+/); 
+    let shortName = parts[0]; 
+    if (parts.length > 1 && parts[1]) shortName += " " + parts[1].charAt(0).toUpperCase() + "."; 
+    return `От ${decl} ${shortName}`; 
+}
+
+export function formatRemarkText(text, targetName = null) { 
+    if (!text) return ""; 
+    let str = String(text); 
+    let splitRegex = /\n\n>\s*(.*?)\n/i; 
+    let parts = str.split(splitRegex); 
+    if (parts.length >= 3) { 
+        let main = parts[0]; let authorLabel = parts[1]; let quote = parts.slice(2).join(""); 
+        return `${main}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${authorLabel}</b><br>${quote}</div>`; 
+    } 
+    let oldRegex = /(Ответ.*?:\s*)/i; 
+    let oldParts = str.split(oldRegex); 
+    if (oldParts.length >= 3) { 
+        return `${oldParts[0]}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${oldParts[1]}</b><br>${oldParts.slice(2).join("")}</div>`; 
+    } 
+    if (targetName) { 
+        let targetShort = targetName; let tParts = String(targetName).trim().split(/\s+/); 
+        if (tParts.length > 1 && tParts[1]) targetShort = tParts[0] + " " + tParts[1].charAt(0).toUpperCase() + "."; 
+        return `${str}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid gray; border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:gray; font-style:normal;">${targetShort}</b><br><span style="color:gray;">Ожидает ответа...</span></div>`; 
+    } 
+    return str; 
 }
