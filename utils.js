@@ -71,7 +71,8 @@ export function formatNumberWithSpaces(x) {
 
 export function getSourceColor(src) {
   let originalSrc = String(src).trim();
-  if (window.dynamicPrefixColors[originalSrc]) return window.dynamicPrefixColors[originalSrc];
+  if (window.dynamicPrefixColors && window.dynamicPrefixColors[originalSrc])
+    return window.dynamicPrefixColors[originalSrc];
   let s = originalSrc.toLowerCase();
   if (s.includes('сц')) return '#e67e22';
   if (s.includes('trade-in')) return '#8e44ad';
@@ -159,8 +160,8 @@ export function getMonthName(dateStr) {
 }
 
 export function renderHistoryItem(i, isCompact = false) {
-  let roleStr = String(window.appState?.role || "").toLowerCase();
-  let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом");
+  const roleStr = window.appState ? String(window.appState.role || "").toLowerCase() : "";
+  const isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом");
   let rawNum = parseFloat(String(i.val).replace(',', '.').replace('+', '')) || 0;
   let valStr = String(rawNum).replace('.', ',');
   if (rawNum > 0 && !String(i.type).toLowerCase().includes('штраф')) {
@@ -182,8 +183,8 @@ export function renderHistoryItem(i, isCompact = false) {
 }
 
 export function renderMoneyFineItem(i) {
-  let roleStr = String(window.appState?.role || "").toLowerCase();
-  let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом");
+  const roleStr = window.appState ? String(window.appState.role || "").toLowerCase() : "";
+  const isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом");
   let moneyVal = parseFloat(String(i.moneyFine).replace(',', '.')) || 0;
   let ptsVal = parseFloat(String(i.val).replace(',', '.')) || 0;
   let badgeHtml = "";
