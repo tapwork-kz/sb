@@ -236,12 +236,73 @@ async function loadDashboard(isSilent = false) {
         applyTimeLimits(state);
     }
     
+    // === ИСПРАВЛЕНИЕ ЗДЕСЬ: АВТОМАТИЧЕСКИЙ ВЫБОР ВКЛАДКИ ===
+    if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) {
+        let roleStr = String(appState.role).toLowerCase();
+        let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
+        let isZavSklad = roleStr.includes("заведующий складом");
+        
+        if (isDir || isZavSklad) {
+            switchTab('adm-main');
+        } else {
+            switchTab('time');
+        }
+    }
+    
     if (!isSilent) hideLoader();
 }
 
 // Рендер конкретных кусков UI (вызывает функции из ui.js)
 function renderDashboardUI(data) {
-    // 1. Обновляем бейджи входящих
+    let roleStr = String(appState.role).toLowerCase();
+    let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
+    let isZavSklad = roleStr.includes("заведующий складом");
+    let isSeller = !appState.isPromoter && !isDir && !isZavSklad;
+
+    // === ИСПРАВЛЕНИЕ ЗДЕСЬ: НАСТРОЙКА ВИДИМОСТИ МЕНЮ И ДАШБОРДА ===
+    const navTime = document.getElementById("nav-time-icon");
+    const navCreate = document.getElementById("nav-create-icon");
+    const navInbox = document.getElementById("inbox-icon");
+    const navAdmOuts = document.getElementById("nav-adm-outs");
+    const navAdmMain = document.getElementById("nav-adm-main");
+    const navAdmInbox = document.getElementById("nav-adm-inbox");
+    const dashBanner = document.getElementById("info-dashboard");
+
+    if (isZavSklad) {
+        if(navTime) navTime.classList.add("hidden");
+        if(navCreate) navCreate.classList.add("hidden");
+        if(navInbox) navInbox.classList.remove("hidden");
+        if(navAdmOuts) navAdmOuts.classList.remove("hidden");
+        if(navAdmMain) navAdmMain.classList.remove("hidden");
+        if(navAdmInbox) navAdmInbox.classList.add("hidden");
+        if(dashBanner) dashBanner.classList.add("hidden");
+    } else if (isDir) {
+        if(navTime) navTime.classList.add("hidden");
+        if(navCreate) navCreate.classList.add("hidden");
+        if(navInbox) navInbox.classList.add("hidden");
+        if(navAdmOuts) navAdmOuts.classList.remove("hidden");
+        if(navAdmMain) navAdmMain.classList.remove("hidden");
+        if(navAdmInbox) navAdmInbox.classList.remove("hidden");
+        if(dashBanner) dashBanner.classList.add("hidden");
+    } else {
+        // Логика для обычного продавца
+        if(navTime) navTime.classList.remove("hidden");
+        if(navCreate) navCreate.classList.remove("hidden");
+        if(navInbox) navInbox.classList.remove("hidden");
+        if(navAdmOuts) navAdmOuts.classList.add("hidden");
+        if(navAdmMain) navAdmMain.classList.add("hidden");
+        if(navAdmInbox) navAdmInbox.classList.add("hidden");
+        
+        // Показываем дашборд (баллы, табель) только продавцам
+        if (isSeller && dashBanner) {
+            dashBanner.classList.remove("hidden");
+            dashBanner.classList.add("slide-down-fade");
+        } else if (dashBanner) {
+            dashBanner.classList.add("hidden");
+        }
+    }
+
+    // Обновляем бейджи входящих
     let uInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : [];
     const uBadge = document.getElementById("user-badge");
     
@@ -257,10 +318,10 @@ function renderDashboardUI(data) {
         appState.lastInboxCount = 0;
     }
 
-    // 2. Рендерим списки через ui.js
+    // Рендерим списки через ui.js
     renderUserInbox(uInbox, appState.iin, "inbox-list");
     
-    // 3. Обновляем шапку (KPI, Баллы)
+    // Обновляем шапку (KPI, Баллы)
     let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0;
     let kValEl = document.getElementById("kpi-val");
     if(kValEl) kValEl.innerText = kpiValue + '%';
