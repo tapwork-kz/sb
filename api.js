@@ -1437,32 +1437,17 @@ function showLoader() {
 }
 
 export function forceLogout() {
-  if (pollingTimer) clearInterval(pollingTimer);
-  clearMemory();
-  appState.token = null;
-  appState.iin = null;
-  document.getElementById("main-screen").style.opacity = '0';
-  setTimeout(() => {
-    document.getElementById("main-screen").classList.add("hidden");
-    document.getElementById("auth-screen").classList.remove("hidden");
-    document.getElementById("auth-screen").style.opacity = '1';
-    document.getElementById("main-screen").style.opacity = '1';
-    document.getElementById("iin-input").value = '';
-    document.getElementById("iin-input").disabled = false;
-  }, 600);
-}
-function forceLogout() {
-  if (pollingTimer) clearInterval(pollingTimer);
-  clearMemory();
-  appState.token = null;
-  appState.iin = null;
-  document.getElementById("main-screen").style.opacity = '0';
-  setTimeout(() => {
-    document.getElementById("main-screen").classList.add("hidden");
-    document.getElementById("auth-screen").classList.remove("hidden");
-    document.getElementById("auth-screen").style.opacity = '1';
-    document.getElementById("main-screen").style.opacity = '1';
-    document.getElementById("iin-input").value = '';
-    document.getElementById("iin-input").disabled = false;
-  }, 600);
+    if (pollingTimer) clearInterval(pollingTimer);
+    clearMemory();
+    appState.token = null;
+    appState.iin = null;
+    document.getElementById("main-screen").style.opacity = '0';
+    setTimeout(() => {
+        document.getElementById("main-screen").classList.add("hidden");
+        document.getElementById("auth-screen").classList.remove("hidden");
+        document.getElementById("auth-screen").style.opacity = '1';
+        document.getElementById("main-screen").style.opacity = '1';
+        document.getElementById("iin-input").value = '';
+        document.getElementById("iin-input").disabled = false;
+    }, 600);
 }
