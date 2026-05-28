@@ -750,7 +750,7 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
       }).join("") || "<p style='color:gray;text-align:center;font-size:13px;'>Новых запросов нет</p>";
   }
   window.adminHistoryGlobal = data.adminHistory || []; if(isDir && typeof renderAdminHistory === "function") renderAdminHistory();
-  adminScItemsGlobal = data.adminScItems || []; globalSellers = data.sellers || []; globalScItems = data.scItems || []; allEmployeesData = data.adminEmployees || []; tradeInModelsGlobal = data.tradeInModels || []; 
+  adminScItemsGlobal = data.adminScItems || []; globalSellers = data.sellers || []; globalScItems = data.scItems || []; allEmployeesData = data.adminEmployees || []; tradeInModelsGlobal = data.tradeInModels || []; window.adminVacationsGlobal = data.vacations || []; 
   if ((isDir || isZavSklad) && typeof renderAdminEmps === "function") renderAdminEmps(currentEmpDept, null);
 let vacContainer = document.getElementById("vacation-list-container");
   if (vacContainer) {
@@ -764,32 +764,6 @@ let vacContainer = document.getElementById("vacation-list-container");
               return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-color);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:12px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="text-align:right; flex-shrink:0;"><div style="font-size:11px; font-weight:bold; margin-bottom:2px;">${v.details}</div><div style="font-size:9px; font-weight:bold; color:${stColor}; background:var(--inner-bg); display:inline-block; padding:2px 6px; border-radius:4px;">${stText}</div></div></div>`; 
           }).join(""); 
       }
-      let adminVacContainer = document.getElementById("admin-vacation-list");
-  if (adminVacContainer) {
-      let vList = data.vacations || [];
-      let activeVacs = vList.filter(v => {
-          // Показываем в админке только ОДОБРЕННЫЕ отпуска
-          if (v.status !== "approved" && v.status !== "approved_notify_zav") return false;
-          try {
-              let m = JSON.parse(v.meta);
-              let now = new Date(); now.setHours(0,0,0,0);
-              let s = new Date(m.startDate); s.setHours(0,0,0,0);
-              let e = new Date(m.endDate); e.setHours(23,59,59,999);
-              return now >= s && now <= e; // Проверка: текущая дата внутри периода отпуска
-          } catch(err) { return false; }
-      });
-      
-      if (activeVacs.length === 0) {
-          adminVacContainer.innerHTML = "<p style='color:gray; font-size:13px; text-align:center;'>Нет сотрудников в отпуске</p>";
-      } else {
-          adminVacContainer.innerHTML = activeVacs.map(v => {
-              let deptHtml = v.authorDept ? `<div style="font-size:10px; color:gray; margin-top:2px;">${v.authorDept}</div>` : '';
-              let meta = JSON.parse(v.meta);
-              let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}`; };
-              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="font-size:11px; font-weight:bold; color:#f39c12; background:rgba(243, 156, 18, 0.1); padding:4px 8px; border-radius:6px; flex-shrink:0;">До ${formatD(meta.endDate)}</div></div>`;
-          }).join("");
-      }
-  }
   }
 }
 
@@ -887,13 +861,46 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
 
 function renderAdminOuts() {
   let list = globalActiveOuts || []; const now = Date.now();
-  document.getElementById('admin-outs-list').innerHTML = list.map(out => { 
+  
+  // 1. Обычные статусы отсутствия (перерывы, обеды)
+  let outsHtml = list.map(out => { 
       let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
       if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
       if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
       let actionTitle = out.action; if(actionTitle.includes("Перерыв")) actionTitle = "Перерыв"; let roleLabel = isProm ? out.role : `Продавец — ${out.dept || 'Сотрудник'}`; 
       return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
-  }).join("") || "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
+  }).join("");
+  
+  if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
+  
+  // 2. Отдельный блок для отпусков (Текущие и предстоящие)
+  let vacHtml = "";
+  let activeVacations = [];
+  
+  (window.adminVacationsGlobal || []).forEach(v => {
+      let metaObj = {}; try { metaObj = JSON.parse(v.meta); } catch(e){}
+      // Оставляем в списке, пока дата окончания отпуска не прошла (проверяем по миллисекундам)
+      if (metaObj.endDate) {
+          let endTime = new Date(metaObj.endDate).getTime() + 86400000; // До конца указанных суток
+          if (now <= endTime) {
+              activeVacations.push({ ...v, metaObj });
+          }
+      }
+  });
+  
+  if (activeVacations.length > 0) {
+      vacHtml = `<div style="margin-top:20px; border-top:1px solid var(--border-color); padding-top:15px;"><div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:10px; display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> Отпуска (Заявки и Утвержденные):</div>`;
+      vacHtml += activeVacations.map(v => {
+          let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
+          let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
+          let deptHtml = v.authorDept ? `<div style="font-size:10px; color:gray;">${v.authorDept}</div>` : '';
+          return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="text-align:right; flex-shrink:0;"><div style="font-size:12px; font-weight:bold; margin-bottom:2px;">${v.details}</div><div style="font-size:9px; font-weight:bold; color:${stColor}; background:var(--inner-bg); display:inline-block; padding:2px 6px; border-radius:4px;">${stText}</div></div></div>`;
+      }).join("");
+      vacHtml += `</div>`;
+  }
+  
+  // Склеиваем оба списка и отправляем в контейнер админа
+  document.getElementById('admin-outs-list').innerHTML = outsHtml + vacHtml;
 }
 
 function renderAdminEmps(dept, btnElement) {
