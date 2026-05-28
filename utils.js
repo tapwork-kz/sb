@@ -123,6 +123,55 @@ export function vibrate(ms = 50) {
 // === Дизайн и Цвета ===
 window.dynamicPrefixColors = window.dynamicPrefixColors || {};
 
+// === Форматирование замечаний ===
+
+export function formatRemarkAuthor(name, role) { 
+    let r = String(role || "руководителя").toLowerCase(); 
+    let decl = "руководителя"; 
+    
+    if (r.includes("директор")) decl = "директора"; 
+    else if (r.includes("супервайзер")) decl = "супервайзера"; 
+    else if (r.includes("управляющ")) decl = "управляющего"; 
+    else if (r.includes("админ")) decl = "администратора"; 
+    else if (r.includes("заведующий складом") || r.includes("зав. складом")) decl = "заведующего"; 
+    
+    let parts = String(name).trim().split(/\s+/); 
+    let shortName = parts[0]; 
+    if (parts.length > 1 && parts[1]) shortName += " " + parts[1].charAt(0).toUpperCase() + "."; 
+    
+    return `От ${decl} ${shortName}`; 
+}
+
+export function formatRemarkText(text, targetName = null) { 
+    if (!text) return ""; 
+    let str = String(text); 
+    let splitRegex = /\n\n>\s*(.*?)\n/i; 
+    let parts = str.split(splitRegex); 
+    
+    if (parts.length >= 3) { 
+        let main = parts[0]; 
+        let authorLabel = parts[1]; 
+        let quote = parts.slice(2).join(""); 
+        return `${main}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${authorLabel}</b><br>${quote}</div>`; 
+    } 
+    
+    let oldRegex = /(Ответ.*?:\s*)/i; 
+    let oldParts = str.split(oldRegex); 
+    
+    if (oldParts.length >= 3) { 
+        return `${oldParts[0]}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${oldParts[1]}</b><br>${oldParts.slice(2).join("")}</div>`; 
+    } 
+    
+    if (targetName) { 
+        let targetShort = targetName; 
+        let tParts = String(targetName).trim().split(/\s+/); 
+        if (tParts.length > 1 && tParts[1]) targetShort = tParts[0] + " " + tParts[1].charAt(0).toUpperCase() + "."; 
+        return `${str}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid gray; border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:gray; font-style:normal;">${targetShort}</b><br><span style="color:gray;">Ожидает ответа...</span></div>`; 
+    } 
+    
+    return str; 
+}
+
 export function getSourceColor(src) { 
     let originalSrc = String(src).trim();
     if (window.dynamicPrefixColors[originalSrc]) return window.dynamicPrefixColors[originalSrc];
