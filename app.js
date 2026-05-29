@@ -314,7 +314,7 @@ async function callBackend(actionName, payloadData = {}) {
                       }
                       
                       if (count !== null && count <= 0) return; 
-                      activeAdminPromoList.items.push({ cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts, link: link }); 
+                      activeAdminPromoList.items.push({ name: btnName, cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts, link: link }); 
                   } else {
                       currentSub = btnName;
                   }
@@ -632,11 +632,11 @@ function renderDashboardData(data, isSilent = false) {
                   let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
                   let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
                   
-                  let rawName = item.name;
+                  let rawName = item.name || item.cleanName || "";
                   let cleanName = item.cleanName || rawName;
-                  let link = "";
+                  let link = item.link || "";
                   let bracketIdx = rawName.indexOf('[');
-                  if (bracketIdx !== -1) {
+                  if (bracketIdx !== -1 && !link) {
                       let metaStr = rawName.substring(bracketIdx);
                       let urlMatch = metaStr.match(/https?:\/\/[^\s\]]+/);
                       if (urlMatch) link = urlMatch[0];
