@@ -750,9 +750,10 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
       }).join("") || "<p style='color:gray;text-align:center;font-size:13px;'>Новых запросов нет</p>";
   }
   window.adminHistoryGlobal = data.adminHistory || []; if(isDir && typeof renderAdminHistory === "function") renderAdminHistory();
-  adminScItemsGlobal = data.adminScItems || []; globalSellers = data.sellers || []; globalScItems = data.scItems || []; allEmployeesData = data.adminEmployees || []; tradeInModelsGlobal = data.tradeInModels || []; window.adminVacationsGlobal = data.vacations || []; 
+  adminScItemsGlobal = data.adminScItems || []; globalSellers = data.sellers || []; globalScItems = data.scItems || []; allEmployeesData = data.adminEmployees || []; tradeInModelsGlobal = data.tradeInModels || []; window.adminVacationsGlobal = data.vacations || [];
   if ((isDir || isZavSklad) && typeof renderAdminEmps === "function") renderAdminEmps(currentEmpDept, null);
-let vacContainer = document.getElementById("vacation-list-container");
+
+  let vacContainer = document.getElementById("vacation-list-container");
   if (vacContainer) {
       let vList = data.vacations || [];
       if (vList.length === 0) { vacContainer.innerHTML = "<div style='color:gray; font-size:12px; text-align:center;'>Нет активных заявок</div>"; } 
@@ -862,7 +863,6 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
 function renderAdminOuts() {
   let list = globalActiveOuts || []; const now = Date.now();
   
-  // 1. Обычные статусы отсутствия (перерывы, обеды)
   let outsHtml = list.map(out => { 
       let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
       if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
@@ -874,17 +874,12 @@ function renderAdminOuts() {
   if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
   document.getElementById('admin-outs-list').innerHTML = outsHtml;
 
-  // 2. Отдельный список для отпусков
-  let vacHtml = "";
   let activeVacations = [];
-  
   (window.adminVacationsGlobal || []).forEach(v => {
       let metaObj = {}; try { metaObj = JSON.parse(v.meta); } catch(e){}
       if (metaObj.endDate) {
           let endTime = new Date(metaObj.endDate).getTime() + 86400000;
-          if (now <= endTime) {
-              activeVacations.push({ ...v, metaObj });
-          }
+          if (now <= endTime) { activeVacations.push({ ...v, metaObj }); }
       }
   });
   
@@ -900,8 +895,19 @@ function renderAdminOuts() {
           return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="text-align:right; flex-shrink:0;"><div style="font-size:12px; font-weight:bold; margin-bottom:2px;">${v.details}</div><div style="font-size:9px; font-weight:bold; color:${stColor}; background:var(--inner-bg); display:inline-block; padding:2px 6px; border-radius:4px;">${stText}</div></div></div>`;
       }).join("");
   } else if (vacContainer) {
-      vacContainer.style.display = 'none'; // Скрываем блок, если отпусков нет
+      vacContainer.style.display = 'none';
   }
+}
+
+function submitVacation() { 
+    let start = document.getElementById("vac-start").value; 
+    let end = document.getElementById("vac-end").value; 
+    if (!start || !end) return showToast("Выберите даты начала и конца отпуска!", true); 
+    if (new Date(start) > new Date(end)) return showToast("Дата конца не может быть раньше начала!", true); 
+    let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
+    let details = `С ${formatD(start)} по ${formatD(end)}`; 
+    let meta = JSON.stringify({ startDate: start, endDate: end }); 
+    executeSubmit("Отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
 }
 
 function renderAdminEmps(dept, btnElement) {
