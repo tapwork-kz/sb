@@ -146,35 +146,6 @@
           </div>
         </div>
   
-  <h3 style="padding-top:10px; border-top:1px solid var(--border-color); font-size:15px;">Обмен сменами</h3>
-  <select id="fs-target" onchange="checkSwapFields()"></select>
-  <div id="fs-extra" class="hidden">
-    <p style="margin: 10px 0 6px; font-size: 13px; font-weight: bold; color:var(--form-title-color);">Укажите вашу новую смену:</p>
-    <input type="text" id="fs-date" class="smart-date" data-realdate="">
-    <select id="fs-shift"><option value="09:00 - 19:00">09:00 - 19:00</option><option value="12:00 - 22:00">12:00 - 22:00</option></select>
-    <button onclick="submitSwap()" style="margin-top:10px; width:100%; font-size:13px; padding:10px;">Запросить обмен</button>
-  </div>
-
-  <h3 style="padding-top:15px; margin-top:15px; border-top:1px solid var(--border-color); font-size:15px;">Заявка в отпуск</h3>
-  <div style="display:flex; gap:8px; margin-bottom:10px;">
-    <div style="flex:1;">
-       <div style="font-size:11px; color:gray; margin-bottom:4px;">Начало:</div>
-       <input type="date" id="vac-start" style="width:100%; height:36px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-color); font-family:inherit;">
-    </div>
-    <div style="flex:1;">
-       <div style="font-size:11px; color:gray; margin-bottom:4px;">Конец:</div>
-       <input type="date" id="vac-end" style="width:100%; height:36px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-color); font-family:inherit;">
-    </div>
-  </div>
-  <button class="btn-green" onclick="submitVacation()" style="margin-bottom:15px; width:100%; font-size:13px; padding:10px;">Отправить заявку в отпуск</button>
-  
-  <div style="font-size:13px; font-weight:bold; margin-bottom:8px; color:var(--text-color);">График отпусков:</div>
-  <div id="vacation-list-container" style="max-height:200px; overflow-y:auto; padding:4px;"></div>
-  
-  <div class="grid-btns" style="margin-top: 15px;">
-    <button class="btn-gray" onclick="closeForm()" style="grid-column: 1 / -1;">Закрыть окно</button>
-  </div>
-</div>
       </div>
       <div id="content-inbox" class="hidden">
         <div class="sticky-header glass" style="margin-top:0; margin-bottom: 12px;"><h3 style="margin:0; color:var(--btn-color); text-align:center; font-size: 15px;">Входящие</h3></div>
