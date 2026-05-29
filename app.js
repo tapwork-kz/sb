@@ -365,12 +365,21 @@ async function callBackend(actionName, payloadData = {}) {
 
               if (ptsMotivation !== 0 || ud.type === "Штраф") {
                   let histItem = { date: dateStr, type: ud.type, source: dynamicType, reason: cleanActionText, val: ptsMotivation > 0 ? "+" + ptsMotivation : ptsMotivation, approver: managerName, moneyFine: ud.fine_money || 0, kpiChange: kpiChange };
-                  if (ud.type === "Штраф") { histItem.type = "Штраф"; histItem.source = managerName; } else if (ud.type === "Продажа СЦ/Дефект" || ud.type === "Продажа Trade-In" || ud.type === dynamicType) { histItem.type = "Начисление"; histItem.source = dynamicType; histItem.val = "+" + ptsMotivation; } else if (ud.type === "Использование") { histItem.type = "Использование"; histItem.source = "Мотивация"; } else if (ud.type === "Горячий чек") { 
+                  
+                  if (ud.type === "Штраф") { 
+                      histItem.type = "Штраф"; histItem.source = managerName; 
+                  } else if (ud.type === "Использование") { 
+                      histItem.type = "Использование"; histItem.source = "Мотивация"; 
+                  } else if (ud.type === "Горячий чек") { 
                       histItem.type = "Начисление"; histItem.source = "Горячий чек"; 
                       let firstWord = String(cleanActionText).split(' ')[0];
                       if(firstWord && firstWord !== "Горячий" && cleanActionText.includes(firstWord + ' ')) { histItem.source = firstWord; }
                       histItem.val = "+" + ptsMotivation; 
+                  } else {
+                      // Ловит ВСЕ продажи: СЦ, Дефект, Фокус, Trade-In, Слив и т.д.
+                      histItem.type = "Начисление"; histItem.source = dynamicType; histItem.val = "+" + ptsMotivation; 
                   }
+                  
                   if (ud.iin === appState.iin) { myPtsHistory.push(histItem); }
                   if (empMap[ud.iin]) { empMap[ud.iin].ptsHistory.push(histItem); if (histItem.type === "Начисление") { empMap[ud.iin].pts.acc += ptsMotivation; if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; else empMap[ud.iin].sales.sc++; } if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); }
               }
@@ -596,10 +605,17 @@ function renderDashboardData(data, isSilent = false) {
   let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0; let kValEl = document.getElementById("kpi-val"); if(kValEl) kValEl.innerText = kpiValue + '%'; setKpiColor(kpiValue, document.getElementById("kpi-circle"), document.getElementById("kpi-val")); myKpiDetails = data.info?.kpiDetails || [];
   let infoTabel = document.getElementById("info-tabel"); if(infoTabel) { infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div>`; }
 
-  myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.type === "Штраф"); myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек"); window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
-  let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear; let monthSc = myScHistory.filter(p => p && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
-  let countSc = monthSc.filter(p => p && (p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект")).length; 
-  let countFocus = monthSc.filter(p => p && (p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект")).length; 
+  myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.type === "Штраф"); 
+  myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление"); 
+  window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
+  
+  let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear; 
+  let monthSc = myScHistory.filter(p => p && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
+  
+  // Строго отбираем СЦ (учитывая старые названия), всё остальное математически уходит в Фокус
+  let countSc = monthSc.filter(p => { let s = String(p.source).toLowerCase(); return s === "сц" || s.includes("сц/дефект") || (s.includes("сц/фокус") && !String(p.reason).toLowerCase().includes("фокус")); }).length; 
+  let countFocus = monthSc.length - countSc; 
+  
   let scEl = document.getElementById("info-sc-val"); if(scEl) { scEl.innerText = `${countSc} | ${countFocus}`; if (countSc + countFocus > 0) scEl.style.color = "#27ae60"; else scEl.style.color = "#e74c3c"; }
 
   let hcCard = document.getElementById("hot-check-card");
@@ -940,9 +956,11 @@ function renderAdminEmps(dept, btnElement) {
    currentEmpDept = dept; if (btnElement) { document.getElementById('flt-emp-cifra').classList.remove('active-flt'); document.getElementById('flt-emp-mbt').classList.remove('active-flt'); document.getElementById('flt-emp-kbt').classList.remove('active-flt'); btnElement.classList.add('active-flt'); }
    let container = document.getElementById("admin-emp-list"); let filtered = allEmployeesData.filter(e => e.dept.toLowerCase().includes(dept.toLowerCase())); let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
    container.innerHTML = filtered.map(e => { 
-           let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
-           let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
-           let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
+           let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
+           
+           let curMonthSc = monthScHist.filter(p => { let s = String(p.source).toLowerCase(); return s === "сц" || s.includes("сц/дефект") || (s.includes("сц/фокус") && !String(p.reason).toLowerCase().includes("фокус")); }).length; 
+           let curMonthFocus = monthScHist.length - curMonthSc; 
+           
            let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
            return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
        }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
