@@ -89,7 +89,7 @@ function renderPlanUI(pData) {
 
 function generateDatePanelHTML(idPrefix, onChangeFuncName) {
     let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><div style="position:relative; width:36px; height:36px; flex-shrink:0;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div><div style="position:relative; width:36px; height:36px; flex-shrink:0;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></button></div><button class="btn-green" style="margin:0; border-radius:8px; width:36px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="${onChangeFuncName}('search')"><span class="material-symbols-rounded" style="font-size:18px; color:white;">search</span></button></div></div>`;
+    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></button></div></div></div>`;
 }
 
 function setPanelDates(type, val, idPrefix, reloadFn) {
@@ -252,17 +252,22 @@ async function callBackend(actionName, payloadData = {}) {
 
           window.dynamicPrefixColors = window.dynamicPrefixColors || {};
           let adminAllPromoLists = [];
+          let allHotChecks = [];
+          
           const allDeptsCols = [
               {n: 'col_e_cifra_name', k: 'col_f_cifra_kpi', p: 'col_g_cifra_pts', dept: 'Цифра'},
               {n: 'col_h_mbt_name', k: 'col_i_mbt_kpi', p: 'col_j_mbt_pts', dept: 'МБТ'},
               {n: 'col_k_kbt_name', k: 'col_l_kbt_kpi', p: 'col_m_kbt_pts', dept: 'КБТ'}
           ];
+          
           allDeptsCols.forEach(cols => {
               let activeAdminPromoList = null;
+              let currentSub = "";
               rows.forEach(r => {
                   let btnName = String(r[cols.n] || "").trim();
                   let rawVal = String(r[cols.k] || "").trim();
                   let rawPts = String(r[cols.p] || "").trim();
+                  if (!btnName) return; 
                   
                   if (btnName.startsWith("_") && rawVal.startsWith("_") && rawPts.startsWith("_#")) {
                       let prefix = rawVal.indexOf(" ") !== -1 ? rawVal.substring(1, rawVal.indexOf(" ")).trim() : rawVal.substring(1).trim();
@@ -278,7 +283,12 @@ async function callBackend(actionName, payloadData = {}) {
                       
                       activeAdminPromoList = { title: btnName.substring(1).trim(), prefix: prefix, defKpi: defKpi, listColor: listColor, items: [], dept: cols.dept };
                       adminAllPromoLists.push(activeAdminPromoList);
-                  } else if (activeAdminPromoList && btnName && !btnName.includes("*")) {
+                  } else if (btnName.includes("*")) {
+                      activeAdminPromoList = null; 
+                      let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
+                      let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
+                      allHotChecks.push({ sub: (currentSub ? `${cols.dept} - ${currentSub}` : cols.dept), name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); 
+                  } else if (activeAdminPromoList) {
                       let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); 
                       if (!btnVal || btnVal === "0") btnVal = activeAdminPromoList.defKpi; 
                       let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
@@ -303,91 +313,18 @@ async function callBackend(actionName, payloadData = {}) {
                           count = Math.max(0, count - approvedCount);
                       }
                       
-                      if (count !== null && count <= 0) return;
-                      activeAdminPromoList.items.push({ cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts, link: link }); 
+                      if (count !== null && count <= 0) return; 
+                      activeAdminPromoList.items.push({ name: btnName, cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts, link: link }); 
+                  } else {
+                      currentSub = btnName;
                   }
               });
           });
-          window.adminPromoListsGlobal = adminAllPromoLists.filter(l => l.items.length > 0);
-
-          let d = String(userData.dept).toLowerCase(); let nameCol, kpiCol, ptsCol;
-          if (d.includes("цифра") || d.includes("чт")) { nameCol = 'col_e_cifra_name'; kpiCol = 'col_f_cifra_kpi'; ptsCol = 'col_g_cifra_pts'; }
-          else if (d.includes("мбт")) { nameCol = 'col_h_mbt_name'; kpiCol = 'col_i_mbt_kpi'; ptsCol = 'col_j_mbt_pts'; }
-          else if (d.includes("кбт")) { nameCol = 'col_k_kbt_name'; kpiCol = 'col_l_kbt_kpi'; ptsCol = 'col_m_kbt_pts'; }
           
-          if (nameCol) {
-              let currentSub = ""; let activePromoList = null; localData.promoLists = []; freshHotChecks = [];
-              rows.forEach(r => {
-                  let btnName = String(r[nameCol] || "").trim(); if (!btnName) return;
-                  let rawVal = String(r[kpiCol] || "").trim(); 
-                  let rawPts = String(r[ptsCol] || "").trim();
-                  
-                  if (btnName.startsWith("_")) {
-                      let title = btnName.substring(1).trim(); 
-                      let prefix = ""; let defKpi = "0"; let listColor = "var(--text-color)";
-                      
-                      if (rawVal.startsWith("_")) { 
-                          let spaceIdx = rawVal.indexOf(" "); 
-                          if (spaceIdx !== -1) { 
-                              prefix = rawVal.substring(1, spaceIdx).trim(); 
-                              defKpi = rawVal.substring(spaceIdx).replace('%', '').replace(',', '.').trim(); 
-                          } else { 
-                              prefix = rawVal.substring(1).trim(); 
-                          } 
-                      } else { 
-                          defKpi = rawVal.replace('%', '').replace(',', '.').trim(); 
-                      }
-                      
-                      // Парсим цвет из колонки PTS и сохраняем глобально для всех карточек
-                      if (rawPts.startsWith("_#")) {
-                          let spaceIdx = rawPts.indexOf(" ");
-                          if (spaceIdx !== -1) {
-                              listColor = rawPts.substring(1, spaceIdx).trim();
-                          } else {
-                              listColor = rawPts.substring(1).trim();
-                          }
-                          if (prefix) window.dynamicPrefixColors[prefix] = listColor;
-                      }
-                      
-                      activePromoList = { title: title, prefix: prefix, defKpi: defKpi, listColor: listColor, items: [] };
-                      localData.promoLists.push(activePromoList);
-                  } else if (btnName.includes("*")) { 
-                      activePromoList = null; let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
-                      let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
-                      freshHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); 
-                  } else { 
-                      if (activePromoList) { 
-                          let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); 
-                          if (!btnVal || btnVal === "0") btnVal = activePromoList.defKpi; 
-                          let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
-                          
-                          let cleanName = btnName; let count = null;
-                          let bracketIdx = btnName.indexOf('[');
-                          if (bracketIdx !== -1) {
-                              cleanName = btnName.substring(0, bracketIdx).trim();
-                              let metaStr = btnName.substring(bracketIdx);
-                              let countMatch = metaStr.match(/\[(\d+),/);
-                              if (countMatch) count = parseInt(countMatch[1]) || 0;
-                          }
-                          
-                          if (count !== null && allReqs) {
-                              // Строгая фильтрация по ПРИСТАВКЕ, чтобы списки не воровали значения друг у друга
-                              let approvedCount = allReqs.filter(req => 
-                                  (req.status === 'approved' || req.status === 'approved_notify_zav') && 
-                                  String(req.details).trim() === cleanName &&
-                                  (req.type === activePromoList.prefix || (req.metadata && req.metadata.type === activePromoList.prefix) || (req.meta && req.meta.includes(`"type":"${activePromoList.prefix}"`)))
-                              ).length;
-                              count = Math.max(0, count - approvedCount);
-                          }
-                          
-                          activePromoList.items.push({ name: btnName, cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts }); 
-                      } 
-                      else { currentSub = btnName; }
-                  }
-              });
-          }
+          window.adminPromoListsGlobal = adminAllPromoLists.filter(l => l.items.length > 0);
+          localData.promoLists = window.adminPromoListsGlobal;
+          localData.hotChecks = allHotChecks;
       }
-      if (freshHotChecks.length > 0) localData.hotChecks = freshHotChecks;
 
       let userMap = {}; let adminEmployees = []; let empMap = {};
       if (allUsers) {
@@ -498,6 +435,16 @@ function groupAndRenderByMonth(itemsArray, renderItemFn) {
 
 document.addEventListener("DOMContentLoaded", async () => {
   try {
+      // Исправление багов отображения нативного текста дат
+      const dateStyle = document.createElement('style');
+      dateStyle.innerHTML = `
+        input[type="date"]::-webkit-date-and-time-value, input[type="month"]::-webkit-date-and-time-value {
+          text-align: center; display: flex; align-items: center; justify-content: center; min-height: 34px;
+        }
+        input[type="date"], input[type="month"] { -webkit-appearance: listbox !important; appearance: auto !important; text-align: center; }
+      `;
+      document.head.appendChild(dateStyle);
+
       requestNotificationPermission(); initAutoScroll(); initSmartDates(); initSwipe(); 
       if(document.getElementById('password-input')) { let pass = document.getElementById('password-input'); pass.style.width = '100%'; pass.style.boxSizing = 'border-box'; pass.style.height = '48px'; pass.style.padding = '0 16px'; pass.style.fontSize = '16px'; pass.style.borderRadius = '12px'; pass.style.border = '1px solid var(--border-color)'; pass.style.background = 'var(--card-bg)'; pass.style.color = 'var(--text-color)'; pass.style.marginTop = '8px'; }
       const urlParams = new URLSearchParams(window.location.search); const urlIin = urlParams.get('iin');
@@ -635,7 +582,7 @@ function renderDashboardData(data, isSilent = false) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
       let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "";
       let filteredAdminInbox = data.adminInbox ? data.adminInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const aBadge = document.getElementById("admin-badge"); if (filteredAdminInbox.length > 0) { if(aBadge) { aBadge.innerText = filteredAdminInbox.length; aBadge.classList.remove("hidden"); } if (filteredAdminInbox.length > appState.lastInboxCount) showPushNotification("Новая заявка!", "Появилась заявка в админке"); appState.lastInboxCount = filteredAdminInbox.length; } else { if(aBadge) aBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      let adminPlanList = document.getElementById("admin-plan-list"); if (adminPlanList) { let planFiltersExist = document.getElementById("plan-filter-start"); if (!planFiltersExist) { let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0)); adminPlanList.innerHTML = `<style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style><div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button><div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;"><input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:2;"><button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button></div><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button></div><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="plan-filter-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="plan-filter-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><div style="position:relative; width:44px; height:36px; flex-shrink:0;"><input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div><button class="btn-green" style="margin:0; border-radius:8px; width:44px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="loadPlanHistory(false)"><span class="material-symbols-rounded" style="font-size:18px; color:white;">search</span></button></div></div><div id="plan-render-area"></div>`; setTimeout(() => loadPlanHistory(true), 100); } else { if (!isSensitiveState()) { loadPlanHistory(true); } } }
+      let adminPlanList = document.getElementById("admin-plan-list"); if (adminPlanList) { let planFiltersExist = document.getElementById("plan-filter-start"); if (!planFiltersExist) { let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0)); adminPlanList.innerHTML = `<style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style><div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button><div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;"><input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button></div><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button></div><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="plan-filter-start" value="${defStart}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="plan-filter-end" value="${defEnd}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:44px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div></div></div><div id="plan-render-area"></div>`; setTimeout(() => loadPlanHistory(true), 100); } else { if (!isSensitiveState()) { loadPlanHistory(true); } } }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
       if (isUserPromoter) { document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); let db = document.getElementById("desc-break"); if(db) db.innerText = "15 мин"; let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "1 час"; let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; if(dash) dash.classList.add("hidden"); } 
@@ -651,8 +598,8 @@ function renderDashboardData(data, isSilent = false) {
 
   myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.type === "Штраф"); myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек"); window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
   let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear; let monthSc = myScHistory.filter(p => p && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
-  let countSc = monthSc.filter(p => p && p.source === "Продажа СЦ/Дефект").length; 
-  let countFocus = monthSc.filter(p => p && p.source !== "Продажа СЦ/Дефект").length; 
+  let countSc = monthSc.filter(p => p && (p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект")).length; 
+  let countFocus = monthSc.filter(p => p && (p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект")).length; 
   let scEl = document.getElementById("info-sc-val"); if(scEl) { scEl.innerText = `${countSc} | ${countFocus}`; if (countSc + countFocus > 0) scEl.style.color = "#27ae60"; else scEl.style.color = "#e74c3c"; }
 
   let hcCard = document.getElementById("hot-check-card");
@@ -685,11 +632,11 @@ function renderDashboardData(data, isSilent = false) {
                   let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
                   let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
                   
-                  let rawName = item.name;
+                  let rawName = item.name || item.cleanName || "";
                   let cleanName = item.cleanName || rawName;
-                  let link = "";
+                  let link = item.link || "";
                   let bracketIdx = rawName.indexOf('[');
-                  if (bracketIdx !== -1) {
+                  if (bracketIdx !== -1 && !link) {
                       let metaStr = rawName.substring(bracketIdx);
                       let urlMatch = metaStr.match(/https?:\/\/[^\s\]]+/);
                       if (urlMatch) link = urlMatch[0];
@@ -994,8 +941,8 @@ function renderAdminEmps(dept, btnElement) {
    let container = document.getElementById("admin-emp-list"); let filtered = allEmployeesData.filter(e => e.dept.toLowerCase().includes(dept.toLowerCase())); let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
    container.innerHTML = filtered.map(e => { 
            let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
-           let curMonthSc = monthScHist.filter(p => p.source === "Продажа СЦ/Дефект" || p.source === "Продажа СЦ/Фокус").length; 
-           let curMonthFocus = monthScHist.filter(p => p.source !== "Продажа СЦ/Дефект" && p.source !== "Продажа СЦ/Фокус").length; 
+           let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
+           let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
            let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
            return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
        }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
@@ -1175,7 +1122,7 @@ function openAdminPlanScDetails() {
 function openEmpScDetails(iin) {
     let emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return; let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-title").innerText = `СЦ | Фокус: ${emp.name}`; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
     let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-    let headerHtml = `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="emp-sc-start" value="${defStart}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="emp-sc-end" value="${defEnd}" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none;"><div style="position:relative; width:36px; height:36px; flex-shrink:0;"><input type="date" onchange="setEmpScDates('single', this.value, '${iin}'); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div><div style="position:relative; width:36px; height:36px; flex-shrink:0;"><input type="month" onchange="setEmpScDates('month', this.value, '${iin}'); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></button></div><button class="btn-green" style="margin:0; border-radius:8px; width:36px; height:36px; flex-shrink:0; display:flex; justify-content:center; align-items:center; padding:0;" onclick="renderEmpScDetailsData('${iin}')"><span class="material-symbols-rounded" style="font-size:18px; color:white;">search</span></button></div></div><div id="emp-sc-render-area"></div>`;
+    let headerHtml = `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="emp-sc-start" value="${defStart}" onchange="renderEmpScDetailsData('${iin}')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="emp-sc-end" value="${defEnd}" onchange="renderEmpScDetailsData('${iin}')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="setEmpScDates('single', this.value, '${iin}'); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="setEmpScDates('month', this.value, '${iin}'); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></button></div></div></div><div id="emp-sc-render-area"></div>`;
     document.getElementById("details-list").innerHTML = headerHtml; renderEmpScDetailsData(iin);
 }
 
