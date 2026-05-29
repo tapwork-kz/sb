@@ -236,12 +236,14 @@ async function callBackend(actionName, payloadData = {}) {
           });
 
           window.dynamicPrefixColors = window.dynamicPrefixColors || {};
+          let adminAllPromoLists = [];
           const allDeptsCols = [
-              {n: 'col_e_cifra_name', k: 'col_f_cifra_kpi', p: 'col_g_cifra_pts'},
-              {n: 'col_h_mbt_name', k: 'col_i_mbt_kpi', p: 'col_j_mbt_pts'},
-              {n: 'col_k_kbt_name', k: 'col_l_kbt_kpi', p: 'col_m_kbt_pts'}
+              {n: 'col_e_cifra_name', k: 'col_f_cifra_kpi', p: 'col_g_cifra_pts', dept: 'Цифра'},
+              {n: 'col_h_mbt_name', k: 'col_i_mbt_kpi', p: 'col_j_mbt_pts', dept: 'МБТ'},
+              {n: 'col_k_kbt_name', k: 'col_l_kbt_kpi', p: 'col_m_kbt_pts', dept: 'КБТ'}
           ];
           allDeptsCols.forEach(cols => {
+              let activeAdminPromoList = null;
               rows.forEach(r => {
                   let btnName = String(r[cols.n] || "").trim();
                   let rawVal = String(r[cols.k] || "").trim();
@@ -251,9 +253,47 @@ async function callBackend(actionName, payloadData = {}) {
                       let prefix = rawVal.indexOf(" ") !== -1 ? rawVal.substring(1, rawVal.indexOf(" ")).trim() : rawVal.substring(1).trim();
                       let listColor = rawPts.indexOf(" ") !== -1 ? rawPts.substring(1, rawPts.indexOf(" ")).trim() : rawPts.substring(1).trim();
                       if (prefix) window.dynamicPrefixColors[prefix] = listColor;
+                      
+                      let defKpi = "0";
+                      if (rawVal.indexOf(" ") !== -1) {
+                          defKpi = rawVal.substring(rawVal.indexOf(" ")).replace('%', '').replace(',', '.').trim();
+                      } else {
+                          defKpi = rawVal.replace('%', '').replace(',', '.').trim();
+                      }
+                      
+                      activeAdminPromoList = { title: btnName.substring(1).trim(), prefix: prefix, defKpi: defKpi, listColor: listColor, items: [], dept: cols.dept };
+                      adminAllPromoLists.push(activeAdminPromoList);
+                  } else if (activeAdminPromoList && btnName && !btnName.includes("*")) {
+                      let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); 
+                      if (!btnVal || btnVal === "0") btnVal = activeAdminPromoList.defKpi; 
+                      let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
+                      
+                      let cleanName = btnName; let count = null; let link = "";
+                      let bracketIdx = btnName.indexOf('[');
+                      if (bracketIdx !== -1) {
+                          cleanName = btnName.substring(0, bracketIdx).trim();
+                          let metaStr = btnName.substring(bracketIdx);
+                          let countMatch = metaStr.match(/\[(\d+),/);
+                          if (countMatch) count = parseInt(countMatch[1]) || 0;
+                          let urlMatch = metaStr.match(/https?:\/\/[^\s\]]+/);
+                          if (urlMatch) link = urlMatch[0];
+                      }
+                      
+                      if (count !== null && allReqs) {
+                          let approvedCount = allReqs.filter(req => 
+                              (req.status === 'approved' || req.status === 'approved_notify_zav') && 
+                              String(req.details).trim() === cleanName &&
+                              (req.type === activeAdminPromoList.prefix || (req.metadata && req.metadata.type === activeAdminPromoList.prefix) || (req.meta && req.meta.includes(`"type":"${activeAdminPromoList.prefix}"`)))
+                          ).length;
+                          count = Math.max(0, count - approvedCount);
+                      }
+                      
+                      if (count !== null && count <= 0) return;
+                      activeAdminPromoList.items.push({ cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts, link: link }); 
                   }
               });
           });
+          window.adminPromoListsGlobal = adminAllPromoLists.filter(l => l.items.length > 0);
 
           let d = String(userData.dept).toLowerCase(); let nameCol, kpiCol, ptsCol;
           if (d.includes("цифра") || d.includes("чт")) { nameCol = 'col_e_cifra_name'; kpiCol = 'col_f_cifra_kpi'; ptsCol = 'col_g_cifra_pts'; }
@@ -948,11 +988,55 @@ function renderAdminScItems(dept, btnElement) {
    if (btnElement) { document.getElementById('flt-cifra').classList.remove('active-flt'); document.getElementById('flt-mbt').classList.remove('active-flt'); document.getElementById('flt-kbt').classList.remove('active-flt'); document.getElementById('flt-focus').classList.remove('active-flt'); btnElement.classList.add('active-flt'); }
    let container = document.getElementById("admin-sc-container"); let searchInput = document.getElementById("admin-sc-search"); let searchQ = searchInput ? searchInput.value.toLowerCase() : ""; container.innerHTML = ""; 
    if (currentAdminScTabType === 'active') { 
-       let filtered = adminScItemsGlobal.filter(i => (dept === "Фокус" ? i.type === "Фокус" : (i.dept === dept && i.type === "СЦ"))); if (searchQ) filtered = filtered.filter(i => i.name.toLowerCase().includes(searchQ)); if (filtered.length === 0) { container.innerHTML = "<p style='text-align:center; color:gray; padding:15px; font-size:12px;'>Пусто</p>"; return; }
-       if (dept === "Фокус") { 
-           let groups = {"Цифра": [], "МБТ": [], "КБТ": []}; filtered.forEach(i => { if(groups[i.dept]) groups[i.dept].push(i); });
-           for (const [dName, items] of Object.entries(groups)) { if (items.length === 0) continue; let headerText = items[0].focusHeader || `${dName} Фокус`; let html = `<div class="inner-block card" style="margin-bottom:8px; padding:8px; background: var(--card-bg);"><div style="font-size:13px; font-weight:bold; color:var(--text-color); margin-bottom:6px;">${headerText}</div>`; items.forEach((i, idx) => { let ptNoun = formatPointsNoun(i.pts); html += `<div class="sc-item" onclick="this.classList.toggle('selected')" style="padding:10px; border-bottom:1px solid rgba(130, 130, 130, 0.35); display:flex; justify-content:space-between; margin-bottom:4px;"><div><div style="font-size:12px; margin-bottom:2px;"><b>${idx+1}.</b> ${i.name}</div><div class="type-label" style="font-size:10px; color:#e74c3c; font-weight:bold;">Фокус — ${String(i.pts).replace('.',',')} ${ptNoun}</div></div></div>`; }); html += `</div>`; container.innerHTML += html; }
+       if (dept === "Фокус") {
+           let promoLists = window.adminPromoListsGlobal || [];
+           if (searchQ) {
+               promoLists = promoLists.map(list => {
+                   return { ...list, items: list.items.filter(item => item.cleanName.toLowerCase().includes(searchQ)) };
+               }).filter(list => list.items.length > 0);
+           }
+           if (promoLists.length === 0) { container.innerHTML = "<p style='text-align:center; color:gray; padding:15px; font-size:12px;'>Пусто</p>"; return; }
+           
+           let promoHtml = "";
+           promoLists.forEach((list, lIdx) => {
+               let headerColor = list.listColor || "var(--text-color)";
+               let deptTag = `<span style="font-size:10px; background:var(--bg-color); border:1px solid var(--border-color); color:var(--desc-color); padding:2px 6px; border-radius:6px; margin-left:8px; vertical-align:middle; font-weight:normal;">${list.dept}</span>`;
+               promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 14px 12px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative;">`;
+               promoHtml += `<div style="font-size:14px; font-weight:bold; color:${headerColor}; margin-bottom: 14px; display:flex; align-items:center;">${list.title} ${deptTag}</div>`;
+               promoHtml += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
+               
+               list.items.forEach((item, iIdx) => {
+                   let ptsVal = parseFloat(String(item.pts || "0").replace(',', '.')); 
+                   let kpiBonus = parseFloat(String(item.val || "0").replace(',', '.')); 
+                   
+                   let badgeHtml = "";
+                   if (item.currentCount !== null || kpiBonus > 0 || ptsVal > 0) { 
+                       badgeHtml = `<div style="position:absolute; top:-8px; right:4px; display:flex; gap:3px; z-index: 5;">`; 
+                       if (item.currentCount !== null) badgeHtml += `<span style="background:#f39c12; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">Ост: ${item.currentCount}</span>`;
+                       if (kpiBonus > 0) badgeHtml += `<span style="background:#3498db; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">+${kpiBonus}%</span>`; 
+                       if (ptsVal > 0) badgeHtml += `<span style="background:#e74c3c; color:white; font-size:10px; font-weight:bold; padding:2px 6px; border-radius:8px; box-shadow: 0 1px 3px rgba(0,0,0,0.15);">+${ptsVal} б.</span>`; 
+                       badgeHtml += `</div>`; 
+                   }
+                   
+                   let bypassLink = item.link ? (item.link + (item.link.includes('?') ? '&' : '?') + 'force_browser_bypass=1#web') : '';
+                   let linkBtn = bypassLink ? `<div onclick="event.stopPropagation(); window.open('${bypassLink}', '_blank');" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; width:22px; height:22px; border-radius:5px; margin-right:8px; flex-shrink:0; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;"><span class="material-symbols-rounded" style="font-size:16px;">open_in_new</span></div>` : '';
+                   
+                   promoHtml += `
+                   <div style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
+                       ${linkBtn}
+                       <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.06)); border-radius:10px; padding:8px 12px; display:flex; align-items:center; min-height:34px; box-sizing:border-box;">
+                           <span style="font-size:13px; font-weight:normal; color:var(--text-color); opacity:0.85; line-height:1.2; text-align:left;">${item.cleanName}</span>
+                       </div>
+                       ${badgeHtml}
+                   </div>`;
+               });
+               promoHtml += `</div></div>`;
+           });
+           container.innerHTML = promoHtml;
        } else { 
+           let filtered = adminScItemsGlobal.filter(i => i.dept === dept && i.type === "СЦ"); 
+           if (searchQ) filtered = filtered.filter(i => i.name.toLowerCase().includes(searchQ)); 
+           if (filtered.length === 0) { container.innerHTML = "<p style='text-align:center; color:gray; padding:15px; font-size:12px;'>Пусто</p>"; return; }
            let html = `<div class="card" style="padding: 6px;">`; filtered.forEach((i, idx) => { let docBtn = i.docUrl ? `<a href="${i.docUrl}" target="_blank" style="text-decoration:none; background:var(--inner-bg); color:var(--text-color); padding:4px 8px; border-radius:8px; display:inline-flex; align-items:center; transition:0.6s;" onclick="event.stopPropagation()"><span class="material-symbols-rounded" style="font-size:20px;">description</span></a>` : ''; html += `<div class="sc-item" onclick="this.classList.toggle('selected')" style="padding:10px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><div><div style="font-size:12px; margin-bottom:2px;"><b>${idx+1}.</b> ${i.name}</div><div class="type-label" style="font-size:10px; color:#e67e22; font-weight:bold;">СЦ${i.discount ? `<span style="color:#e74c3c; margin-left:10px;">-${i.discount.replace(/%/g, '% ')}</span>` : ''}</div></div><div>${docBtn}</div></div>`; }); html += `</div>`; container.innerHTML = html;
        }
    } else { 
