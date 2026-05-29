@@ -762,11 +762,11 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
               let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
               let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12"; 
               let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
-              let roleWord = (v.authorRole || "Продавец").split(" ")[0].toLowerCase();
+              let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
               let roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
               let detailsStr = String(v.details).toLowerCase();
               return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div>`; 
-          }).join(""); 
+          }).join("");
       }
   }
 }
@@ -907,7 +907,7 @@ function renderAdminOuts() {
           let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
           let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
           let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
-          let roleWord = (v.authorRole || "Продавец").split(" ")[0].toLowerCase();
+          let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
           let roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
           let detailsStr = String(v.details).toLowerCase();
           return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div>`; 
