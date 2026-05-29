@@ -649,15 +649,18 @@ function renderDashboardData(data, isSilent = false) {
                       badgeHtml += `</div>`; 
                   }
                   
-                  // Безопасный клик через div и stopPropagation, чтобы Telegram не дублировал открытие
-                  let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) { window.Telegram.WebApp.openLink('${link}'); } else { window.open('${link}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; width:22px; height:22px; border-radius:5px; margin-right:8px; flex-shrink:0; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;"><span class="material-symbols-rounded" style="font-size:16px;">open_in_new</span></div>` : '';
+                  // Добавляем символы, чтобы сбить перехват ссылки нативными приложениями
+                  let bypassLink = link ? (link + (link.includes('?') ? '&' : '?') + 'force_browser_bypass=1#web') : '';
                   
-                  // Текст товара: font-weight:normal и color:#555
+                  // Безопасный клик через div и stopPropagation, чтобы Telegram не дублировал открытие
+                  let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) { window.Telegram.WebApp.openLink('${bypassLink}'); } else { window.open('${bypassLink}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; width:22px; height:22px; border-radius:5px; margin-right:8px; flex-shrink:0; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;"><span class="material-symbols-rounded" style="font-size:16px;">open_in_new</span></div>` : '';
+                  
+                  // Текст товара: используем адаптивный var(--text-color) для совместимости с темной темой
                   promoHtml += `
                   <div id="promo-item-${lIdx}-${iIdx}" style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
                       ${linkBtn}
                       <div style="flex:1; background:var(--inner-bg, rgba(150,150,150,0.06)); border-radius:10px; padding:8px 12px; display:flex; align-items:center; cursor:pointer; min-height:34px; box-sizing:border-box;" onclick="submitPromoCheck('${cleanName}', '${item.val}', '${item.pts || 0}', '${lIdx}', '${iIdx}', '${list.prefix}')">
-                          <span style="font-size:13px; font-weight:normal; color:#555; line-height:1.2; text-align:left;">${cleanName}</span>
+                          <span style="font-size:13px; font-weight:normal; color:var(--text-color); opacity:0.85; line-height:1.2; text-align:left;">${cleanName}</span>
                       </div>
                       ${badgeHtml}
                   </div>`;
