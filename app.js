@@ -1040,10 +1040,48 @@ function renderAdminScItems(dept, btnElement) {
            let html = `<div class="card" style="padding: 6px;">`; filtered.forEach((i, idx) => { let docBtn = i.docUrl ? `<a href="${i.docUrl}" target="_blank" style="text-decoration:none; background:var(--inner-bg); color:var(--text-color); padding:4px 8px; border-radius:8px; display:inline-flex; align-items:center; transition:0.6s;" onclick="event.stopPropagation()"><span class="material-symbols-rounded" style="font-size:20px;">description</span></a>` : ''; html += `<div class="sc-item" onclick="this.classList.toggle('selected')" style="padding:10px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;"><div><div style="font-size:12px; margin-bottom:2px;"><b>${idx+1}.</b> ${i.name}</div><div class="type-label" style="font-size:10px; color:#e67e22; font-weight:bold;">СЦ${i.discount ? `<span style="color:#e74c3c; margin-left:10px;">-${i.discount.replace(/%/g, '% ')}</span>` : ''}</div></div><div>${docBtn}</div></div>`; }); html += `</div>`; container.innerHTML = html;
        }
    } else { 
-       let historyArray = window.adminHistoryGlobal || []; let sold = historyArray.filter(r => r.status === "approved" && r.type === "Продажа СЦ/Дефект");
-       if (dept === "Фокус") { sold = sold.filter(r => { try { let m = JSON.parse(r.meta); return m.type === "Фокус"; } catch(e) { return r.details.toLowerCase().includes("фокус"); } }); } else { sold = sold.filter(r => { try { let m = JSON.parse(r.meta); return m.dept === dept && m.type !== "Фокус"; } catch(e) { return false; } }); }
-       if (searchQ) sold = sold.filter(r => r.details.toLowerCase().includes(searchQ) || r.authorName.toLowerCase().includes(searchQ)); if (sold.length === 0) { container.innerHTML = "<p style='text-align:center; color:gray; padding:15px; font-size:12px;'>Нет проданных товаров</p>"; return; }
-       container.innerHTML = groupAndRenderByMonth(sold, r => { const isFocus = dept === "Фокус"; const tagColor = isFocus ? "#f39c12" : "#3390ec"; let metaObj = {}; try { metaObj = JSON.parse(r.meta); } catch(e){} let displayAct = r.actUrl || metaObj.docUrl || ""; let displayDisc = r.discount || metaObj.discount || "0%"; let rawDetails = String(r.details || ""); let match = rawDetails.match(/\n\[(.*?)\]$/); let approverName = ""; if (match) { approverName = formatShortName(match[1]); rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } let actHtml = displayAct ? `<span style="display:inline-flex; align-items:center; gap:4px; vertical-align:middle;"><span class="material-symbols-rounded" style="font-size:14px; color:#3390ec;">description</span> <a href="${displayAct}" target="_blank" style="color:#3390ec; text-decoration:none; font-weight:bold;" onclick="event.stopPropagation()">Акт товара</a></span>` : (isFocus ? '' : '<span style="color:gray; font-size:10px;">(Акт не прикреплен)</span>'); let approverHtml = approverName ? `<div style="margin-top:6px; font-size:10px; color:gray; text-align:right;">Одобрил: ${approverName}</div>` : ''; return `<div class="inner-block sc-item card" onclick="this.classList.toggle('selected')" style="padding:10px; margin-bottom:8px; border-left: 3px solid ${tagColor}; cursor: pointer; background: var(--card-bg);"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="type-label" style="font-size:9px; font-weight:bold; color:${tagColor};">${isFocus ? 'ФОКУС' : 'СЦ'}</span><span style="font-size:9px; color:gray;">${r.date}</span></div><div style="font-size:12px; font-weight:bold; margin-bottom:4px;">${rawDetails}</div><div style="font-size:11px; line-height:1.6; display:flex; flex-direction:column; gap:2px; margin-bottom:4px;"><div style="display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px; color:gray;">badge</span> <span><span style="color:gray;">Продавец:</span> <b>${r.authorName}</b></span></div>${displayDisc !== "0%" ? `<div style="display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px; color:gray;">sell</span> <span><span style="color:gray;">Скидка:</span> <b style="color:#e74c3c;">${displayDisc}</b></span></div>` : ''}<div>${actHtml}</div></div>${approverHtml}</div>`; });
+       let historyArray = window.adminHistoryGlobal || [];
+       let promoPrefixes = (window.adminPromoListsGlobal || []).map(l => l.prefix);
+       
+       let sold = historyArray.filter(r => {
+           if (r.status !== "approved") return false;
+           if (dept === "Фокус") {
+               // Проверяем, совпадает ли тип запроса с любым из динамических префиксов (Фокус, Слив и т.д.)
+               if (promoPrefixes.includes(r.type)) return true;
+               // Либо проверяем старый системный тип
+               if (r.type === "Продажа СЦ/Дефект" || r.type === "Продажа СЦ/Фокус") {
+                   try { let m = JSON.parse(r.meta); return m.type === "Фокус" || r.details.toLowerCase().includes("фокус"); } catch(e) { return r.details.toLowerCase().includes("фокус"); }
+               }
+               return false;
+           } else {
+               // Для обычных товарных отделов (Цифра, МБТ, КБТ)
+               if (r.type !== "Продажа СЦ/Дефект" && r.type !== "Продажа СЦ/Фокус") return false;
+               try { let m = JSON.parse(r.meta); return m.dept === dept && m.type !== "Фокус"; } catch(e) { return false; }
+           }
+       });
+
+       if (searchQ) sold = sold.filter(r => r.details.toLowerCase().includes(searchQ) || r.authorName.toLowerCase().includes(searchQ)); 
+       if (sold.length === 0) { container.innerHTML = "<p style='text-align:center; color:gray; padding:15px; font-size:12px;'>Нет проданных товаров</p>"; return; }
+       
+       container.innerHTML = groupAndRenderByMonth(sold, r => { 
+           const isFocus = dept === "Фокус"; 
+           const tagColor = isFocus ? "#f39c12" : "#3390ec"; 
+           let metaObj = {}; try { metaObj = JSON.parse(r.meta); } catch(e){} 
+           let displayAct = r.actUrl || metaObj.docUrl || ""; 
+           let displayDisc = r.discount || metaObj.discount || "0%"; 
+           let rawDetails = String(r.details || ""); 
+           let match = rawDetails.match(/\n\[(.*?)\]$/); 
+           let approverName = ""; 
+           if (match) { approverName = formatShortName(match[1]); rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } 
+           if (metaObj.approver) approverName = formatShortName(metaObj.approver);
+           let actHtml = displayAct ? `<span style="display:inline-flex; align-items:center; gap:4px; vertical-align:middle;"><span class="material-symbols-rounded" style="font-size:14px; color:#3390ec;">description</span> <a href="${displayAct}" target="_blank" style="color:#3390ec; text-decoration:none; font-weight:bold;" onclick="event.stopPropagation()">Акт товара</a></span>` : (isFocus ? '' : '<span style="color:gray; font-size:10px;">(Акт не прикреплен)</span>'); 
+           let approverHtml = approverName ? `<div style="margin-top:6px; font-size:10px; color:gray; text-align:right;">Одобрил: ${approverName}</div>` : ''; 
+           
+           // Выводим реальный тип (ФОКУС, СЛИВ и т.д.) вместо заглушки
+           let displayTagText = isFocus ? String(r.type).toUpperCase() : 'СЦ';
+           
+           return `<div class="inner-block sc-item card" onclick="this.classList.toggle('selected')" style="padding:10px; margin-bottom:8px; border-left: 3px solid ${tagColor}; cursor: pointer; background: var(--card-bg);"><div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span class="type-label" style="font-size:9px; font-weight:bold; color:${tagColor};">${displayTagText}</span><span style="font-size:9px; color:gray;">${r.date}</span></div><div style="font-size:12px; font-weight:bold; margin-bottom:4px;">${rawDetails}</div><div style="font-size:11px; line-height:1.6; display:flex; flex-direction:column; gap:2px; margin-bottom:4px;"><div style="display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px; color:gray;">badge</span> <span><span style="color:gray;">Продавец:</span> <b>${r.authorName}</b></span></div>${displayDisc !== "0%" ? `<div style="display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:14px; color:gray;">sell</span> <span><span style="color:gray;">Скидка:</span> <b style="color:#e74c3c;">${displayDisc}</b></span></div>` : ''}<div>${actHtml}</div></div>${approverHtml}</div>`; 
+       });
    }
 }
 
