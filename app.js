@@ -761,8 +761,11 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
           vacContainer.innerHTML = vList.map(v => { 
               let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
               let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12"; 
-              let deptHtml = v.authorDept ? `<div style="font-size:10px; color:gray;">${v.authorDept}</div>` : ''; 
-              return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid var(--border-color);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:12px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="text-align:right; flex-shrink:0;"><div style="font-size:11px; font-weight:bold; margin-bottom:2px;">${v.details}</div><div style="font-size:9px; font-weight:bold; color:${stColor}; background:var(--inner-bg); display:inline-block; padding:2px 6px; border-radius:4px;">${stText}</div></div></div>`; 
+              let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
+              let roleWord = (v.authorRole || "Продавец").split(" ")[0].toLowerCase();
+              let roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
+              let detailsStr = String(v.details).toLowerCase();
+              return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div>`; 
           }).join(""); 
       }
   }
@@ -903,8 +906,11 @@ function renderAdminOuts() {
       vHtml += `<div id="admin-vac-list">` + activeVacations.map(v => {
           let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
           let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
-          let deptHtml = v.authorDept ? `<div style="font-size:10px; color:gray;">${v.authorDept}</div>` : '';
-          return `<div style="display:flex; justify-content:space-between; align-items:center; padding:8px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="flex:1; min-width:0; margin-right:8px;"><div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${v.authorName}</div>${deptHtml}</div><div style="text-align:right; flex-shrink:0;"><div style="font-size:12px; font-weight:bold; margin-bottom:2px;">${v.details}</div><div style="font-size:9px; font-weight:bold; color:${stColor}; background:var(--inner-bg); display:inline-block; padding:2px 6px; border-radius:4px;">${stText}</div></div></div>`;
+          let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
+          let roleWord = (v.authorRole || "Продавец").split(" ")[0].toLowerCase();
+          let roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
+          let detailsStr = String(v.details).toLowerCase();
+          return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div>`; 
       }).join("") + `</div>`;
       vacContainer.innerHTML = vHtml;
   } else if (vacContainer) {
