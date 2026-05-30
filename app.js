@@ -407,12 +407,19 @@ async function callBackend(actionName, payloadData = {}) {
                       else if (rep.title.includes("уборка")) { ptPenalty = rep.errors * ptsCfg.ub; penalty = rep.errors * kpiCfg.ub; } 
                       else if (rep.title.includes("Отзыв")) { ptPenalty = rep.errors * ptsCfg.rev; penalty = rep.errors * kpiCfg.rev; }
                       
-                      if (penalty !== 0) { emp.kpi += penalty; emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: penalty, date: "" }); }
+                      // Передаем правильную дату из БД для КФ. ЭФФ.
+                      if (penalty !== 0) { emp.kpi += penalty; emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: penalty, date: rep.date || "" }); }
+                      
                       if (ptPenalty !== 0) {
-                          // Превращаем вычеты из отчетов в настоящие штрафы для истории баллов
-                          let histItem = { date: formatDateLocal(new Date()), type: "Штраф", source: "Отчет", reason: `${rep.title} (${rep.errors} шт)`, val: ptPenalty, approver: "Система", moneyFine: 0, kpiChange: penalty };
+                          // Берем дату напрямую из отчета (или ставим сегодня, если ее нет)
+                          let rDate = rep.date || formatDateLocal(new Date());
+                          // Если в БД есть описание, берем его, иначе ставим "Отсутствие отчета"
+                          let rReason = rep.desc ? rep.desc : (rep.errors > 1 ? `Отсутствие отчета (${rep.errors} шт)` : "Отсутствие отчета");
+                          
+                          // Формируем красивый элемент для Истории баллов
+                          let histItem = { date: rDate, type: "Штраф", source: rep.title, reason: rReason, val: ptPenalty, approver: "", moneyFine: 0, kpiChange: penalty };
                           emp.ptsHistory.push(histItem);
-                          emp.pts.fin += Math.abs(ptPenalty); // Автоматически добавляем к счетчику штрафов
+                          emp.pts.fin += Math.abs(ptPenalty); 
                       }
                   });
 
