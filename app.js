@@ -243,32 +243,53 @@ async function callBackend(actionName, payloadData = {}) {
       const [ { data: allUsers }, { data: allReqs }, { data: allUserDetails }, { data: kpiDataRaw }, { data: allSheetInfo }, { data: scItemsRaw }, { data: tradeInRaw } ] = await Promise.all([ supabaseClient.from('users').select('iin, full_name, role, dept'), supabaseClient.from('requests').select('*').order('created_at', { ascending: false }), supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }), supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1), supabaseClient.from('user_sheet_info').select('*'), supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1), supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }) ]);
 
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : []; let tradeInList = (tradeInRaw && tradeInRaw.length > 0) ? tradeInRaw.map(item => item.model_name) : [];
-      let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 }; let freshHotChecks = [];
+      
+      // Инициализируем нулями (теперь всё берется СТРОГО из базы)
+      let kpiCfg = { base: 0, rev: 0, revsn: 0, price: 0, ub: 0, bl: 0, pr: 0 }; 
+      let freshHotChecks = [];
+      window.tradeInKpiBonus = 0; 
 
-      window.tradeInKpiBonus = 3; // Значение по умолчанию
       if (kpiDataRaw && kpiDataRaw.length > 0) {
           let rows = kpiDataRaw[0].data || [];
+          let userDeptStr = String(userData.dept).toLowerCase(); // Отдел продавца
+
           rows.forEach(r => {
-              // Умный парсинг процентов: убираем знак %, пробелы и меняем запятую на точку
+              // Умный парсинг вычетов (убираем % и пробелы, меняем запятую на точку)
               let pValStr = String(r.col_d_penalty_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
               let pVal = parseFloat(pValStr);
 
               let kpiName = String(r.col_a_kpi_name || "").toLowerCase();
               let penName = String(r.col_c_penalty_name || "").toLowerCase();
 
-              // Парсим Базовый КФ. ЭФФ. (ищем по корню слова)
+              // Парсим Базовый КФ. ЭФФ.
               if (kpiName.includes('базов')) {
                   let baseValStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
-                  kpiCfg.base = parseFloat(baseValStr);
+                  kpiCfg.base = parseFloat(baseValStr) || 0;
               }
 
-              // Парсим вычеты (штрафы) по ключевым словам
+              // Парсим вычеты (штрафы)
               if (penName.includes('отзыв') && !isNaN(pVal)) kpiCfg.rev = pVal;
               if (penName.includes('ревизи') && !isNaN(pVal)) kpiCfg.revsn = pVal;
               if (penName.includes('ценник') && !isNaN(pVal)) kpiCfg.price = pVal;
               if (penName.includes('уборк') && !isNaN(pVal)) kpiCfg.ub = pVal;
               if ((penName.includes('бл') || penName.includes('больничн')) && !isNaN(pVal)) kpiCfg.bl = pVal;
-              if ((penName.includes('пр.') || penName.includes('прогул')) && !isNaN(pVal)) kpiCfg.pr = pVal;
+              if ((penName.includes('пр') || penName.includes('прогул')) && !isNaN(pVal)) kpiCfg.pr = pVal;
+              
+              // Парсим Trade-In ИМЕННО ДЛЯ ОТДЕЛА сотрудника
+              if (kpiName.includes('trade-in')) {
+                  let tradeInStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
+                  let parsedTradeIn = parseFloat(tradeInStr) || 0;
+                  
+                  if (userDeptStr.includes("мбт") && kpiName.includes("мбт")) {
+                      window.tradeInKpiBonus = parsedTradeIn;
+                  } else if (userDeptStr.includes("кбт") && kpiName.includes("кбт")) {
+                      window.tradeInKpiBonus = parsedTradeIn;
+                  } else if (userDeptStr.includes("цифра") && kpiName.includes("цифра")) {
+                      window.tradeInKpiBonus = parsedTradeIn;
+                  } else if (window.tradeInKpiBonus === 0) {
+                      window.tradeInKpiBonus = parsedTradeIn; // На случай если отдел не совпал, берем первый попавшийся
+                  }
+              }
           });
 
           window.dynamicPrefixColors = window.dynamicPrefixColors || {};
@@ -1140,7 +1161,7 @@ function showToast(msg, isError = false, duration = 3000) { const t = document.g
 async function executeSubmit(type, details, targetIin = null, meta = "", customMsg = null) { vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitRequest', { token: appState.token, type: type, details: details, targetIin: targetIin, metadata: meta }); if(res.success) { showToast(customMsg || "Запрос успешно отправлен!"); closeForm(); loadDashboard(true); } else showToast("Ошибка: " + res.error, true); }
 
 function submitScForm() { if(!selectedScItem) return showToast("Выберите товар из списка", true); let scDateVal = document.getElementById("sc-date").dataset.realdate; let dStr = scDateVal; if(dStr==="Сегодня") { dStr = formatDateLocal(new Date()); } else { let d = new Date(dStr); dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } selectedScItem.date = dStr; executeSubmit("Продажа СЦ/Дефект", selectedScItem.name, null, JSON.stringify(selectedScItem)); }
-function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel, bonus: window.tradeInKpiBonus || 3, pts: 1 }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
+function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel, bonus: window.tradeInKpiBonus, pts: 1 }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
 function submitPoints() { const act = document.getElementById("fp-action").value; const time = document.getElementById("fp-time").value; const dateVal = document.getElementById("fp-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr }); executeSubmit("Баллы мотивации", `${act} на ${time}`, null, meta); }
 function submitFixShift() { const shiftStr = document.getElementById("fs-fix-shift").value; if (!shiftStr) return showToast("Выберите новую смену", true); const dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); executeSubmit("Исправление смены", shiftStr, null, dStr, "Запрос на исправление отправлен"); }
 function submitSwap() { const select = document.getElementById("fs-target"); const targetIin = select.value; if(!targetIin) return showToast("Выберите сменщика", true); const dateVal = document.getElementById("fs-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); const shiftStr = document.getElementById("fs-shift").value; const targetName = select.options[select.selectedIndex].text; const details = `Дата: ${dStr}, Смена: ${shiftStr}`; executeSubmit("Обмен сменами", details, targetIin, "", "Запрос отправлен: " + targetName); }
