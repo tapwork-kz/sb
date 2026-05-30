@@ -1140,45 +1140,16 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && docu
 function openAdminPlanScDetails() {
     let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-title").innerText = "СЦ | Фокус (План)"; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
     let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000;
-    
-    let sales = []; 
-    if (window.adminHistoryGlobal) { 
+    let sales = []; if (window.adminHistoryGlobal) { 
         let promoPrefixes = (window.adminPromoListsGlobal || []).map(l => l.prefix);
         sales = window.adminHistoryGlobal.filter(r => { 
-            let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){}
-            // Берем дату из заявки (metaObj.date), а если её нет - дату создания
-            let targetDateStr = metaObj.date ? metaObj.date : r.date;
-            let rd = parseCustomDate(targetDateStr); 
-            
+            let m = {}; try { m = JSON.parse(r.meta || "{}"); } catch(e){}
+            let dStr = m.date ? m.date : r.date; // Берем дату из заявки для фильтра периода
+            let rd = parseCustomDate(dStr); 
             return rd >= startTime && rd <= endTime && (r.status === 'approved' || r.status === 'approved_notify_zav') && (r.type === 'Продажа СЦ/Дефект' || r.type === 'Продажа СЦ/Фокус' || r.type === 'Продажа Trade-In' || promoPrefixes.includes(r.type)); 
         }); 
     }
-    
-    let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
-    if (sales.length > 0) { 
-        // Сортируем так же по дате
-        sales.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date)); 
-        listHtml += sales.map((i, idx) => { 
-            let srcColor = getSourceColor(i.type); 
-            let sourceText = i.type === 'Продажа Trade-In' ? 'Trade-In' : (i.type === 'Продажа СЦ/Дефект' || i.type === 'Продажа СЦ/Фокус' ? 'СЦ/Дефект' : i.type); 
-            let rawDetails = i.details; 
-            let match = rawDetails.match(/\n\[(.*?)\]$/); 
-            if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } 
-            
-            try { 
-                let m = JSON.parse(i.meta || i.metadata || "{}"); 
-                if (m.type) sourceText = m.type; 
-                // Добавляем красивую бирку с датой продажи в текст деталей
-                if (m.date) rawDetails += `<br><span style="color:gray; font-size:10px; font-weight:normal;">📅 Дата продажи: ${m.date}</span>`; 
-            } catch(e){} 
-            
-            return buildStandardRow({ title: `${idx + 1}. ${rawDetails}`, typeText: sourceText, typeColor: srcColor, dateText: i.date, nameText: i.authorName, hasBorder: false }); 
-        }).join(""); 
-    } else { 
-        listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В этом периоде пусто</div>"; 
-    } 
-    listHtml += "</div>"; 
-    document.getElementById("details-list").innerHTML = listHtml;
+    let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; if (sales.length > 0) { sales.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date)); listHtml += sales.map((i, idx) => { let srcColor = getSourceColor(i.type); let sourceText = i.type === 'Продажа Trade-In' ? 'Trade-In' : (i.type === 'Продажа СЦ/Дефект' || i.type === 'Продажа СЦ/Фокус' ? 'СЦ/Дефект' : i.type); let rawDetails = i.details; let match = rawDetails.match(/\n\[(.*?)\]$/); if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } let displayDate = String(i.date).split(' ')[0]; try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; if (m.date) displayDate = m.date; } catch(e){} return buildStandardRow({ title: `${idx + 1}. ${rawDetails}`, typeText: sourceText, typeColor: srcColor, dateText: displayDate, nameText: i.authorName, hasBorder: false }); }).join(""); } else { listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В этом периоде пусто</div>"; } listHtml += "</div>"; document.getElementById("details-list").innerHTML = listHtml;
 }
 
 function openEmpScDetails(iin) {
