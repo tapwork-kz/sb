@@ -290,7 +290,8 @@ async function callBackend(actionName, payloadData = {}) {
                       activeAdminPromoList = null; 
                       let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
                       let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
-                      allHotChecks.push({ sub: (currentSub ? `${cols.dept} - ${currentSub}` : cols.dept), name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts }); 
+                      // Убрали приставку отдела из названия, но сохранили dept для скрытого фильтра
+                      allHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts, dept: cols.dept }); 
                   } else if (activeAdminPromoList) {
                       let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); 
                       if (!btnVal || btnVal === "0") btnVal = activeAdminPromoList.defKpi; 
@@ -372,12 +373,22 @@ async function callBackend(actionName, payloadData = {}) {
                   if (kpiChange === 0) kpiChange = window.tradeInKpiBonus || 3;
                   if (ptsMotivation === 0) ptsMotivation = 1;
               }
-              
+
               let dynamicType = ud.category || ud.type;
               let cleanActionText = ud.action_text || "";
-              // Удаляем приставку типа из начала строки, если она там присутствует
               if (dynamicType && cleanActionText.startsWith(dynamicType + " ")) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
+              }
+
+              // Ищем исходную заявку, чтобы вытащить пользовательскую дату
+              if (allReqs) {
+                  let reqMatch = allReqs.find(r => r.author_iin === ud.iin && r.details && String(r.details).includes(cleanActionText));
+                  if (reqMatch) {
+                      try {
+                          let m = typeof reqMatch.metadata === 'string' ? JSON.parse(reqMatch.metadata) : (reqMatch.metadata || {});
+                          if (m.date) dateStr = m.date; // Заменяем дату на ту, что была выбрана при продаже
+                      } catch(e) {}
+                  }
               }
 
               if (ptsMotivation !== 0 || ud.type === "Штраф") {
