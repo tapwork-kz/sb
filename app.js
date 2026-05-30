@@ -249,16 +249,26 @@ async function callBackend(actionName, payloadData = {}) {
       if (kpiDataRaw && kpiDataRaw.length > 0) {
           let rows = kpiDataRaw[0].data || [];
           rows.forEach(r => {
-              let pVal = parseFloat(String(r.col_d_penalty_val).replace(',', '.'));
-              if (r.col_a_kpi_name === 'Базовы') kpiCfg.base = parseFloat(String(r.col_b_kpi_val).replace(',', '.')) || 80;
-              if (r.col_c_penalty_name === 'Отзыв') kpiCfg.rev = pVal || -5;
-              if (r.col_c_penalty_name === 'Ревизия') kpiCfg.revsn = pVal || -5;
-              if (r.col_c_penalty_name === 'Проверка ценников') kpiCfg.price = pVal || -4;
-              if (r.col_c_penalty_name === 'Ген. уборка') kpiCfg.ub = pVal || -7;
-              if (r.col_c_penalty_name && r.col_c_penalty_name.includes('БЛ')) kpiCfg.bl = pVal || -1;
-              if (r.col_c_penalty_name && r.col_c_penalty_name.includes('ПР')) kpiCfg.pr = pVal || -10;
-              // Подхватываем KPI для Trade-In из БД
-              if (String(r.col_a_kpi_name).includes('Trade-In')) window.tradeInKpiBonus = parseFloat(String(r.col_b_kpi_val || "3").replace(',', '.')) || 3;
+              // Умный парсинг процентов: убираем знак %, пробелы и меняем запятую на точку
+              let pValStr = String(r.col_d_penalty_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
+              let pVal = parseFloat(pValStr);
+
+              let kpiName = String(r.col_a_kpi_name || "").toLowerCase();
+              let penName = String(r.col_c_penalty_name || "").toLowerCase();
+
+              // Парсим Базовый КФ. ЭФФ. (ищем по корню слова)
+              if (kpiName.includes('базов')) {
+                  let baseValStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
+                  kpiCfg.base = parseFloat(baseValStr);
+              }
+
+              // Парсим вычеты (штрафы) по ключевым словам
+              if (penName.includes('отзыв') && !isNaN(pVal)) kpiCfg.rev = pVal;
+              if (penName.includes('ревизи') && !isNaN(pVal)) kpiCfg.revsn = pVal;
+              if (penName.includes('ценник') && !isNaN(pVal)) kpiCfg.price = pVal;
+              if (penName.includes('уборк') && !isNaN(pVal)) kpiCfg.ub = pVal;
+              if ((penName.includes('бл') || penName.includes('больничн')) && !isNaN(pVal)) kpiCfg.bl = pVal;
+              if ((penName.includes('пр.') || penName.includes('прогул')) && !isNaN(pVal)) kpiCfg.pr = pVal;
           });
 
           window.dynamicPrefixColors = window.dynamicPrefixColors || {};
