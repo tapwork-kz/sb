@@ -42,9 +42,10 @@ function renderPlanUI(pData) {
     let scCount = 0; let focusCount = 0;
     if (window.adminHistoryGlobal) { 
         let promoPrefixes = (window.adminPromoListsGlobal || []).map(l => l.prefix);
-        let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; 
-        let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; 
-        let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000; 
+        let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; 
+        let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; 
+        let sP = startD.split('-'); let startTime = new Date(sP[0], sP[1]-1, sP[2], 0, 0, 0).getTime(); 
+        let eP = endD.split('-'); let endTime = new Date(eP[0], eP[1]-1, eP[2], 23, 59, 59).getTime();
         
         window.adminHistoryGlobal.forEach(r => { 
             let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){}
@@ -771,7 +772,9 @@ function renderDashboardData(data, isSilent = false) {
   let uHistory = data.userHistory || []; uHistory = uHistory.filter(r => !(r.type === "Запрос на штраф" && r.targetIin === appState.iin)); let uHistList = document.getElementById("user-history-list");
   if (uHistList) {
       if (!document.getElementById("user-hist-panel")) { let panelDiv = document.createElement("div"); panelDiv.id = "user-hist-panel"; panelDiv.innerHTML = generateDatePanelHTML('user-hist', 'window.triggerUserHistReload'); uHistList.parentNode.insertBefore(panelDiv, uHistList); window.triggerUserHistReload = function(type, val) { if(type) setPanelDates(type, val, 'user-hist', () => { let dStr = localStorage.getItem("dashData_" + appState.iin); if(dStr) renderDashboardData(JSON.parse(dStr), true); }); }; }
-      let usD = document.getElementById("user-hist-start").value; let ueD = document.getElementById("user-hist-end").value; let usTime = new Date(usD).getTime(); let ueTime = new Date(ueD).getTime() + 86400000;
+      let usD = document.getElementById("user-hist-start").value; let ueD = document.getElementById("user-hist-end").value; 
+      let sP = usD.split('-'); let usTime = new Date(sP[0], sP[1]-1, sP[2], 0, 0, 0).getTime(); 
+      let eP = ueD.split('-'); let ueTime = new Date(eP[0], eP[1]-1, eP[2], 23, 59, 59).getTime();
       let filteredUHistory = uHistory.filter(r => { let rd = parseCustomDate(r.date); return rd >= usTime && rd <= ueTime; });
       uHistList.innerHTML = groupAndRenderByMonth(filteredUHistory, r => {
           let stText = "Просмотрен"; let stColor = "#95a5a6"; if (r.status.includes("approved")) { stText = "Одобрен"; stColor = "#27ae60"; } else if (r.status.includes("rejected")) { stText = "Отклонен"; stColor = "#e74c3c"; } if (r.type === "Исправление смены") { if (r.status.includes("approved")) stText = "Исправлен"; else if (r.status.includes("rejected")) stText = "Отклонен"; }
@@ -894,7 +897,9 @@ let currentHistFilter = 'all';
 function renderAdminHistory(filterType) {
   if(filterType) currentHistFilter = filterType; ['all', 'sales', 'pts', 'viol'].forEach(f => { let el = document.getElementById('flt-hist-' + f); if(el) el.classList.remove('active-flt'); }); let activeEl = document.getElementById('flt-hist-' + currentHistFilter); if(activeEl) activeEl.classList.add('active-flt');
   let listContainer = document.getElementById("admin-history-list"); if (!document.getElementById("admin-hist-panel")) { let panelDiv = document.createElement("div"); panelDiv.id = "admin-hist-panel"; panelDiv.innerHTML = generateDatePanelHTML('admin-hist', 'window.triggerAdminHistReload'); listContainer.parentNode.insertBefore(panelDiv, listContainer); window.triggerAdminHistReload = function(type, val) { if(type) setPanelDates(type, val, 'admin-hist', () => renderAdminHistory(currentHistFilter)); else renderAdminHistory(currentHistFilter); }; }
-  let startD = document.getElementById("admin-hist-start").value; let endD = document.getElementById("admin-hist-end").value; let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000;
+  let startD = document.getElementById("admin-hist-start").value; let endD = document.getElementById("admin-hist-end").value; 
+  let sP = startD.split('-'); let startTime = new Date(sP[0], sP[1]-1, sP[2], 0, 0, 0).getTime(); 
+  let eP = endD.split('-'); let endTime = new Date(eP[0], eP[1]-1, eP[2], 23, 59, 59).getTime();
   let aHist = window.adminHistoryGlobal || []; aHist = aHist.filter(r => { let rd = parseCustomDate(r.date); return rd >= startTime && rd <= endTime; });
   if (currentHistFilter === 'sales') { aHist = aHist.filter(r => ["Продажа СЦ/Дефект", "Продажа Trade-In", "Горячий чек"].includes(r.type)); } else if (currentHistFilter === 'pts') { aHist = aHist.filter(r => r.type === "Баллы мотивации"); } else if (currentHistFilter === 'viol') { aHist = aHist.filter(r => r.type === "Замечание" || r.type === "Штраф" || r.type === "Запрос на штраф"); }
   listContainer.innerHTML = groupAndRenderByMonth(aHist, r => {
@@ -1146,7 +1151,9 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && docu
 
 function openAdminPlanScDetails() {
     let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-title").innerText = "СЦ | Фокус (План)"; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
-    let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000;
+    let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; 
+    let sP = startD.split('-'); let startTime = new Date(sP[0], sP[1]-1, sP[2], 0, 0, 0).getTime(); 
+    let eP = endD.split('-'); let endTime = new Date(eP[0], eP[1]-1, eP[2], 23, 59, 59).getTime();
     
     let sales = []; 
     if (window.adminHistoryGlobal) { 
@@ -1205,7 +1212,9 @@ function setEmpScDates(type, val, iin) { let endD = new Date(); let startD = new
 
 function renderEmpScDetailsData(iin) {
     let emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return;
-    let startD = document.getElementById("emp-sc-start").value; let endD = document.getElementById("emp-sc-end").value; let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000;
+    let startD = document.getElementById("emp-sc-start").value; let endD = document.getElementById("emp-sc-end").value; 
+    let sP = startD.split('-'); let startTime = new Date(sP[0], sP[1]-1, sP[2], 0, 0, 0).getTime(); 
+    let eP = endD.split('-'); let endTime = new Date(eP[0], eP[1]-1, eP[2], 23, 59, 59).getTime();
     let sales = emp.ptsHistory.filter(p => { if (p.type !== "Начисление") return false; let s = String(p.source).toLowerCase(); if (!(s.includes("сц") || s.includes("фокус") || s.includes("trade-in"))) return false; let rd = parseCustomDate(p.date); return rd >= startTime && rd <= endTime; });
     let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>";
     if (sales.length > 0) { listHtml += groupAndRenderByMonth(sales, i => { let rawDetails = i.reason || ""; let match = rawDetails.match(/\n\[(.*?)\]$/); if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } return buildStandardRow({ title: rawDetails, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, nameText: emp.name, hasBorder: false }); }); } else { listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; }
