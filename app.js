@@ -196,7 +196,7 @@ async function callBackend(actionName, payloadData = {}) {
                       let earnSourceType = (reqType === "Продажа Trade-In") ? "Trade-In" : (metaObj.type || reqType); 
                       let pts = (reqType === "Продажа Trade-In") ? 1 : (parseFloat(metaObj.pts) || 0); 
                       // Берем реальный процент из меты, а не захардкоженные 3%
-                      let bonus = metaObj.bonus ? parseFloat(metaObj.bonus) : (reqType === "Продажа СЦ/Дефект" ? 3 : 0);
+                      let bonus = metaObj.bonus ? parseFloat(metaObj.bonus) : ((reqType === "Продажа СЦ/Дефект" || reqType === "Продажа Trade-In") ? 3 : 0);
                       
                       await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: bonus, manager_iin: appState.iin }]); 
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
@@ -237,6 +237,7 @@ async function callBackend(actionName, payloadData = {}) {
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : []; let tradeInList = (tradeInRaw && tradeInRaw.length > 0) ? tradeInRaw.map(item => item.model_name) : [];
       let kpiCfg = { base: 80, rev: -5, revsn: -5, price: -4, ub: -7, bl: -1, pr: -10 }; let freshHotChecks = [];
 
+      window.tradeInKpiBonus = 3; // Значение по умолчанию
       if (kpiDataRaw && kpiDataRaw.length > 0) {
           let rows = kpiDataRaw[0].data || [];
           rows.forEach(r => {
@@ -248,6 +249,8 @@ async function callBackend(actionName, payloadData = {}) {
               if (r.col_c_penalty_name === 'Ген. уборка') kpiCfg.ub = pVal || -7;
               if (r.col_c_penalty_name && r.col_c_penalty_name.includes('БЛ')) kpiCfg.bl = pVal || -1;
               if (r.col_c_penalty_name && r.col_c_penalty_name.includes('ПР')) kpiCfg.pr = pVal || -10;
+              // Подхватываем KPI для Trade-In из БД
+              if (String(r.col_a_kpi_name).includes('Trade-In')) window.tradeInKpiBonus = parseFloat(String(r.col_b_kpi_val || "3").replace(',', '.')) || 3;
           });
 
           window.dynamicPrefixColors = window.dynamicPrefixColors || {};
@@ -322,8 +325,16 @@ async function callBackend(actionName, payloadData = {}) {
           });
           
           window.adminPromoListsGlobal = adminAllPromoLists.filter(l => l.items.length > 0);
-          localData.promoLists = window.adminPromoListsGlobal;
-          localData.hotChecks = allHotChecks;
+          
+          // Определяем отдел текущего пользователя
+          let dStr = String(userData.dept).toLowerCase(); 
+          let myDept = 'Цифра';
+          if (dStr.includes("мбт")) myDept = 'МБТ';
+          else if (dStr.includes("кбт")) myDept = 'КБТ';
+
+          // Фильтруем данные: продавцу только его отдел, админ потом берет из window.adminPromoListsGlobal
+          localData.promoLists = window.adminPromoListsGlobal.filter(l => l.dept === myDept);
+          localData.hotChecks = allHotChecks.filter(hc => hc.dept === myDept || hc.sub.includes(myDept));
       }
 
       let userMap = {}; let adminEmployees = []; let empMap = {};
@@ -355,6 +366,12 @@ async function callBackend(actionName, payloadData = {}) {
           allUserDetails.forEach(ud => {
               let d = new Date(ud.created_at); let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
               let ptsMotivation = parseFloat(ud.points_motivation) || 0; let kpiChange = parseFloat(ud.kpi_change) || 0; let managerName = ud.manager_iin ? (userMap[ud.manager_iin]?.full_name || ud.manager_iin) : "";
+              
+              // Ретроактивно чиним прошлые записи Trade-In (если в БД они лежат с 0%)
+              if (ud.type === "Продажа Trade-In") {
+                  if (kpiChange === 0) kpiChange = window.tradeInKpiBonus || 3;
+                  if (ptsMotivation === 0) ptsMotivation = 1;
+              }
               
               let dynamicType = ud.category || ud.type;
               let cleanActionText = ud.action_text || "";
@@ -395,8 +412,12 @@ async function callBackend(actionName, payloadData = {}) {
       if (allReqs) {
           allReqs.forEach(r => {
               let author = userMap[r.author_iin] || {}; let target = userMap[r.target_iin] || {}; let d = new Date(r.created_at); let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
-              let reqObj = { id: r.id, date: dateStr, authorIin: r.author_iin, authorName: author.full_name || r.author_iin, authorRole: author.role || "Продавец", authorDept: author.dept || "", adminDisplayName: author.dept ? `${author.full_name} — ${author.dept}` : author.full_name, type: r.type, details: r.details, targetIin: r.target_iin, targetName: target.full_name || "", status: r.status === 'pending' ? 'pending_admin' : r.status, meta: r.metadata ? JSON.stringify(r.metadata) : "{}" };
-              let isDismissedByMe = false; try { let m = r.metadata || {}; if (m.dismissedBy && m.dismissedBy.includes(appState.iin)) isDismissedByMe = true; } catch(e) {}
+              let metaObj = {}; try { metaObj = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {}); } catch(e) {}
+              // Если в заявке есть выбранная дата - показываем ее, иначе дату создания
+              let finalDateStr = metaObj.date ? metaObj.date : dateStr;
+              
+              let reqObj = { id: r.id, date: finalDateStr, authorIin: r.author_iin, authorName: author.full_name || r.author_iin, authorRole: author.role || "Продавец", authorDept: author.dept || "", adminDisplayName: author.dept ? `${author.full_name} — ${author.dept}` : author.full_name, type: r.type, details: r.details, targetIin: r.target_iin, targetName: target.full_name || "", status: r.status === 'pending' ? 'pending_admin' : r.status, meta: r.metadata ? JSON.stringify(r.metadata) : "{}" };
+              let isDismissedByMe = false; try { if (metaObj.dismissedBy && metaObj.dismissedBy.includes(appState.iin)) isDismissedByMe = true; } catch(e) {}
               if (reqObj.type === "Отпуск" && !["rejected", "rejected_by_user", "rejected_notify_user", "rejected_notify_zav"].includes(reqObj.status)) { globalVacations.push(reqObj); }
               if (r.type === "Замечание" && (r.status === "approved" || r.status === "pending_user_reply" || r.status === "pending_admin_view_remark")) { if (empMap[r.target_iin]) empMap[r.target_iin].remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr }); if (r.target_iin === appState.iin) { if (!localData.info.remarks) localData.info.remarks = []; localData.info.remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr }); } }
               if (isDir) { if (reqObj.status === "pending_admin" || reqObj.status === "pending_admin_view") adminInbox.push(reqObj); if (reqObj.status === "pending_admin_view_remark" && !isDismissedByMe) adminInbox.push(reqObj); if (reqObj.type === "Замечание" && reqObj.status === "pending_user_reply" && reqObj.authorIin !== appState.iin && !isDismissedByMe) adminInbox.push(reqObj); if (["approved", "rejected", "viewed", "rejected_by_user", "rejected_notify_user", "approved_notify_zav", "rejected_notify_zav"].includes(reqObj.status) || isDismissedByMe) { if (adminHistory.length < 200) adminHistory.push(reqObj); } }
@@ -1087,7 +1108,7 @@ function showToast(msg, isError = false, duration = 3000) { const t = document.g
 async function executeSubmit(type, details, targetIin = null, meta = "", customMsg = null) { vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitRequest', { token: appState.token, type: type, details: details, targetIin: targetIin, metadata: meta }); if(res.success) { showToast(customMsg || "Запрос успешно отправлен!"); closeForm(); loadDashboard(true); } else showToast("Ошибка: " + res.error, true); }
 
 function submitScForm() { if(!selectedScItem) return showToast("Выберите товар из списка", true); let scDateVal = document.getElementById("sc-date").dataset.realdate; let dStr = scDateVal; if(dStr==="Сегодня") { dStr = formatDateLocal(new Date()); } else { let d = new Date(dStr); dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } selectedScItem.date = dStr; executeSubmit("Продажа СЦ/Дефект", selectedScItem.name, null, JSON.stringify(selectedScItem)); }
-function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
+function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel, bonus: window.tradeInKpiBonus || 3, pts: 1 }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
 function submitPoints() { const act = document.getElementById("fp-action").value; const time = document.getElementById("fp-time").value; const dateVal = document.getElementById("fp-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr }); executeSubmit("Баллы мотивации", `${act} на ${time}`, null, meta); }
 function submitFixShift() { const shiftStr = document.getElementById("fs-fix-shift").value; if (!shiftStr) return showToast("Выберите новую смену", true); const dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); executeSubmit("Исправление смены", shiftStr, null, dStr, "Запрос на исправление отправлен"); }
 function submitSwap() { const select = document.getElementById("fs-target"); const targetIin = select.value; if(!targetIin) return showToast("Выберите сменщика", true); const dateVal = document.getElementById("fs-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); const shiftStr = document.getElementById("fs-shift").value; const targetName = select.options[select.selectedIndex].text; const details = `Дата: ${dStr}, Смена: ${shiftStr}`; executeSubmit("Обмен сменами", details, targetIin, "", "Запрос отправлен: " + targetName); }
