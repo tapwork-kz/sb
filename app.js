@@ -202,9 +202,9 @@ async function callBackend(actionName, payloadData = {}) {
                   else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Продажа СЦ/Дефект" || reqType === "Продажа Trade-In" || metaObj.type || reqType === metaObj.type) { 
                       let earnSourceType = (reqType === "Продажа Trade-In") ? "Trade-In" : (metaObj.type || reqType); 
-                      let pts = (reqType === "Продажа Trade-In") ? 1 : (parseFloat(metaObj.pts) || 0); 
-                      // Берем реальный процент из меты, а не захардкоженные 3%
-                      let bonus = metaObj.bonus ? parseFloat(metaObj.bonus) : ((reqType === "Продажа СЦ/Дефект" || reqType === "Продажа Trade-In") ? 3 : 0);
+                      // Берем точные значения баллов и KPI из сформированной заявки (или БД)
+                      let pts = parseFloat(metaObj.pts) || 0; 
+                      let bonus = parseFloat(metaObj.bonus) || 0;
                       
                       await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: bonus, manager_iin: appState.iin }]); 
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
@@ -246,49 +246,60 @@ async function callBackend(actionName, payloadData = {}) {
       
       // Инициализируем нулями (теперь всё берется СТРОГО из базы)
       let kpiCfg = { base: 0, rev: 0, revsn: 0, price: 0, ub: 0, bl: 0, pr: 0 }; 
+      let ptsCfg = { rev: 0, revsn: 0, price: 0, ub: 0 };
       let freshHotChecks = [];
-      window.tradeInKpiBonus = 0; 
+      window.tradeInKpiBonus = 0; window.tradeInPtsBonus = 0;
+      window.scKpiBonus = 0; window.scPtsBonus = 0;
 
       if (kpiDataRaw && kpiDataRaw.length > 0) {
           let rows = kpiDataRaw[0].data || [];
           let userDeptStr = String(userData.dept).toLowerCase(); // Отдел продавца
 
           rows.forEach(r => {
-              // Умный парсинг вычетов (убираем % и пробелы, меняем запятую на точку)
+              // Парсим проценты вычетов
               let pValStr = String(r.col_d_penalty_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
-              let pVal = parseFloat(pValStr);
+              let pVal = parseFloat(pValStr) || 0;
 
-              let kpiName = String(r.col_a_kpi_name || "").toLowerCase();
-              let penName = String(r.col_c_penalty_name || "").toLowerCase();
+              let kpiNameRaw = String(r.col_a_kpi_name || "");
+              let penNameRaw = String(r.col_c_penalty_name || "");
+              let kpiName = kpiNameRaw.toLowerCase();
+              let penName = penNameRaw.toLowerCase();
 
-              // Парсим Базовый КФ. ЭФФ.
+              // Функция для извлечения баллов из квадратных скобок [x]
+              const extractPts = (str) => { let m = str.match(/\[(.*?)]/); return m ? (parseFloat(m[1].replace(',', '.')) || 0) : null; };
+              let penPts = extractPts(penNameRaw);
+              let kpiPts = extractPts(kpiNameRaw);
+
               if (kpiName.includes('базов')) {
                   let baseValStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
                   kpiCfg.base = parseFloat(baseValStr) || 0;
               }
 
-              // Парсим вычеты (штрафы)
-              if (penName.includes('отзыв') && !isNaN(pVal)) kpiCfg.rev = pVal;
-              if (penName.includes('ревизи') && !isNaN(pVal)) kpiCfg.revsn = pVal;
-              if (penName.includes('ценник') && !isNaN(pVal)) kpiCfg.price = pVal;
-              if (penName.includes('уборк') && !isNaN(pVal)) kpiCfg.ub = pVal;
-              if ((penName.includes('бл') || penName.includes('больничн')) && !isNaN(pVal)) kpiCfg.bl = pVal;
-              if ((penName.includes('пр') || penName.includes('прогул')) && !isNaN(pVal)) kpiCfg.pr = pVal;
-              
-              // Парсим Trade-In ИМЕННО ДЛЯ ОТДЕЛА сотрудника
-              if (kpiName.includes('trade-in')) {
-                  let tradeInStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
-                  let parsedTradeIn = parseFloat(tradeInStr) || 0;
-                  
-                  if (userDeptStr.includes("мбт") && kpiName.includes("мбт")) {
-                      window.tradeInKpiBonus = parsedTradeIn;
-                  } else if (userDeptStr.includes("кбт") && kpiName.includes("кбт")) {
-                      window.tradeInKpiBonus = parsedTradeIn;
-                  } else if (userDeptStr.includes("цифра") && kpiName.includes("цифра")) {
-                      window.tradeInKpiBonus = parsedTradeIn;
-                  } else if (window.tradeInKpiBonus === 0) {
-                      window.tradeInKpiBonus = parsedTradeIn; // На случай если отдел не совпал, берем первый попавшийся
-                  }
+              // Присваиваем проценты и БАЛЛЫ штрафов
+              if (penName.includes('отзыв')) { kpiCfg.rev = pVal; if (penPts !== null) ptsCfg.rev = penPts; }
+              if (penName.includes('ревизи')) { kpiCfg.revsn = pVal; if (penPts !== null) ptsCfg.revsn = penPts; }
+              if (penName.includes('ценник')) { kpiCfg.price = pVal; if (penPts !== null) ptsCfg.price = penPts; }
+              if (penName.includes('уборк')) { kpiCfg.ub = pVal; if (penPts !== null) ptsCfg.ub = penPts; }
+              if (penName.includes('бл') || penName.includes('больничн')) kpiCfg.bl = pVal;
+              if (penName.includes('пр') || penName.includes('прогул')) kpiCfg.pr = pVal;
+
+              // Проверяем принадлежность к отделу
+              let deptMatched = false;
+              if (userDeptStr.includes("мбт") && kpiName.includes("мбт")) deptMatched = true;
+              else if (userDeptStr.includes("кбт") && kpiName.includes("кбт")) deptMatched = true;
+              else if (userDeptStr.includes("цифра") && kpiName.includes("цифра")) deptMatched = true;
+
+              // Парсим проценты и БАЛЛЫ для Trade-In ИМЕННО ДЛЯ ОТДЕЛА сотрудника
+              if (kpiName.includes('trade-in') && (deptMatched || window.tradeInKpiBonus === 0)) {
+                  let valStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
+                  window.tradeInKpiBonus = parseFloat(valStr) || 0;
+                  if (kpiPts !== null) window.tradeInPtsBonus = kpiPts;
+              }
+              // То же самое для СЦ/Дефект
+              if (kpiName.includes('сц/дефект') && (deptMatched || window.scKpiBonus === 0)) {
+                  let valStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
+                  window.scKpiBonus = parseFloat(valStr) || 0;
+                  if (kpiPts !== null) window.scPtsBonus = kpiPts;
               }
           });
 
@@ -382,15 +393,29 @@ async function callBackend(actionName, payloadData = {}) {
           allUsers.forEach(u => {
               userMap[u.iin] = u; let sInfo = (allSheetInfo || []).find(s => String(s.iin) === String(u.iin)) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
               let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
-              sInfo.reports_data.forEach(rep => {
-                  repErrors += rep.errors; directPenaltyPoints += (rep.penaltySum || 0); let penalty = 0;
-                  if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) penalty = rep.errors * kpiCfg.price; else if (rep.title.includes("Ревизия")) penalty = rep.errors * kpiCfg.revsn; else if (rep.title.includes("уборка")) penalty = rep.errors * kpiCfg.ub; else if (rep.title.includes("Отзыв")) penalty = rep.errors * kpiCfg.rev;
-                  if (penalty !== 0) { kpiVal += penalty; kDetails.push({ name: "Ошибки", source: rep.title, val: penalty, date: "" }); }
-              });
               let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0; let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0; let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
+              
               if (u.role.toLowerCase().includes("продавец")) {
-                  let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: u.role || 'Продавец', kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: repErrors, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: directPenaltyPoints };
+                  let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: u.role || 'Продавец', kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
+                  
+                  sInfo.reports_data.forEach(rep => {
+                      emp.reportErrors += rep.errors; 
+                      let ptPenalty = 0; let penalty = 0;
+                      if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenalty = rep.errors * ptsCfg.price; penalty = rep.errors * kpiCfg.price; } 
+                      else if (rep.title.includes("Ревизия")) { ptPenalty = rep.errors * ptsCfg.revsn; penalty = rep.errors * kpiCfg.revsn; } 
+                      else if (rep.title.includes("уборка")) { ptPenalty = rep.errors * ptsCfg.ub; penalty = rep.errors * kpiCfg.ub; } 
+                      else if (rep.title.includes("Отзыв")) { ptPenalty = rep.errors * ptsCfg.rev; penalty = rep.errors * kpiCfg.rev; }
+                      
+                      if (penalty !== 0) { emp.kpi += penalty; emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: penalty, date: "" }); }
+                      if (ptPenalty !== 0) {
+                          // Превращаем вычеты из отчетов в настоящие штрафы для истории баллов
+                          let histItem = { date: formatDateLocal(new Date()), type: "Штраф", source: "Отчет", reason: `${rep.title} (${rep.errors} шт)`, val: ptPenalty, approver: "Система", moneyFine: 0, kpiChange: penalty };
+                          emp.ptsHistory.push(histItem);
+                          emp.pts.fin += Math.abs(ptPenalty); // Автоматически добавляем к счетчику штрафов
+                      }
+                  });
+
                   adminEmployees.push(emp); empMap[u.iin] = emp;
               }
           });
@@ -402,6 +427,7 @@ async function callBackend(actionName, payloadData = {}) {
       else { localData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] }; }
 
       let myPtsHistory = []; let myKpiChanges = 0;
+      if (myEmp) { myPtsHistory = myPtsHistory.concat(myEmp.ptsHistory); }
       if (allUserDetails) {
           allUserDetails.forEach(ud => {
               let d = new Date(ud.created_at); let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
@@ -450,9 +476,11 @@ async function callBackend(actionName, payloadData = {}) {
           });
       }
 
-      adminEmployees.forEach(e => { e.pts.rem = e.pts.acc - e.pts.use - e.pts.fin + e.directPenaltyPoints; });
-      let myAcc=0, myUse=0, myFin=0; myPtsHistory.forEach(h => { let pts = parseFloat(String(h.val).replace('+','').replace(',','.')) || 0; if (h.type === "Начисление") myAcc += pts; if (h.type === "Использование") myUse += Math.abs(pts); if (h.type === "Штраф") myFin += Math.abs(pts); });
-      localData.info.myPtsHistory = myPtsHistory; localData.info.ptsAccrued = myAcc; localData.info.ptsUsed = myUse; localData.info.ptsFine = myFin + Math.abs(localData.info.directPenaltyPoints || 0); localData.info.ptsLeft = myAcc - myUse - myFin + (localData.info.directPenaltyPoints || 0);
+      adminEmployees.forEach(e => { e.pts.rem = e.pts.acc - e.pts.use - e.pts.fin; });
+      let myAcc=0, myUse=0, myFin=0; 
+      myPtsHistory.forEach(h => { let pts = parseFloat(String(h.val).replace('+','').replace(',','.')) || 0; if (h.type === "Начисление") myAcc += pts; if (h.type === "Использование") myUse += Math.abs(pts); if (h.type === "Штраф") myFin += Math.abs(pts); });
+      myPtsHistory.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+      localData.info.myPtsHistory = myPtsHistory; localData.info.ptsAccrued = myAcc; localData.info.ptsUsed = myUse; localData.info.ptsFine = myFin; localData.info.ptsLeft = myAcc - myUse - myFin;
       if (!isNaN(localData.info.kpiValue)) localData.info.kpiValue = parseFloat(localData.info.kpiValue) + myKpiChanges;
 
       let userInbox = [], userHistory = [], adminInbox = [], adminHistory = [], globalVacations = [];
@@ -1160,8 +1188,8 @@ function openScDoc() { if (selectedScItem && selectedScItem.docUrl) { if (tg && 
 function showToast(msg, isError = false, duration = 3000) { const t = document.getElementById("toast"); t.innerText = msg; t.style.background = isError ? "#e74c3c" : "#34495e"; t.classList.add("show"); if (duration !== 9999) setTimeout(() => t.classList.remove("show"), duration); }
 async function executeSubmit(type, details, targetIin = null, meta = "", customMsg = null) { vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitRequest', { token: appState.token, type: type, details: details, targetIin: targetIin, metadata: meta }); if(res.success) { showToast(customMsg || "Запрос успешно отправлен!"); closeForm(); loadDashboard(true); } else showToast("Ошибка: " + res.error, true); }
 
-function submitScForm() { if(!selectedScItem) return showToast("Выберите товар из списка", true); let scDateVal = document.getElementById("sc-date").dataset.realdate; let dStr = scDateVal; if(dStr==="Сегодня") { dStr = formatDateLocal(new Date()); } else { let d = new Date(dStr); dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } selectedScItem.date = dStr; executeSubmit("Продажа СЦ/Дефект", selectedScItem.name, null, JSON.stringify(selectedScItem)); }
-function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel, bonus: window.tradeInKpiBonus, pts: 1 }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
+function submitScForm() { if(!selectedScItem) return showToast("Выберите товар из списка", true); let scDateVal = document.getElementById("sc-date").dataset.realdate; let dStr = scDateVal; if(dStr==="Сегодня") { dStr = formatDateLocal(new Date()); } else { let d = new Date(dStr); dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } selectedScItem.date = dStr; selectedScItem.bonus = window.scKpiBonus; selectedScItem.pts = window.scPtsBonus; executeSubmit("Продажа СЦ/Дефект", selectedScItem.name, null, JSON.stringify(selectedScItem)); }
+function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel, bonus: window.tradeInKpiBonus, pts: window.tradeInPtsBonus }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
 function submitPoints() { const act = document.getElementById("fp-action").value; const time = document.getElementById("fp-time").value; const dateVal = document.getElementById("fp-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr }); executeSubmit("Баллы мотивации", `${act} на ${time}`, null, meta); }
 function submitFixShift() { const shiftStr = document.getElementById("fs-fix-shift").value; if (!shiftStr) return showToast("Выберите новую смену", true); const dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); executeSubmit("Исправление смены", shiftStr, null, dStr, "Запрос на исправление отправлен"); }
 function submitSwap() { const select = document.getElementById("fs-target"); const targetIin = select.value; if(!targetIin) return showToast("Выберите сменщика", true); const dateVal = document.getElementById("fs-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); const shiftStr = document.getElementById("fs-shift").value; const targetName = select.options[select.selectedIndex].text; const details = `Дата: ${dStr}, Смена: ${shiftStr}`; executeSubmit("Обмен сменами", details, targetIin, "", "Запрос отправлен: " + targetName); }
