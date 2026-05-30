@@ -40,22 +40,29 @@ function renderPlanUI(pData) {
     let parse = (str) => parseFloat(String(str).replace(/\s/g, '').replace(',', '.')) || 0;
     let html = ""; let totalPlan = pData.totalPlan; let totalFact = pData.to.total.fact + pData.aks.total.fact + pData.usl.total.fact; let totalFactEd = pData.to.total.fact + pData.to.total.ed + pData.aks.total.fact + pData.aks.total.ed + pData.usl.total.fact + pData.usl.total.ed; let remPlan = totalPlan - totalFactEd; let totalPct = totalPlan > 0 ? ((totalFact / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00"; let totalPctEd = totalPlan > 0 ? ((totalFactEd / totalPlan) * 100).toFixed(2).replace('.', ',') : "0,00";
     let scCount = 0; let focusCount = 0;
-    if (window.adminHistoryGlobal) { 
-        let promoPrefixes = (window.adminPromoListsGlobal || []).map(l => l.prefix);
-        let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000; 
-        window.adminHistoryGlobal.forEach(r => { 
-            let rd = parseCustomDate(r.date); 
-            if (rd >= startTime && rd <= endTime && (r.status === 'approved' || r.status === 'approved_notify_zav')) { 
-                if (r.type === 'Продажа СЦ/Дефект' || r.type === 'Продажа СЦ/Фокус') { 
-                    let isFocus = false;
-                    try { let m = JSON.parse(r.meta); if(m.type === "Фокус" || r.details.toLowerCase().includes("фокус")) isFocus = true; } catch(e){ if(r.details.toLowerCase().includes("фокус")) isFocus = true; }
-                    if (isFocus) focusCount++; else scCount++;
-                } else if (r.type === 'Продажа Trade-In' || promoPrefixes.includes(r.type)) {
-                    focusCount++;
-                }
-            } 
-        }); 
-    }
+    if (window.adminHistoryGlobal) { 
+        let promoPrefixes = (window.adminPromoListsGlobal || []).map(l => l.prefix);
+        let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; 
+        let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; 
+        let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000; 
+        
+        window.adminHistoryGlobal.forEach(r => { 
+            let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){}
+            // Берем дату продажи из заявки, если есть, иначе системную
+            let targetDateStr = metaObj.date ? metaObj.date : r.date;
+            let rd = parseCustomDate(targetDateStr); 
+            
+            if (rd >= startTime && rd <= endTime && (r.status === 'approved' || r.status === 'approved_notify_zav')) { 
+                if (r.type === 'Продажа СЦ/Дефект' || r.type === 'Продажа СЦ/Фокус') { 
+                    let isFocus = false;
+                    if (metaObj.type === "Фокус" || String(r.details).toLowerCase().includes("фокус")) isFocus = true;
+                    if (isFocus) focusCount++; else scCount++;
+                } else if (r.type === 'Продажа Trade-In' || promoPrefixes.includes(r.type)) {
+                    focusCount++;
+                }
+            } 
+        }); 
+    }
 
     html += `<div class="inner-block card" style="margin-bottom:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><div style="font-size:14px; font-weight:bold; color:var(--text-color); text-transform:none;">Общая сводка</div><div onclick="openAdminPlanScDetails()" style="font-size:11px; font-weight:bold; color:var(--btn-color); cursor:pointer; padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px;">СЦ: ${scCount} | Фокус: ${focusCount}</div></div><div style="background:var(--card-bg); padding:10px; border-radius:12px; border:1px solid var(--border-color); margin-bottom:12px;"><div style="color:#7f8c8d; font-size:12px; text-transform:uppercase; margin-bottom:8px; font-weight:bold; text-align:center; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;">Итоговый показатель</div><div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;"><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:bold;">${fmtSum(totalPlan)}</div><div style="margin-top:4px; font-size:10px; color:${remPlan <= 0 ? '#27ae60' : '#e74c3c'};">Ост: <b>${fmtSum(remPlan)}</b></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:bold; margin-bottom:2px;">${fmtSum(totalFact)}</div><div><span style="color:${getDynColor(totalPct)}; font-weight:bold; font-size:10px;">${totalPct}%</span></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:bold; margin-bottom:2px;">${fmtSum(totalFactEd)}</div><div><span style="color:${getDynColor(totalPctEd)}; font-weight:bold; font-size:10px;">${totalPctEd}%</span></div></div></div></div>`;
     html += `<div style="background:var(--card-bg); border-radius:12px; padding:10px; margin-bottom:8px; border:1px solid var(--border-color);"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px;"><b style="color:#7f8c8d; font-size:12px; text-transform:uppercase;">Основной товарооборот</b><span style="color:#e84393; font-size:11px; font-weight:normal; font-style:italic;">+ЭД ${fmtSum(pData.to.total.ed)}</span></div><div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:4px; text-align:center; align-items:start;"><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ПЛАН</div><div style="color:var(--text-color); font-size:13px; font-weight:normal; letter-spacing:-0.5px;">${fmtSum(pData.to.total.plan)}</div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ</div><div style="color:#27ae60; font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact)}</div><div><span style="color:${getDynColor(pData.to.total.pct)}; font-weight:bold; font-size:10px;">${pData.to.total.pct}%</span></div></div><div><div style="color:gray; font-size:9px; margin-bottom:2px;">ФАКТ с ЭД</div><div style="color:var(--btn-color); font-size:13px; font-weight:normal; margin-bottom:2px; letter-spacing:-0.5px;">${fmtSum(pData.to.total.fact + pData.to.total.ed)}</div><div><span style="color:${getDynColor(pData.to.total.pctEd)}; font-weight:bold; font-size:10px;">${pData.to.total.pctEd}%</span></div></div></div></div>`;
@@ -1140,16 +1147,51 @@ document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && docu
 function openAdminPlanScDetails() {
     let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-title").innerText = "СЦ | Фокус (План)"; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
     let startD = document.getElementById("plan-filter-start") ? document.getElementById("plan-filter-start").value : "2000-01-01"; let endD = document.getElementById("plan-filter-end") ? document.getElementById("plan-filter-end").value : "2099-01-01"; let startTime = new Date(startD).getTime(); let endTime = new Date(endD).getTime() + 86400000;
-    let sales = []; if (window.adminHistoryGlobal) { 
+    
+    let sales = []; 
+    if (window.adminHistoryGlobal) { 
         let promoPrefixes = (window.adminPromoListsGlobal || []).map(l => l.prefix);
         sales = window.adminHistoryGlobal.filter(r => { 
             let m = {}; try { m = JSON.parse(r.meta || "{}"); } catch(e){}
-            let dStr = m.date ? m.date : r.date; // Берем дату из заявки для фильтра периода
+            // Фильтруем по дате из заявки (если есть)
+            let dStr = m.date ? m.date : r.date; 
             let rd = parseCustomDate(dStr); 
             return rd >= startTime && rd <= endTime && (r.status === 'approved' || r.status === 'approved_notify_zav') && (r.type === 'Продажа СЦ/Дефект' || r.type === 'Продажа СЦ/Фокус' || r.type === 'Продажа Trade-In' || promoPrefixes.includes(r.type)); 
         }); 
     }
-    let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; if (sales.length > 0) { sales.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date)); listHtml += sales.map((i, idx) => { let srcColor = getSourceColor(i.type); let sourceText = i.type === 'Продажа Trade-In' ? 'Trade-In' : (i.type === 'Продажа СЦ/Дефект' || i.type === 'Продажа СЦ/Фокус' ? 'СЦ/Дефект' : i.type); let rawDetails = i.details; let match = rawDetails.match(/\n\[(.*?)\]$/); if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } let displayDate = String(i.date).split(' ')[0]; try { let m = JSON.parse(i.meta); if (m.type) sourceText = m.type; if (m.date) displayDate = m.date; } catch(e){} return buildStandardRow({ title: `${idx + 1}. ${rawDetails}`, typeText: sourceText, typeColor: srcColor, dateText: displayDate, nameText: i.authorName, hasBorder: false }); }).join(""); } else { listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В этом периоде пусто</div>"; } listHtml += "</div>"; document.getElementById("details-list").innerHTML = listHtml;
+    
+    let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
+    if (sales.length > 0) { 
+        // Сортируем тоже по правильной дате
+        sales.sort((a,b) => {
+            let mA = {}; try { mA = JSON.parse(a.meta || "{}"); } catch(e){}
+            let mB = {}; try { mB = JSON.parse(b.meta || "{}"); } catch(e){}
+            let dateA = mA.date ? mA.date : a.date;
+            let dateB = mB.date ? mB.date : b.date;
+            return parseCustomDate(dateB) - parseCustomDate(dateA);
+        }); 
+        
+        listHtml += sales.map((i, idx) => { 
+            let srcColor = getSourceColor(i.type); 
+            let sourceText = i.type === 'Продажа Trade-In' ? 'Trade-In' : (i.type === 'Продажа СЦ/Дефект' || i.type === 'Продажа СЦ/Фокус' ? 'СЦ/Дефект' : i.type); 
+            let rawDetails = i.details; 
+            let match = rawDetails.match(/\n\[(.*?)\]$/); 
+            if (match) { rawDetails = rawDetails.replace(/\n\[(.*?)\]$/, "").trim(); } 
+            
+            let displayDate = String(i.date).split(' ')[0]; 
+            try { 
+                let m = JSON.parse(i.meta || "{}"); 
+                if (m.type) sourceText = m.type; 
+                if (m.date) displayDate = m.date; // Выводим в угол только дату из заявки
+            } catch(e){} 
+            
+            return buildStandardRow({ title: `${idx + 1}. ${rawDetails}`, typeText: sourceText, typeColor: srcColor, dateText: displayDate, nameText: i.authorName, hasBorder: false }); 
+        }).join(""); 
+    } else { 
+        listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; 
+    } 
+    listHtml += "</div>"; 
+    document.getElementById("details-list").innerHTML = listHtml;
 }
 
 function openEmpScDetails(iin) {
