@@ -97,7 +97,7 @@ function renderPlanUI(pData) {
 
 function generateDatePanelHTML(idPrefix, onChangeFuncName, extraHtml = "") {
     let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-    return `<div class="inner-block card date-panel-wrapper" style="padding:12px 12px 8px 12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">${extraHtml}<div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:28px; line-height:26px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:28px; line-height:26px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:28px; height:28px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:16px;">calendar_today</span></button></div><div style="position:relative; width:28px; height:28px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:16px;">calendar_month</span></button></div></div></div>`;
+    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">${extraHtml}<div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></button></div></div></div>`;
 }
 
 function setPanelDates(type, val, idPrefix, reloadFn) {
@@ -146,25 +146,30 @@ async function callBackend(actionName, payloadData = {}) {
     }
     
     if (actionName === "recordAction") {
-      const { iin, actionType, isReturn, isAutoReturn } = payloadData; const roleGroup = getRoleGroup(); const exactRole = appState.role; 
-      if (!isReturn) {
-         const currentHour = new Date().getHours();
-         if (actionType === 'Обед' && (currentHour < 12 || currentHour >= 17)) return { success: false, error: "Обед доступен только с 12:00 до 17:00" };
-         if (actionType === 'Полдник' && (currentHour < 16 || currentHour >= 20)) return { success: false, error: "Полдник доступен только с 16:00 до 20:00" };
-         const dayOfWeek = new Date().getDay() || 7; const limitField = actionType === 'Обед' ? 'lunch_limit' : (actionType === 'Полдник' ? 'snack_limit' : 'break_limit');
-         const todayStart = new Date(); todayStart.setHours(0,0,0,0);
-         const [ { data: limitData }, { data: todayLogs } ] = await Promise.all([ supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(), supabaseClient.from('time_tracking').select('*, users(role)').gte('created_at', todayStart.toISOString()) ]);
-         if (actionType === 'Обед' || actionType === 'Полдник') { const hasTakenToday = (todayLogs || []).some(log => log.iin === iin && log.action_type === actionType && log.direction === 'Уход'); if (hasTakenToday) return { success: false, error: `Вы уже ходили на ${actionType.toLowerCase()} сегодня` }; }
-         const maxAllowed = limitData ? limitData[limitField] : 1; const totalAllowed = limitData ? limitData.total_limit : 2;
-         let userStates = {}; (todayLogs || []).forEach(log => { let r = log.users ? log.users.role : log.role_group; if (String(r).toLowerCase().includes(roleGroup.toLowerCase())) { if (log.direction === 'Уход') userStates[log.iin] = log.action_type; else delete userStates[log.iin]; } });
-         let activeCounts = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0; for (let key in userStates) { activeCounts[userStates[key]]++; totalOut++; }
-         if (activeCounts[actionType] >= maxAllowed || totalOut >= totalAllowed) return { success: false, error: `Мест на ${actionType} нет` };
-      }
-      let direction = isReturn ? (isAutoReturn ? 'Автовозврат' : 'Возврат') : 'Уход'; let roleToSave = roleGroup === 'Промоутер' ? exactRole : roleGroup;
-      const { error } = await supabaseClient.from('time_tracking').insert([{ iin: iin, action_type: actionType, direction: direction, role_group: roleToSave }]);
-      if (error) return { success: false, error: "Ошибка записи в БД" };
-      return { success: true, savedAction: isReturn ? null : actionType };
-    }
+      const { iin, actionType, isReturn, isAutoReturn } = payloadData; const roleGroup = getRoleGroup(); const exactRole = appState.role; 
+      let finalActionType = actionType;
+      if (!isReturn) {
+         const currentHour = new Date().getHours();
+         if (actionType === 'Обед' && (currentHour < 12 || currentHour >= 17)) return { success: false, error: "Обед доступен только с 12:00 до 17:00" };
+         if (actionType === 'Полдник' && (currentHour < 16 || currentHour >= 20)) return { success: false, error: "Полдник доступен только с 16:00 до 20:00" };
+         const dayOfWeek = new Date().getDay() || 7; const limitField = actionType === 'Обед' ? 'lunch_limit' : (actionType === 'Полдник' ? 'snack_limit' : 'break_limit');
+         const todayStart = new Date(); todayStart.setHours(0,0,0,0);
+         const [ { data: limitData }, { data: todayLogs } ] = await Promise.all([ supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(), supabaseClient.from('time_tracking').select('*, users(role)').gte('created_at', todayStart.toISOString()) ]);
+         if (actionType === 'Обед' || actionType === 'Полдник') { const hasTakenToday = (todayLogs || []).some(log => log.iin === iin && log.action_type === actionType && log.direction === 'Уход'); if (hasTakenToday) return { success: false, error: `Вы уже ходили на ${actionType.toLowerCase()} сегодня` }; }
+         const maxAllowed = limitData ? limitData[limitField] : 1; const totalAllowed = limitData ? limitData.total_limit : 2;
+         let userStates = {}; (todayLogs || []).forEach(log => { let r = log.users ? log.users.role : log.role_group; if (String(r).toLowerCase().includes(roleGroup.toLowerCase())) { if (log.direction === 'Уход') userStates[log.iin] = log.action_type; else delete userStates[log.iin]; } });
+         
+         let activeCounts = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0; 
+         for (let key in userStates) { let st = userStates[key]; if (st && st.startsWith('Перерыв')) activeCounts['Перерыв']++; else if (activeCounts[st] !== undefined) activeCounts[st]++; totalOut++; }
+         if (activeCounts[actionType] >= maxAllowed || totalOut >= totalAllowed) return { success: false, error: `Мест на ${actionType} нет` };
+         
+         if (actionType === 'Перерыв') { let myBreaksToday = (todayLogs || []).filter(log => log.iin === iin && log.action_type.startsWith('Перерыв') && log.direction === 'Уход').length; finalActionType = `Перерыв ${myBreaksToday + 1}`; }
+      }
+      let direction = isReturn ? (isAutoReturn ? 'Автовозврат' : 'Возврат') : 'Уход'; let roleToSave = roleGroup === 'Промоутер' ? exactRole : roleGroup;
+      const { error } = await supabaseClient.from('time_tracking').insert([{ iin: iin, action_type: finalActionType, direction: direction, role_group: roleToSave }]);
+      if (error) return { success: false, error: "Ошибка записи в БД" };
+      return { success: true, savedAction: isReturn ? null : finalActionType };
+    }
 
     if (actionName === "startupCheck") {
       const roleGroup = getRoleGroup(); const dayOfWeek = new Date().getDay() || 7; const todayStart = new Date(); todayStart.setHours(0,0,0,0); const currentHour = new Date().getHours();
@@ -172,7 +177,7 @@ async function callBackend(actionName, payloadData = {}) {
       let activeOutsMap = {}; let myLogs = [];
       (todayLogs || []).forEach(log => { if (log.iin === payloadData.iin) myLogs.push(log); if (log.direction === 'Уход') { activeOutsMap[log.iin] = { iin: log.iin, action: log.action_type, leftAt: new Date(log.created_at).getTime(), name: log.users ? log.users.full_name : 'Сотрудник', role: log.users ? log.users.role : log.role_group, dept: log.users ? log.users.dept : 'Цифра' }; } else { delete activeOutsMap[log.iin]; } });
       let myActiveAction = activeOutsMap[payloadData.iin] ? activeOutsMap[payloadData.iin].action : null; let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
-      for (let key in activeOutsMap) { if (activeOutsMap[key].role.toLowerCase().includes(roleGroup.toLowerCase())) { outByAction[activeOutsMap[key].action]++; totalOut++; } }
+      for (let key in activeOutsMap) { if (activeOutsMap[key].role.toLowerCase().includes(roleGroup.toLowerCase())) { let act = activeOutsMap[key].action; if (act && act.startsWith('Перерыв')) outByAction['Перерыв']++; else if (outByAction[act] !== undefined) outByAction[act]++; totalOut++; } }
       const tookLunch = myLogs.some(l => l.action_type === 'Обед' && l.direction === 'Уход'); const tookSnack = myLogs.some(l => l.action_type === 'Полдник' && l.direction === 'Уход');
       const isLunchTime = currentHour >= 12 && currentHour < 17; const isSnackTime = currentHour >= 16 && currentHour < 20;
       const hasLunchSlot = (outByAction['Обед'] < (limitData?.lunch_limit || 1)) && (totalOut < (limitData?.total_limit || 2)); const hasSnackSlot = (outByAction['Полдник'] < (limitData?.snack_limit || 1)) && (totalOut < (limitData?.total_limit || 2)); const hasBreakSlot = (outByAction['Перерыв'] < (limitData?.break_limit || 1)) && (totalOut < (limitData?.total_limit || 2));
@@ -1006,20 +1011,20 @@ function openDetails(type) {
       let rem = document.getElementById("pt-rem") ? document.getElementById("pt-rem").innerText : 0;
       let fin = document.getElementById("pt-fin") ? document.getElementById("pt-fin").innerText : 0;
 
-      let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:10px;">
-          <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:25px; box-sizing:border-box; gap:4px;">
+      let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:12px;">
+          <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
               <span style="color:gray; font-size:10px;">Нач.</span><b style="font-size:13px; color:var(--text-color);">${acc}</b>
           </div>
-          <div id="my-flt-pts-use" onclick="window.triggerMyPtsReload('filter', 'use')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:25px; box-sizing:border-box; gap:4px;">
+          <div id="my-flt-pts-use" onclick="window.triggerMyPtsReload('filter', 'use')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
               <span style="color:gray; font-size:10px;">Исп.</span><b style="font-size:13px; color:var(--text-color);">${use}</b>
           </div>
-          <div id="my-flt-pts-rem" onclick="window.triggerMyPtsReload('filter', 'rem')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:25px; box-sizing:border-box; gap:4px;">
+          <div id="my-flt-pts-rem" onclick="window.triggerMyPtsReload('filter', 'rem')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
               <span style="color:gray; font-size:10px;">Ост.</span><b style="font-size:13px; color:#27ae60;">${rem}</b>
           </div>
-          <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:25px; box-sizing:border-box; gap:4px;">
+          <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
               <span style="color:gray; font-size:10px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${fin}</b>
           </div>
-      </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 8px -12px;"></div>`;
+      </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`;
       
       listHtml = generateDatePanelHTML('my-pts', 'window.triggerMyPtsReload', pointsHeader); 
       listHtml += "<div id='my-pts-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; 
@@ -1042,7 +1047,7 @@ function openDetails(type) {
                           el.style.background = bgs[f];
                           el.style.borderColor = colors[f];
                       } else {
-                          el.style.background = 'var(--card-bg)';
+                          el.style.background = 'var(--bg-color)';
                           el.style.borderColor = 'var(--border-color)';
                       }
                   }
@@ -1097,21 +1102,21 @@ function renderEmpDetailTab(tab, iin) {
   document.getElementById('emp-tab-rep').classList.remove('active-flt'); document.getElementById('emp-tab-pts').classList.remove('active-flt'); document.getElementById('emp-tab-viol').classList.remove('active-flt'); document.getElementById('emp-tab-'+tab).classList.add('active-flt');
   let content = document.getElementById('emp-detail-content'); content.classList.remove("slide-up-fade"); void content.offsetWidth; content.classList.add("slide-up-fade"); let html = "";
   if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
-  else if (tab === 'pts') { 
-    let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:10px;">
-        <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:25px; box-sizing:border-box; gap:4px;">
+  else if (tab === 'pts') { 
+    let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:12px;">
+        <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
             <span style="color:gray; font-size:10px;">Нач.</span><b style="font-size:13px; color:var(--text-color);">${emp.pts.acc || 0}</b>
         </div>
-        <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:25px; box-sizing:border-box; gap:4px;">
+        <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
             <span style="color:gray; font-size:10px;">Исп.</span><b style="font-size:13px; color:var(--text-color);">${emp.pts.use || 0}</b>
         </div>
-        <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:25px; box-sizing:border-box; gap:4px;">
+        <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
             <span style="color:gray; font-size:10px;">Ост.</span><b style="font-size:13px; color:#27ae60;">${emp.pts.rem || 0}</b>
         </div>
-        <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:25px; box-sizing:border-box; gap:4px;">
+        <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
             <span style="color:gray; font-size:10px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${emp.pts.fin || 0}</b>
         </div>
-    </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 8px -12px;"></div>`; 
+    </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`; 
     
     html = generateDatePanelHTML('emp-pts', `window.triggerEmpPtsReload_${iin}`, pointsHeader); 
     html += `<div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
@@ -1133,7 +1138,7 @@ function renderEmpDetailTab(tab, iin) {
                         el.style.background = bgs[f];
                         el.style.borderColor = colors[f];
                     } else {
-                        el.style.background = 'var(--card-bg)';
+                        el.style.background = 'var(--bg-color)';
                         el.style.borderColor = 'var(--border-color)';
                     }
                 }
@@ -1148,7 +1153,6 @@ function renderEmpDetailTab(tab, iin) {
                 let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; 
                 if (p.type === "KPI" && p.source !== "Горячий чек") return false; 
                 if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; 
-                if (ptsVal === 0) return false;
                 
                 let rd = parseCustomDate(p.date); 
                 if (rd < st || rd > en) return false;
@@ -1162,7 +1166,7 @@ function renderEmpDetailTab(tab, iin) {
             document.getElementById('emp-pts-render-area').innerHTML = groupAndRenderByMonth(displayHistory, p => { return renderHistoryItem(p, true); });
         }
     }; setTimeout(() => window[`triggerEmpPtsReload_${iin}`]('search'), 100);
-  }
+  }
   else if (tab === 'viol') {
     html = `<div style="display:flex; gap:8px; margin-bottom:12px;"><button class="btn-red" onclick="document.getElementById('fine-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0;">Выписать штраф</button><button class="btn-orange" onclick="document.getElementById('remark-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0;">Сделать замечание</button></div>`;
     html += `<div id="fine-form-${iin}" class="hidden inner-block slide-up-fade" style="border:1px solid #e74c3c; background:rgba(231, 76, 60, 0.05);"><input type="text" id="fine-reason-${iin}" placeholder="Причина штрафа..." style="box-sizing: border-box; width:100%; height:36px; margin-top:0; margin-bottom:8px; font-size:13px; background:var(--card-bg);"><div style="display:flex; gap:8px; margin-bottom:8px;"><input type="number" id="fine-amount-${iin}" placeholder="0 (Баллы)" style="box-sizing: border-box; height:36px; margin:0; flex:1; font-size:14px; background:var(--card-bg);"><input type="number" id="fine-money-${iin}" placeholder="0 (Сумма ₸)" style="box-sizing: border-box; height:36px; margin:0; flex:1; font-size:14px; background:var(--card-bg);"></div><button class="btn-red" onclick="executeFine('${iin}', '${emp.name}')" style="padding:8px; font-size:12px; margin:0;">Подтвердить штраф</button></div>`;
