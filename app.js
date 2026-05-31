@@ -7,11 +7,70 @@ const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const GAS_URL = "https://script.google.com/macros/s/AKfycbxb2UW5ctVar9QhWmjI-IIFA1EOxDCovRDoNBcbN31x4L4-mCh1lGcF-ZdH-62pUrbR/exec";
 
 let tg = window.Telegram ? window.Telegram.WebApp : null; if (tg) { tg.expand(); }
-if ('serviceWorker' in navigator) { window.addEventListener('load', () => { navigator.serviceWorker.register('sw.js').catch(()=>{}); }); }
+// --- НАСТРОЙКА WEB PUSH ---
+const VAPID_PUBLIC_KEY = "BJavWxbhl-PK3aCAKnHFLqx6DwHPYAgJ_KGsERfe2_yqwph8_0iTmxreqA-BrzfZtZZYDBvmakXseugFVmlwvoA";
+
+if ('serviceWorker' in navigator) { 
+    window.addEventListener('load', () => { 
+        navigator.serviceWorker.register('sw.js').then(reg => {
+            console.log("Service Worker зарегистрирован");
+        }).catch(()=>{}); 
+    }); 
+}
 
 function safeIin(val) { if(val === undefined || val === null) return ""; return String(val).trim().replace(/^0+/, ''); }
-function requestNotificationPermission() { if ("Notification" in window && Notification.permission !== "granted" && Notification.permission !== "denied") Notification.requestPermission(); }
-function showPushNotification(title, bodyText) { if ("Notification" in window && Notification.permission === "granted") new Notification(title, { body: bodyText, icon: "icon.png" }); }
+
+// Функция конвертации ключа
+function urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64 = (base64String + padding).replace(/\-/g, '+').replace(/_/g, '/');
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+    for (let i = 0; i < rawData.length; ++i) { outputArray[i] = rawData.charCodeAt(i); }
+    return outputArray;
+}
+
+// Запрос прав и подписка на серверы Google/Apple
+async function requestNotificationPermission() { 
+    if (!("Notification" in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) return;
+    
+    if (Notification.permission === "default") {
+        await Notification.requestPermission();
+    }
+    
+    if (Notification.permission === "granted") {
+        try {
+            const registration = await navigator.serviceWorker.ready;
+            let subscription = await registration.pushManager.getSubscription();
+            
+            // Если подписки нет, создаем новую
+            if (!subscription) {
+                subscription = await registration.pushManager.subscribe({
+                    userVisibleOnly: true,
+                    applicationServerKey: urlBase64ToUint8Array(VAPID_PUBLIC_KEY)
+                });
+            }
+            
+            // Сохраняем подписку в БД Supabase
+            if (appState.iin && subscription) {
+                await supabaseClient.from('users').update({ 
+                    push_sub: JSON.parse(JSON.stringify(subscription)) 
+                }).eq('iin', appState.iin);
+            }
+        } catch (e) {
+            console.error("Ошибка подписки на Push:", e);
+        }
+    }
+}
+
+// Старая функция локальных пушей (для открытого приложения)
+function showPushNotification(title, bodyText) { 
+    if ("Notification" in window && Notification.permission === "granted") {
+        navigator.serviceWorker.ready.then(registration => {
+            registration.showNotification(title, { body: bodyText, icon: "icon.png" });
+        });
+    }
+}
 function fmtSum(val) { if(!val) return "0"; return String(Math.round(val)).replace(/\s/g, '').replace(/\B(?=(\d{3})+(?!\d))/g, " "); }
 function formatDateLocal(d) { if (!d) d = new Date(); let y = d.getFullYear(); let m = ("0" + (d.getMonth() + 1)).slice(-2); let day = ("0" + d.getDate()).slice(-2); return `${y}-${m}-${day}`; }
 
@@ -608,7 +667,18 @@ async function manualLogin() {
   if (!iinVal || iinVal.length !== 12) { document.getElementById("login-error").innerText = "ИИН должен состоять из 12 цифр"; return; } if (!passVal) { document.getElementById("login-error").innerText = "Введите пароль"; return; }
   elIin.disabled = true; elPass.disabled = true; showToast("Авторизация...", false, 9999); 
   let res = await callBackend('loginByIIN', { iin: iinVal, password: passVal });
-  if (res.success) { appState.iin = res.iin; appState.token = res.token; appState.firstName = res.firstName; appState.currentAction = null; isUserPromoter = res.isPromoter; saveMemory("userIIN", appState.iin); saveMemory("userToken", appState.token); saveMemory("userName", appState.firstName); saveMemory("currentAction", ""); document.getElementById("toast").classList.remove("show"); document.getElementById("auth-screen").style.opacity = '0'; setTimeout(() => { document.getElementById("auth-screen").classList.add("hidden"); document.getElementById("main-screen").classList.remove("hidden"); document.getElementById("main-screen").style.opacity = '1'; document.getElementById("user-greeting").innerText = appState.firstName; loadDashboard(false); startPolling(); }, 600); } 
+  if (res.success) { 
+      appState.iin = res.iin; appState.token = res.token; appState.firstName = res.firstName; appState.currentAction = null; isUserPromoter = res.isPromoter; 
+      saveMemory("userIIN", appState.iin); saveMemory("userToken", appState.token); saveMemory("userName", appState.firstName); saveMemory("currentAction", ""); 
+      document.getElementById("toast").classList.remove("show"); document.getElementById("auth-screen").style.opacity = '0'; 
+      setTimeout(() => { 
+          document.getElementById("auth-screen").classList.add("hidden"); document.getElementById("main-screen").classList.remove("hidden"); document.getElementById("main-screen").style.opacity = '1'; 
+          document.getElementById("user-greeting").innerText = appState.firstName; 
+          loadDashboard(false); 
+          startPolling(); 
+          requestNotificationPermission(); 
+      }, 600); 
+  }
   else { elIin.disabled = false; elPass.disabled = false; document.getElementById("login-error").innerText = res.error; document.getElementById("toast").classList.remove("show"); }
 }
 
