@@ -246,7 +246,7 @@ async function callBackend(actionName, payloadData = {}) {
       
       // Инициализируем нулями (теперь всё берется СТРОГО из базы)
       let kpiCfg = { base: 0, rev: 0, revsn: 0, price: 0, ub: 0, bl: 0, pr: 0 }; 
-      let ptsCfg = { rev: 0, revsn: 0, price: 0, ub: 0 };
+      window.ptsCfg = { rev: 0, revsn: 0, price: 0, ub: 0 }; let ptsCfg = window.ptsCfg;
       let freshHotChecks = [];
       window.tradeInKpiBonus = 0; window.tradeInPtsBonus = 0;
       window.scKpiBonus = 0; window.scPtsBonus = 0;
@@ -902,7 +902,52 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
   }
 }
 
-function generateHorizontalGrid(dataObj) { if (!dataObj.headers || dataObj.headers.length === 0) return "<div style='padding:8px;text-align:center;color:gray;font-size:12px;'>Нет данных</div>"; let gridCols = `repeat(${dataObj.headers.length}, 1fr)`; let badge = (dataObj.errors && dataObj.errors > 0) ? `<span style="background:#e74c3c; color:white; font-size:10px; padding:2px 6px; border-radius:8px; margin-left:8px; vertical-align:middle; display:inline-flex; align-items:center; font-weight:bold;"><span class="material-symbols-rounded" style="font-size:12px; margin-right:2px;">close</span>${dataObj.errors}</span>` : ''; let html = `<div class="grid-details-container inner-block"><div class="grid-details-title" style="margin-bottom: 6px; display:flex; align-items:center; justify-content:center;">${dataObj.title}${badge}</div><div class="grid-details-box" style="grid-template-columns: ${gridCols}; gap:3px;">`; dataObj.headers.forEach(h => { html += `<div class="grid-details-header">${h || '-'}</div>`; }); dataObj.values.forEach(v => { let displayVal = '-'; if (v === '✔') displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#27ae60;">check_circle</span>'; else if (v === '✖') displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#e74c3c;">cancel</span>'; else if (v === 'ПР') displayVal = '<span style="color:#e74c3c;font-weight:bold;">ПР</span>'; else if (v !== '' && v !== '-') displayVal = '<span style="color:#f39c12;font-weight:bold;">'+v+'</span>'; else displayVal = v || '-'; html += `<div class="grid-details-value" style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:4px 0; display:flex; align-items:center; justify-content:center; min-height:28px; width:100%; box-sizing:border-box;">${displayVal}</div>`; }); html += `</div></div>`; return html; }
+function generateHorizontalGrid(dataObj) { 
+    if (!dataObj.headers || dataObj.headers.length === 0) return "<div style='padding:8px;text-align:center;color:gray;font-size:12px;'>Нет данных</div>"; 
+    
+    // Получаем точный балл штрафа из БД для конкретного отчета
+    let pen = -1; 
+    if (window.ptsCfg) {
+        if (dataObj.title.includes("Ценников") || dataObj.title.includes("Ценники")) pen = window.ptsCfg.price;
+        else if (dataObj.title.includes("Ревизия")) pen = window.ptsCfg.revsn;
+        else if (dataObj.title.includes("уборка")) pen = window.ptsCfg.ub;
+        else if (dataObj.title.includes("Отзыв")) pen = window.ptsCfg.rev;
+    }
+    
+    // Форматируем цифру для вывода (например, 0.5 превращаем в -0,5)
+    let penText = "";
+    if (pen !== 0) {
+        penText = String(pen).replace('.', ',');
+        if (!penText.startsWith("-")) penText = "-" + penText; // Гарантируем, что стоит минус
+    }
+
+    let gridCols = `repeat(${dataObj.headers.length}, 1fr)`; 
+    // Заголовок теперь без красного бейджа
+    let html = `<div class="grid-details-container inner-block"><div class="grid-details-title" style="margin-bottom: 6px; text-align:center;">${dataObj.title}</div><div class="grid-details-box" style="grid-template-columns: ${gridCols}; gap:3px;">`; 
+    
+    dataObj.headers.forEach(h => { html += `<div class="grid-details-header">${h || '-'}</div>`; }); 
+    
+    dataObj.values.forEach(v => { 
+        let displayVal = '-'; 
+        if (v === '✔') {
+            displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#27ae60;">check_circle</span>'; 
+        } else if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
+            // Рисуем цифру штрафа ровно над крестиком
+            let badgeHtml = penText ? `<span style="color:#e74c3c; font-size:10px; font-weight:bold; margin-bottom:1px; line-height:1;">${penText}</span>` : '';
+            displayVal = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">${badgeHtml}<span class="material-symbols-rounded" style="font-size:18px; color:#e74c3c;">cancel</span></div>`; 
+        } else if (v === 'ПР') {
+            displayVal = '<span style="color:#e74c3c;font-weight:bold;">ПР</span>'; 
+        } else if (v !== '' && v !== '-') {
+            displayVal = '<span style="color:#f39c12;font-weight:bold;">'+v+'</span>'; 
+        } else {
+            displayVal = v || '-'; 
+        }
+        // Увеличили min-height до 38px, чтобы крестик и цифра над ним поместились без обрезки
+        html += `<div class="grid-details-value" style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:4px 0; display:flex; align-items:center; justify-content:center; min-height:38px; width:100%; box-sizing:border-box;">${displayVal}</div>`; 
+    }); 
+    html += `</div></div>`; 
+    return html; 
+}
 
 function renderHistoryItem(i, isCompact = false) { 
     let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
