@@ -1008,16 +1008,16 @@ function openDetails(type) {
 
       listHtml = `<div class="grid-details-container inner-block" style="margin-bottom:12px; padding:10px;"><div style="display:flex; justify-content:space-between; text-align:center; gap:6px;">
           <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
-              <div style="color:gray; font-size:10px; margin-bottom:2px;">Нач.</div><b style="font-size:14px; color:var(--text-color);">${acc}</b>
+              <div style="color:gray; font-size:10px; margin-bottom:2px;">Начисление</div><b style="font-size:14px; color:var(--text-color);">${acc}</b>
           </div>
           <div id="my-flt-pts-use" onclick="window.triggerMyPtsReload('filter', 'use')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
-              <div style="color:gray; font-size:10px; margin-bottom:2px;">Исп.</div><b style="font-size:14px; color:var(--text-color);">${use}</b>
+              <div style="color:gray; font-size:10px; margin-bottom:2px;">Использование</div><b style="font-size:14px; color:var(--text-color);">${use}</b>
           </div>
           <div id="my-flt-pts-rem" onclick="window.triggerMyPtsReload('filter', 'rem')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
-              <div style="color:gray; font-size:10px; margin-bottom:2px;">Ост.</div><b style="font-size:14px; color:#27ae60;">${rem}</b>
+              <div style="color:gray; font-size:10px; margin-bottom:2px;">Остаток</div><b style="font-size:14px; color:#27ae60;">${rem}</b>
           </div>
           <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
-              <div style="color:gray; font-size:10px; margin-bottom:2px;">Штрф.</div><b style="font-size:14px; color:#e74c3c;">${fin}</b>
+              <div style="color:gray; font-size:10px; margin-bottom:2px;">Штрафы</div><b style="font-size:14px; color:#e74c3c;">${fin}</b>
           </div>
       </div></div>`;
       
@@ -1100,16 +1100,16 @@ function renderEmpDetailTab(tab, iin) {
   else if (tab === 'pts') { 
     html = `<div class="grid-details-container inner-block" style="margin-bottom:12px; padding:10px;"><div style="display:flex; justify-content:space-between; text-align:center; gap:6px;">
         <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
-            <div style="color:gray; font-size:10px; margin-bottom:2px;">Нач.</div><b style="font-size:14px; color:var(--text-color);">${emp.pts.acc || 0}</b>
+            <div style="color:gray; font-size:10px; margin-bottom:2px;">Начисление</div><b style="font-size:14px; color:var(--text-color);">${emp.pts.acc || 0}</b>
         </div>
         <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
-            <div style="color:gray; font-size:10px; margin-bottom:2px;">Исп.</div><b style="font-size:14px; color:var(--text-color);">${emp.pts.use || 0}</b>
+            <div style="color:gray; font-size:10px; margin-bottom:2px;">Использование</div><b style="font-size:14px; color:var(--text-color);">${emp.pts.use || 0}</b>
         </div>
         <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
-            <div style="color:gray; font-size:10px; margin-bottom:2px;">Ост.</div><b style="font-size:14px; color:#27ae60;">${emp.pts.rem || 0}</b>
+            <div style="color:gray; font-size:10px; margin-bottom:2px;">Остаток</div><b style="font-size:14px; color:#27ae60;">${emp.pts.rem || 0}</b>
         </div>
         <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
-            <div style="color:gray; font-size:10px; margin-bottom:2px;">Штрф.</div><b style="font-size:14px; color:#e74c3c;">${emp.pts.fin || 0}</b>
+            <div style="color:gray; font-size:10px; margin-bottom:2px;">Штрафы</div><b style="font-size:14px; color:#e74c3c;">${emp.pts.fin || 0}</b>
         </div>
     </div></div>`;
     
