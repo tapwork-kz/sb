@@ -502,7 +502,13 @@ async function callBackend(actionName, payloadData = {}) {
 
       adminEmployees.forEach(e => { e.pts.rem = e.pts.acc - e.pts.use - e.pts.fin; });
       let myAcc=0, myUse=0, myFin=0; 
-      myPtsHistory.forEach(h => { let pts = parseFloat(String(h.val).replace('+','').replace(',','.')) || 0; if (h.type === "Начисление") myAcc += pts; if (h.type === "Использование") myUse += Math.abs(pts); if (h.type === "Штраф") myFin += Math.abs(pts); });
+      myPtsHistory.forEach(h => { 
+          let pts = parseFloat(String(h.val).replace('+','').replace(',','.')) || 0; 
+          if (h.type === "Начисление") myAcc += pts; 
+          if (h.type === "Использование") myUse += Math.abs(pts); 
+          // Списания из отчетов и штрафы минусуются в общий котел
+          if (h.type === "Штраф" || h.type === "Списание") myFin += Math.abs(pts); 
+      });
       myPtsHistory.sort((a,b) => parseCustomDate(b.date) - parseCustomDate(a.date));
       localData.info.myPtsHistory = myPtsHistory; localData.info.ptsAccrued = myAcc; localData.info.ptsUsed = myUse; localData.info.ptsFine = myFin; localData.info.ptsLeft = myAcc - myUse - myFin;
       if (!isNaN(localData.info.kpiValue)) localData.info.kpiValue = parseFloat(localData.info.kpiValue) + myKpiChanges;
@@ -905,7 +911,6 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
 function generateHorizontalGrid(dataObj) { 
     if (!dataObj.headers || dataObj.headers.length === 0) return "<div style='padding:8px;text-align:center;color:gray;font-size:12px;'>Нет данных</div>"; 
     
-    // Получаем точный балл штрафа из БД для конкретного отчета
     let pen = -1; 
     if (window.ptsCfg) {
         if (dataObj.title.includes("Ценников") || dataObj.title.includes("Ценники")) pen = window.ptsCfg.price;
@@ -914,27 +919,28 @@ function generateHorizontalGrid(dataObj) {
         else if (dataObj.title.includes("Отзыв")) pen = window.ptsCfg.rev;
     }
     
-    // Форматируем цифру для вывода (например, 0.5 превращаем в -0,5)
     let penText = "";
     if (pen !== 0) {
         penText = String(pen).replace('.', ',');
-        if (!penText.startsWith("-")) penText = "-" + penText; // Гарантируем, что стоит минус
+        if (!penText.startsWith("-")) penText = "-" + penText; 
     }
 
     let gridCols = `repeat(${dataObj.headers.length}, 1fr)`; 
-    // Заголовок теперь без красного бейджа
     let html = `<div class="grid-details-container inner-block"><div class="grid-details-title" style="margin-bottom: 6px; text-align:center;">${dataObj.title}</div><div class="grid-details-box" style="grid-template-columns: ${gridCols}; gap:3px;">`; 
     
     dataObj.headers.forEach(h => { html += `<div class="grid-details-header">${h || '-'}</div>`; }); 
     
     dataObj.values.forEach(v => { 
         let displayVal = '-'; 
+        let badgeHtml = '';
         if (v === '✔') {
             displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#27ae60;">check_circle</span>'; 
         } else if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
-            // Рисуем цифру штрафа ровно над крестиком
-            let badgeHtml = penText ? `<span style="color:#e74c3c; font-size:10px; font-weight:bold; margin-bottom:1px; line-height:1;">${penText}</span>` : '';
-            displayVal = `<div style="display:flex; flex-direction:column; align-items:center; justify-content:center;">${badgeHtml}<span class="material-symbols-rounded" style="font-size:18px; color:#e74c3c;">cancel</span></div>`; 
+            displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#e74c3c;">cancel</span>';
+            // Бейдж в углу ячейки, как на горячих чеках
+            if (penText) {
+                badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; z-index: 5;"><span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">${penText}</span></div>`;
+            }
         } else if (v === 'ПР') {
             displayVal = '<span style="color:#e74c3c;font-weight:bold;">ПР</span>'; 
         } else if (v !== '' && v !== '-') {
@@ -942,8 +948,8 @@ function generateHorizontalGrid(dataObj) {
         } else {
             displayVal = v || '-'; 
         }
-        // Увеличили min-height до 38px, чтобы крестик и цифра над ним поместились без обрезки
-        html += `<div class="grid-details-value" style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:4px 0; display:flex; align-items:center; justify-content:center; min-height:38px; width:100%; box-sizing:border-box;">${displayVal}</div>`; 
+        // Вернули высоту 28px и добавили position:relative
+        html += `<div class="grid-details-value" style="position:relative; background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:4px 0; display:flex; align-items:center; justify-content:center; min-height:28px; width:100%; box-sizing:border-box;">${displayVal}${badgeHtml}</div>`; 
     }); 
     html += `</div></div>`; 
     return html; 
