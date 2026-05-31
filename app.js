@@ -651,10 +651,13 @@ window.dynamicPrefixColors = window.dynamicPrefixColors || {};
 
 function getSourceColor(src) { 
     let originalSrc = String(src).trim();
-    // Если цвет для этой приставки был спарсен из таблицы, отдаем его везде!
     if (window.dynamicPrefixColors[originalSrc]) return window.dynamicPrefixColors[originalSrc];
     
     let s = originalSrc.toLowerCase(); 
+    
+    // Новый оранжево-красноватый цвет для всех отчетов и табеля
+    if(s.includes('ценник') || s.includes('ревизи') || s.includes('табел') || s.includes('уборк') || s.includes('отзыв') || s.includes('отчет')) return '#d35400';
+    
     if(s.includes('сц')) return '#e67e22'; 
     if(s.includes('trade-in')) return '#8e44ad'; 
     if(s.includes('горячий')) return '#e84393'; 
@@ -956,14 +959,37 @@ function generateHorizontalGrid(dataObj) {
 }
 
 function renderHistoryItem(i, isCompact = false) { 
-    let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
-    let rawNum = parseFloat(String(i.val).replace(',', '.').replace('+', '')) || 0; let valStr = String(rawNum).replace('.', ',');
-    if (rawNum > 0 && !String(i.type).toLowerCase().includes('штраф')) { valStr = '+' + valStr; } else if (rawNum < 0) { valStr = '-' + Math.abs(rawNum).toString().replace('.', ','); }
-    let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; if(String(i.type).toLowerCase().includes('штраф')) col = 'detail-fine'; 
-    let srcColor = getSourceColor(i.source); let finalType = i.source; let finalColor = srcColor;
-    if (String(i.type).toLowerCase().includes('использ')) { finalColor = "#f39c12"; finalType = "Мотивация"; } else if (String(i.type).toLowerCase().includes('штраф')) { finalColor = "#e74c3c"; finalType = "Штраф"; } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { finalColor = "#27ae60"; finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; }
-    let rightText = isDirOrZav ? formatShortName(String(i.type).toLowerCase().includes('штраф') ? i.source : i.approver) : "";
-    let bColor = rawNum > 0 ? "#27ae60" : (String(i.type).toLowerCase().includes('штраф') ? "#e74c3c" : "#f39c12");
+    let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
+    let rawNum = parseFloat(String(i.val).replace(',', '.').replace('+', '')) || 0; let valStr = String(rawNum).replace('.', ',');
+    let isPenalty = String(i.type).toLowerCase().includes('штраф') || String(i.type).toLowerCase().includes('списание');
+    
+    if (rawNum > 0 && !isPenalty) { valStr = '+' + valStr; } 
+    else if (rawNum < 0) { valStr = '-' + Math.abs(rawNum).toString().replace('.', ','); }
+    
+    let col = String(i.type).toLowerCase().includes('начисл') || valStr.includes('+') ? 'detail-plus' : 'detail-minus'; 
+    if (isPenalty) col = 'detail-fine'; 
+    
+    let srcColor = getSourceColor(i.source); 
+    let finalType = i.source; 
+    let finalColor = srcColor;
+    
+    if (String(i.type).toLowerCase().includes('использ')) { 
+        finalColor = "#f39c12"; finalType = "Мотивация"; 
+    } else if (String(i.type).toLowerCase() === 'штраф' && i.source === i.approver) {
+        finalColor = "#e74c3c"; finalType = "Штраф"; 
+    } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { 
+        finalColor = "#27ae60"; finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; 
+    }
+    
+    let rightText = isDirOrZav ? formatShortName(String(i.type).toLowerCase() === 'штраф' ? i.source : i.approver) : "";
+    
+    // Если это списание из отчетов или системы, выводим "Система"
+    if (i.type === "Списание" || i.approver === "Система" || i.approver === "Отчет") {
+        rightText = "Система";
+    }
+    
+    let bColor = rawNum > 0 ? "#27ae60" : (isPenalty ? "#e74c3c" : "#f39c12");
+    
     return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, borderColor: bColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
 }
 
@@ -999,13 +1025,55 @@ function renderEmpDetailTab(tab, iin) {
   let content = document.getElementById('emp-detail-content'); content.classList.remove("slide-up-fade"); void content.offsetWidth; content.classList.add("slide-up-fade"); let html = "";
   if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
   else if (tab === 'pts') { 
-    html = `<div class="grid-details-container inner-block"><div style="display:flex; justify-content:space-around; text-align:center; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:10px;"><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Нач.</div><b style="font-size:15px;">${emp.pts.acc || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Исп.</div><b style="font-size:15px;">${emp.pts.use || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Ост.</div><b style="font-size:15px; color:#27ae60;">${emp.pts.rem || 0}</b></div><div><div style="color:gray; font-size:10px; margin-bottom:4px;">Штрф.</div><b style="font-size:15px; color:#e74c3c;">${emp.pts.fin || 0}</b></div></div><div class="grid-details-title">История баллов</div></div>`; 
+    html = `<div class="grid-details-container inner-block"><div style="display:flex; justify-content:space-around; text-align:center; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
+        <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; padding:6px; border-radius:8px; transition:0.2s; flex:1;">
+            <div style="color:gray; font-size:10px; margin-bottom:4px;">Нач.</div><b style="font-size:15px;">${emp.pts.acc || 0}</b>
+        </div>
+        <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; padding:6px; border-radius:8px; transition:0.2s; flex:1;">
+            <div style="color:gray; font-size:10px; margin-bottom:4px;">Исп.</div><b style="font-size:15px;">${emp.pts.use || 0}</b>
+        </div>
+        <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; padding:6px; border-radius:8px; transition:0.2s; flex:1;">
+            <div style="color:gray; font-size:10px; margin-bottom:4px;">Ост.</div><b style="font-size:15px; color:#27ae60;">${emp.pts.rem || 0}</b>
+        </div>
+        <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; padding:6px; border-radius:8px; transition:0.2s; flex:1;">
+            <div style="color:gray; font-size:10px; margin-bottom:4px;">Штрф.</div><b style="font-size:15px; color:#e74c3c;">${emp.pts.fin || 0}</b>
+        </div>
+    </div><div class="grid-details-title">История баллов</div></div>`; 
     html += generateDatePanelHTML('emp-pts', `window.triggerEmpPtsReload_${iin}`); html += `<div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
+    
+    window.currentEmpPtsFilter = 'all'; // Сбрасываем фильтр при открытии
+    
     window[`triggerEmpPtsReload_${iin}`] = function(t, val) {
-        if(t && t !== 'search') setPanelDates(t, val, 'emp-pts', () => window[`triggerEmpPtsReload_${iin}`]('search'));
+        if (t === 'filter') {
+            if (window.currentEmpPtsFilter === val) window.currentEmpPtsFilter = 'all'; // Сброс фильтра при повторном клике
+            else window.currentEmpPtsFilter = val;
+            
+            ['acc', 'use', 'rem', 'fin'].forEach(f => {
+                let el = document.getElementById('flt-pts-' + f);
+                if(el) el.style.background = (window.currentEmpPtsFilter === f) ? 'var(--inner-bg)' : 'transparent';
+            });
+            t = 'search'; 
+        }
+        
+        if (t && t !== 'search') setPanelDates(t, val, 'emp-pts', () => window[`triggerEmpPtsReload_${iin}`]('search'));
         else {
             let startParts = document.getElementById('emp-pts-start').value.split('-'); let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime(); let endParts = document.getElementById('emp-pts-end').value.split('-'); let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime();
-            let displayHistory = (emp.ptsHistory || []).filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; let rd = parseCustomDate(p.date); return ptsVal !== 0 && rd >= st && rd <= en; });
+            let displayHistory = (emp.ptsHistory || []).filter(p => { 
+                let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; 
+                if (p.type === "KPI" && p.source !== "Горячий чек") return false; 
+                if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; 
+                if (ptsVal === 0) return false;
+                
+                let rd = parseCustomDate(p.date); 
+                if (rd < st || rd > en) return false;
+                
+                // Фильтрация по кликнутой кнопке в шапке
+                if (window.currentEmpPtsFilter === 'acc') return p.type === "Начисление";
+                if (window.currentEmpPtsFilter === 'use') return p.type === "Использование";
+                if (window.currentEmpPtsFilter === 'fin') return (p.type === "Штраф" || p.type === "Списание");
+                
+                return true; 
+            });
             document.getElementById('emp-pts-render-area').innerHTML = groupAndRenderByMonth(displayHistory, p => { return renderHistoryItem(p, true); });
         }
     }; setTimeout(() => window[`triggerEmpPtsReload_${iin}`]('search'), 100);
