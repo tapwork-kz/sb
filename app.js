@@ -1019,7 +1019,7 @@ function openDetails(type) {
           <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
               <span style="color:gray; font-size:10px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${fin}</b>
           </div>
-      </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`;
+      </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 6px -12px;"></div>`;
       
       listHtml = generateDatePanelHTML('my-pts', 'window.triggerMyPtsReload', pointsHeader); 
       listHtml += "<div id='my-pts-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; 
@@ -1111,7 +1111,7 @@ function renderEmpDetailTab(tab, iin) {
         <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
             <span style="color:gray; font-size:10px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${emp.pts.fin || 0}</b>
         </div>
-    </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`; 
+    </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 5px -12px;"></div>`; 
     
     html = generateDatePanelHTML('emp-pts', `window.triggerEmpPtsReload_${iin}`, pointsHeader); 
     html += `<div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
