@@ -1007,17 +1007,17 @@ function openDetails(type) {
       let fin = document.getElementById("pt-fin") ? document.getElementById("pt-fin").innerText : 0;
 
       let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; text-align:center; gap:8px; margin-bottom:12px;">
-          <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; border-radius:6px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6px 0; box-sizing:border-box;">
-              <div style="color:gray; font-size:10px; margin-bottom:2px;">Нач.</div><b style="font-size:14px; color:var(--text-color); line-height:1;">${acc}</b>
+          <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; border-radius:10px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; height:30px; box-sizing:border-box;">
+              <div style="color:gray; font-size:11px; margin-bottom:4px;">Нач.</div><b style="font-size:15px; color:var(--text-color); line-height:1;">${acc}</b>
           </div>
-          <div id="my-flt-pts-use" onclick="window.triggerMyPtsReload('filter', 'use')" style="cursor:pointer; border-radius:6px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6px 0; box-sizing:border-box;">
-              <div style="color:gray; font-size:10px; margin-bottom:2px;">Исп.</div><b style="font-size:14px; color:var(--text-color); line-height:1;">${use}</b>
+          <div id="my-flt-pts-use" onclick="window.triggerMyPtsReload('filter', 'use')" style="cursor:pointer; border-radius:10px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; height:30px; box-sizing:border-box;">
+              <div style="color:gray; font-size:11px; margin-bottom:4px;">Исп.</div><b style="font-size:15px; color:var(--text-color); line-height:1;">${use}</b>
           </div>
-          <div id="my-flt-pts-rem" onclick="window.triggerMyPtsReload('filter', 'rem')" style="cursor:pointer; border-radius:6px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6px 0; box-sizing:border-box;">
-              <div style="color:gray; font-size:10px; margin-bottom:2px;">Ост.</div><b style="font-size:14px; color:#27ae60; line-height:1;">${rem}</b>
+          <div id="my-flt-pts-rem" onclick="window.triggerMyPtsReload('filter', 'rem')" style="cursor:pointer; border-radius:10px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; height:30px; box-sizing:border-box;">
+              <div style="color:gray; font-size:11px; margin-bottom:4px;">Ост.</div><b style="font-size:15px; color:#27ae60; line-height:1;">${rem}</b>
           </div>
-          <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; border-radius:6px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6px 0; box-sizing:border-box;">
-              <div style="color:gray; font-size:10px; margin-bottom:2px;">Штрф.</div><b style="font-size:14px; color:#e74c3c; line-height:1;">${fin}</b>
+          <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; border-radius:10px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; height:30px; box-sizing:border-box;">
+              <div style="color:gray; font-size:11px; margin-bottom:4px;">Штрф.</div><b style="font-size:15px; color:#e74c3c; line-height:1;">${fin}</b>
           </div>
       </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`;
       
@@ -1099,17 +1099,17 @@ function renderEmpDetailTab(tab, iin) {
   if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
   else if (tab === 'pts') { 
     let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; text-align:center; gap:8px; margin-bottom:12px;">
-        <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:6px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6px 0; box-sizing:border-box;">
-            <div style="color:gray; font-size:10px; margin-bottom:2px;">Нач.</div><b style="font-size:14px; color:var(--text-color); line-height:1;">${emp.pts.acc || 0}</b>
+        <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:10px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; height:60px; box-sizing:border-box;">
+            <div style="color:gray; font-size:11px; margin-bottom:4px;">Нач.</div><b style="font-size:15px; color:var(--text-color); line-height:1;">${emp.pts.acc || 0}</b>
         </div>
-        <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; border-radius:6px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6px 0; box-sizing:border-box;">
-            <div style="color:gray; font-size:10px; margin-bottom:2px;">Исп.</div><b style="font-size:14px; color:var(--text-color); line-height:1;">${emp.pts.use || 0}</b>
+        <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; border-radius:10px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; height:60px; box-sizing:border-box;">
+            <div style="color:gray; font-size:11px; margin-bottom:4px;">Исп.</div><b style="font-size:15px; color:var(--text-color); line-height:1;">${emp.pts.use || 0}</b>
         </div>
-        <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; border-radius:6px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6px 0; box-sizing:border-box;">
-            <div style="color:gray; font-size:10px; margin-bottom:2px;">Ост.</div><b style="font-size:14px; color:#27ae60; line-height:1;">${emp.pts.rem || 0}</b>
+        <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; border-radius:10px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; height:60px; box-sizing:border-box;">
+            <div style="color:gray; font-size:11px; margin-bottom:4px;">Ост.</div><b style="font-size:15px; color:#27ae60; line-height:1;">${emp.pts.rem || 0}</b>
         </div>
-        <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; border-radius:6px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; padding: 6px 0; box-sizing:border-box;">
-            <div style="color:gray; font-size:10px; margin-bottom:2px;">Штрф.</div><b style="font-size:14px; color:#e74c3c; line-height:1;">${emp.pts.fin || 0}</b>
+        <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; border-radius:10px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; flex-direction:column; align-items:center; justify-content:center; height:60px; box-sizing:border-box;">
+            <div style="color:gray; font-size:11px; margin-bottom:4px;">Штрф.</div><b style="font-size:15px; color:#e74c3c; line-height:1;">${emp.pts.fin || 0}</b>
         </div>
     </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`; 
     
