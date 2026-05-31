@@ -998,7 +998,80 @@ function renderMoneyFineItem(i) { let roleStr = String(appState.role).toLowerCas
 function openDetails(type) {
   let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-kpi-circle-container").innerHTML = ""; let listHtml = "";
   if (type === 'sc') { document.getElementById("details-title").innerText = "Детали СЦ | Фокус"; listHtml = generateDatePanelHTML('my-sc', 'window.triggerMyScReload'); listHtml += "<div id='my-sc-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; document.getElementById("details-list").innerHTML = listHtml; window.triggerMyScReload = function(t, val) { if(t && t !== 'search') setPanelDates(t, val, 'my-sc', () => window.triggerMyScReload('search')); else { let startParts = document.getElementById('my-sc-start').value.split('-'); let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime(); let endParts = document.getElementById('my-sc-end').value.split('-'); let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime(); let arr = myScHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; }); arr.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); let h = ""; if(arr.length > 0) { h += arr.map((i, idx) => buildStandardRow({title: `${idx + 1}. ${i.reason}`, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, hasBorder: false})).join(""); } else { h = "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; } document.getElementById('my-sc-list-container').innerHTML = h; } }; window.triggerMyScReload('search'); return; } 
-  else if (type === 'points') { document.getElementById("details-title").innerText = "История Баллов"; listHtml = generateDatePanelHTML('my-pts', 'window.triggerMyPtsReload'); listHtml += "<div id='my-pts-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; document.getElementById("details-list").innerHTML = listHtml; window.triggerMyPtsReload = function(t, val) { if(t && t !== 'search') setPanelDates(t, val, 'my-pts', () => window.triggerMyPtsReload('search')); else { let startParts = document.getElementById('my-pts-start').value.split('-'); let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime(); let endParts = document.getElementById('my-pts-end').value.split('-'); let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime(); let arr = myDisplayPointsHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; }); document.getElementById('my-pts-list-container').innerHTML = groupAndRenderByMonth(arr, i => renderHistoryItem(i, true)); } }; window.triggerMyPtsReload('search'); return; }
+  else if (type === 'points') { 
+      document.getElementById("details-title").innerText = "История Баллов"; 
+      
+      let acc = document.getElementById("pt-acc") ? document.getElementById("pt-acc").innerText : 0;
+      let use = document.getElementById("pt-use") ? document.getElementById("pt-use").innerText : 0;
+      let rem = document.getElementById("pt-rem") ? document.getElementById("pt-rem").innerText : 0;
+      let fin = document.getElementById("pt-fin") ? document.getElementById("pt-fin").innerText : 0;
+
+      listHtml = `<div class="grid-details-container inner-block" style="margin-bottom:12px; padding-bottom:0;"><div style="display:flex; justify-content:space-between; text-align:center; gap:6px;">
+          <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
+              <div style="color:gray; font-size:9px; margin-bottom:4px;">Нач.</div><b style="font-size:13px; color:var(--text-color);">${acc}</b>
+          </div>
+          <div id="my-flt-pts-use" onclick="window.triggerMyPtsReload('filter', 'use')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
+              <div style="color:gray; font-size:9px; margin-bottom:4px;">Исп.</div><b style="font-size:13px; color:var(--text-color);">${use}</b>
+          </div>
+          <div id="my-flt-pts-rem" onclick="window.triggerMyPtsReload('filter', 'rem')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
+              <div style="color:gray; font-size:9px; margin-bottom:4px;">Ост.</div><b style="font-size:13px; color:#27ae60;">${rem}</b>
+          </div>
+          <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
+              <div style="color:gray; font-size:9px; margin-bottom:4px;">Штрф.</div><b style="font-size:13px; color:#e74c3c;">${fin}</b>
+          </div>
+      </div></div>`;
+      
+      listHtml += generateDatePanelHTML('my-pts', 'window.triggerMyPtsReload'); 
+      listHtml += "<div id='my-pts-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; 
+      document.getElementById("details-list").innerHTML = listHtml; 
+      
+      window.currentMyPtsFilter = 'all';
+
+      window.triggerMyPtsReload = function(t, val) { 
+          if (t === 'filter') {
+              if (window.currentMyPtsFilter === val) window.currentMyPtsFilter = 'all';
+              else window.currentMyPtsFilter = val;
+              
+              const colors = { acc: '#27ae60', use: '#f39c12', rem: '#3498db', fin: '#e74c3c' };
+              const bgs = { acc: 'rgba(39,174,96,0.1)', use: 'rgba(243,156,18,0.1)', rem: 'rgba(52,152,219,0.1)', fin: 'rgba(231,76,60,0.1)' };
+              
+              ['acc', 'use', 'rem', 'fin'].forEach(f => {
+                  let el = document.getElementById('my-flt-pts-' + f);
+                  if(el) {
+                      if (window.currentMyPtsFilter === f) {
+                          el.style.background = bgs[f];
+                          el.style.borderColor = colors[f];
+                      } else {
+                          el.style.background = 'var(--card-bg)';
+                          el.style.borderColor = 'var(--border-color)';
+                      }
+                  }
+              });
+              t = 'search'; 
+          }
+
+          if (t && t !== 'search') setPanelDates(t, val, 'my-pts', () => window.triggerMyPtsReload('search')); 
+          else { 
+              let startParts = document.getElementById('my-pts-start').value.split('-'); let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime(); let endParts = document.getElementById('my-pts-end').value.split('-'); let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime(); 
+              let arr = myDisplayPointsHistory.filter(i => { 
+                  let ptsVal = parseFloat(String(i.val).replace(',', '.')) || 0; 
+                  if (i.type === "KPI" && i.source !== "Горячий чек") return false; 
+                  if (i.type === "KPI" && i.source === "Горячий чек" && ptsVal === 0) return false; 
+                  
+                  let rd = parseCustomDate(i.date); 
+                  if (rd < st || rd > en) return false;
+
+                  if (window.currentMyPtsFilter === 'acc') return i.type === "Начисление";
+                  if (window.currentMyPtsFilter === 'use') return i.type === "Использование";
+                  if (window.currentMyPtsFilter === 'fin') return (i.type === "Штраф" || i.type === "Списание");
+                  return true; 
+              }); 
+              document.getElementById('my-pts-list-container').innerHTML = groupAndRenderByMonth(arr, i => renderHistoryItem(i, true)); 
+          } 
+      }; 
+      window.triggerMyPtsReload('search'); 
+      return; 
+  }
   else if (type === 'kpi') { document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date)); currentKpi.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: k.source, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); }); listHtml += "</div>"; }
   else if (type === 'report') { document.getElementById("details-title").innerText = "Мои отчеты"; listHtml = "<div style='padding-top:5px;'>"; listHtml += myReports.map(generateHorizontalGrid).join(''); listHtml += "</div>"; }
   else if (type === 'tabel') { document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); document.getElementById("details-title").innerText = "Нарушения (Штрафы и Замечания)"; listHtml = "<div style='padding-top:5px;'>"; let currentFines = myMoneyFinesHistory.filter(i => isCurrentMonth(i.date)); currentFines.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); if (currentFines.length > 0) listHtml += currentFines.map(i => renderMoneyFineItem(i)).join(""); else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Штрафов в этом месяце нет</div>"; let myRemarks = JSON.parse(localStorage.getItem("dashData_" + appState.iin))?.info?.remarks || []; if (myRemarks.length > 0) { listHtml += `<div class="grid-details-title" style="color:#f39c12; margin-top:10px;">Замечания</div>` + groupAndRenderByMonth(myRemarks, r => { let authorStr = formatRemarkAuthor(r.authorName, r.authorRole); return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="color:#f39c12; font-size:12px;">${authorStr} <span style="float:right; color:gray; font-size:10px;">${r.date}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${formatRemarkText(r.details)}</div></div>`; }); } listHtml += "</div>"; }
@@ -1025,32 +1098,44 @@ function renderEmpDetailTab(tab, iin) {
   let content = document.getElementById('emp-detail-content'); content.classList.remove("slide-up-fade"); void content.offsetWidth; content.classList.add("slide-up-fade"); let html = "";
   if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
   else if (tab === 'pts') { 
-    html = `<div class="grid-details-container inner-block"><div style="display:flex; justify-content:space-around; text-align:center; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:10px;">
-        <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; padding:6px; border-radius:8px; transition:0.2s; flex:1;">
-            <div style="color:gray; font-size:10px; margin-bottom:4px;">Нач.</div><b style="font-size:15px;">${emp.pts.acc || 0}</b>
+    html = `<div class="grid-details-container inner-block" style="padding-bottom:0; margin-bottom:12px;"><div style="display:flex; justify-content:space-between; text-align:center; gap:6px;">
+        <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
+            <div style="color:gray; font-size:9px; margin-bottom:4px;">Нач.</div><b style="font-size:13px; color:var(--text-color);">${emp.pts.acc || 0}</b>
         </div>
-        <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; padding:6px; border-radius:8px; transition:0.2s; flex:1;">
-            <div style="color:gray; font-size:10px; margin-bottom:4px;">Исп.</div><b style="font-size:15px;">${emp.pts.use || 0}</b>
+        <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
+            <div style="color:gray; font-size:9px; margin-bottom:4px;">Исп.</div><b style="font-size:13px; color:var(--text-color);">${emp.pts.use || 0}</b>
         </div>
-        <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; padding:6px; border-radius:8px; transition:0.2s; flex:1;">
-            <div style="color:gray; font-size:10px; margin-bottom:4px;">Ост.</div><b style="font-size:15px; color:#27ae60;">${emp.pts.rem || 0}</b>
+        <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
+            <div style="color:gray; font-size:9px; margin-bottom:4px;">Ост.</div><b style="font-size:13px; color:#27ae60;">${emp.pts.rem || 0}</b>
         </div>
-        <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; padding:6px; border-radius:8px; transition:0.2s; flex:1;">
-            <div style="color:gray; font-size:10px; margin-bottom:4px;">Штрф.</div><b style="font-size:15px; color:#e74c3c;">${emp.pts.fin || 0}</b>
+        <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; padding:8px 2px; border-radius:8px; transition:0.2s; flex:1; background:var(--card-bg); border:1px solid var(--border-color);">
+            <div style="color:gray; font-size:9px; margin-bottom:4px;">Штрф.</div><b style="font-size:13px; color:#e74c3c;">${emp.pts.fin || 0}</b>
         </div>
-    </div><div class="grid-details-title">История баллов</div></div>`; 
+    </div></div>`; 
+    
     html += generateDatePanelHTML('emp-pts', `window.triggerEmpPtsReload_${iin}`); html += `<div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
     
-    window.currentEmpPtsFilter = 'all'; // Сбрасываем фильтр при открытии
+    window.currentEmpPtsFilter = 'all'; 
     
     window[`triggerEmpPtsReload_${iin}`] = function(t, val) {
         if (t === 'filter') {
-            if (window.currentEmpPtsFilter === val) window.currentEmpPtsFilter = 'all'; // Сброс фильтра при повторном клике
+            if (window.currentEmpPtsFilter === val) window.currentEmpPtsFilter = 'all'; 
             else window.currentEmpPtsFilter = val;
+            
+            const colors = { acc: '#27ae60', use: '#f39c12', rem: '#3498db', fin: '#e74c3c' };
+            const bgs = { acc: 'rgba(39,174,96,0.1)', use: 'rgba(243,156,18,0.1)', rem: 'rgba(52,152,219,0.1)', fin: 'rgba(231,76,60,0.1)' };
             
             ['acc', 'use', 'rem', 'fin'].forEach(f => {
                 let el = document.getElementById('flt-pts-' + f);
-                if(el) el.style.background = (window.currentEmpPtsFilter === f) ? 'var(--inner-bg)' : 'transparent';
+                if(el) {
+                    if (window.currentEmpPtsFilter === f) {
+                        el.style.background = bgs[f];
+                        el.style.borderColor = colors[f];
+                    } else {
+                        el.style.background = 'var(--card-bg)';
+                        el.style.borderColor = 'var(--border-color)';
+                    }
+                }
             });
             t = 'search'; 
         }
@@ -1062,12 +1147,10 @@ function renderEmpDetailTab(tab, iin) {
                 let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; 
                 if (p.type === "KPI" && p.source !== "Горячий чек") return false; 
                 if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; 
-                if (ptsVal === 0) return false;
                 
                 let rd = parseCustomDate(p.date); 
                 if (rd < st || rd > en) return false;
                 
-                // Фильтрация по кликнутой кнопке в шапке
                 if (window.currentEmpPtsFilter === 'acc') return p.type === "Начисление";
                 if (window.currentEmpPtsFilter === 'use') return p.type === "Использование";
                 if (window.currentEmpPtsFilter === 'fin') return (p.type === "Штраф" || p.type === "Списание");
