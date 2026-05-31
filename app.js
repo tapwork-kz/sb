@@ -97,8 +97,7 @@ function renderPlanUI(pData) {
 
 function generateDatePanelHTML(idPrefix, onChangeFuncName, extraHtml = "") {
     let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
-    // Уменьшили padding с 12px до 10px, а высоту календарей урезали с 36px до 28px для идеальной симметрии
-    return `<div class="inner-block card date-panel-wrapper" style="padding:10px 12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">${extraHtml}<div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:28px; line-height:26px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:28px; line-height:26px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:28px; height:28px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:16px;">calendar_today</span></button></div><div style="position:relative; width:28px; height:28px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:16px;">calendar_month</span></button></div></div></div>`;
+    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);">${extraHtml}<div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></button></div></div></div>`;
 }
 
 function setPanelDates(type, val, idPrefix, reloadFn) {
@@ -1007,23 +1006,34 @@ function openDetails(type) {
       let rem = document.getElementById("pt-rem") ? document.getElementById("pt-rem").innerText : 0;
       let fin = document.getElementById("pt-fin") ? document.getElementById("pt-fin").innerText : 0;
 
-      let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:12px;">
-          <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
-              <span style="color:gray; font-size:10px;">Нач.</span><b style="font-size:13px; color:var(--text-color);">${acc}</b>
+      let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+
+      listHtml = `<div class="inner-block card" style="padding:10px 12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:10px;">
+              <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:30px; box-sizing:border-box; gap:4px;">
+                  <span style="color:gray; font-size:11px;">Нач.</span><b style="font-size:13px; color:var(--text-color);">${acc}</b>
+              </div>
+              <div id="my-flt-pts-use" onclick="window.triggerMyPtsReload('filter', 'use')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:30px; box-sizing:border-box; gap:4px;">
+                  <span style="color:gray; font-size:11px;">Исп.</span><b style="font-size:13px; color:var(--text-color);">${use}</b>
+              </div>
+              <div id="my-flt-pts-rem" onclick="window.triggerMyPtsReload('filter', 'rem')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:30px; box-sizing:border-box; gap:4px;">
+                  <span style="color:gray; font-size:11px;">Ост.</span><b style="font-size:13px; color:#27ae60;">${rem}</b>
+              </div>
+              <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:30px; box-sizing:border-box; gap:4px;">
+                  <span style="color:gray; font-size:11px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${fin}</b>
+              </div>
           </div>
-          <div id="my-flt-pts-use" onclick="window.triggerMyPtsReload('filter', 'use')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
-              <span style="color:gray; font-size:10px;">Исп.</span><b style="font-size:13px; color:var(--text-color);">${use}</b>
+          <div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 10px -12px;"></div>
+          <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
+              <input type="date" id="my-pts-start" value="${defStart}" onchange="window.triggerMyPtsReload('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:32px; line-height:30px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;">
+              <span style="color:gray; font-weight:bold;">-</span>
+              <input type="date" id="my-pts-end" value="${defEnd}" onchange="window.triggerMyPtsReload('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:32px; line-height:30px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;">
+              <div style="position:relative; width:32px; height:32px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="window.triggerMyPtsReload('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div>
+              <div style="position:relative; width:32px; height:32px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="window.triggerMyPtsReload('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></button></div>
           </div>
-          <div id="my-flt-pts-rem" onclick="window.triggerMyPtsReload('filter', 'rem')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
-              <span style="color:gray; font-size:10px;">Ост.</span><b style="font-size:13px; color:#27ae60;">${rem}</b>
-          </div>
-          <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
-              <span style="color:gray; font-size:10px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${fin}</b>
-          </div>
-      </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`;
-      
-      listHtml = generateDatePanelHTML('my-pts', 'window.triggerMyPtsReload', pointsHeader); 
-      listHtml += "<div id='my-pts-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; 
+      </div>
+      <div id='my-pts-list-container' class='card' style='padding:0; overflow:hidden;'></div>`;
+
       document.getElementById("details-list").innerHTML = listHtml; 
       
       window.currentMyPtsFilter = 'all';
@@ -1099,26 +1109,36 @@ function renderEmpDetailTab(tab, iin) {
   let content = document.getElementById('emp-detail-content'); content.classList.remove("slide-up-fade"); void content.offsetWidth; content.classList.add("slide-up-fade"); let html = "";
   if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
   else if (tab === 'pts') { 
-    let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:12px;">
-        <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
-            <span style="color:gray; font-size:10px;">Нач.</span><b style="font-size:13px; color:var(--text-color);">${emp.pts.acc || 0}</b>
-        </div>
-        <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
-            <span style="color:gray; font-size:10px;">Исп.</span><b style="font-size:13px; color:var(--text-color);">${emp.pts.use || 0}</b>
-        </div>
-        <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
-            <span style="color:gray; font-size:10px;">Ост.</span><b style="font-size:13px; color:#27ae60;">${emp.pts.rem || 0}</b>
-        </div>
-        <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
-            <span style="color:gray; font-size:10px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${emp.pts.fin || 0}</b>
-        </div>
-    </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`; 
-    
-    html = generateDatePanelHTML('emp-pts', `window.triggerEmpPtsReload_${iin}`, pointsHeader); 
-    html += `<div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
+      let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
+
+      html = `<div class="inner-block card" style="padding:10px 12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:10px;">
+              <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:30px; box-sizing:border-box; gap:4px;">
+                  <span style="color:gray; font-size:11px;">Нач.</span><b style="font-size:13px; color:var(--text-color);">${emp.pts.acc || 0}</b>
+              </div>
+              <div id="flt-pts-use" onclick="window.triggerEmpPtsReload_${iin}('filter', 'use')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:30px; box-sizing:border-box; gap:4px;">
+                  <span style="color:gray; font-size:11px;">Исп.</span><b style="font-size:13px; color:var(--text-color);">${emp.pts.use || 0}</b>
+              </div>
+              <div id="flt-pts-rem" onclick="window.triggerEmpPtsReload_${iin}('filter', 'rem')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:30px; box-sizing:border-box; gap:4px;">
+                  <span style="color:gray; font-size:11px;">Ост.</span><b style="font-size:13px; color:#27ae60;">${emp.pts.rem || 0}</b>
+              </div>
+              <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:30px; box-sizing:border-box; gap:4px;">
+                  <span style="color:gray; font-size:11px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${emp.pts.fin || 0}</b>
+              </div>
+          </div>
+          <div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 10px -12px;"></div>
+          <div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();">
+              <input type="date" id="emp-pts-start" value="${defStart}" onchange="window.triggerEmpPtsReload_${iin}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:32px; line-height:30px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;">
+              <span style="color:gray; font-weight:bold;">-</span>
+              <input type="date" id="emp-pts-end" value="${defEnd}" onchange="window.triggerEmpPtsReload_${iin}('search')" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:32px; line-height:30px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;">
+              <div style="position:relative; width:32px; height:32px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="window.triggerEmpPtsReload_${iin}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div>
+              <div style="position:relative; width:32px; height:32px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="window.triggerEmpPtsReload_${iin}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></button></div>
+          </div>
+      </div>
+      <div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
     
     window.currentEmpPtsFilter = 'all'; 
-    
+
     window[`triggerEmpPtsReload_${iin}`] = function(t, val) {
         if (t === 'filter') {
             if (window.currentEmpPtsFilter === val) window.currentEmpPtsFilter = 'all'; 
