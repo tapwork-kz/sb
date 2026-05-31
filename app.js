@@ -556,11 +556,14 @@ async function callBackend(actionName, payloadData = {}) {
                   if (empMap[ud.iin]) { empMap[ud.iin].ptsHistory.push(histItem); if (histItem.type === "Начисление") { empMap[ud.iin].pts.acc += ptsMotivation; if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; else empMap[ud.iin].sales.sc++; } if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); }
               }
               if (kpiChange !== 0) {
-                  let kName = cleanActionText || ud.type; let kSource = dynamicType;
-                  let kpiItem = { name: kName, source: kSource, val: kpiChange, date: dateStr };
-                  if (ud.iin === appState.iin) { if (!localData.info.kpiDetails) localData.info.kpiDetails = []; localData.info.kpiDetails.push(kpiItem); myKpiChanges += kpiChange; }
-                  if (empMap[ud.iin]) { empMap[ud.iin].kpi += kpiChange; if (ud.iin !== appState.iin) empMap[ud.iin].kpiDetails.push(kpiItem); }
-              }
+                  let kName = cleanActionText || ud.type; let kSource = dynamicType;
+                  let kpiItem = { name: kName, source: kSource, val: kpiChange, date: dateStr };
+                  // НОВОЕ: Прибавляем +KPI только если дата заявки относится к текущему месяцу
+                  if (isCurrentMonth(dateStr)) {
+                      if (ud.iin === appState.iin) { if (!localData.info.kpiDetails) localData.info.kpiDetails = []; localData.info.kpiDetails.push(kpiItem); myKpiChanges += kpiChange; }
+                      if (empMap[ud.iin]) { empMap[ud.iin].kpi += kpiChange; if (ud.iin !== appState.iin) empMap[ud.iin].kpiDetails.push(kpiItem); }
+                  }
+              }
           });
       }
 
