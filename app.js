@@ -401,25 +401,42 @@ async function callBackend(actionName, payloadData = {}) {
                   
                   sInfo.reports_data.forEach(rep => {
                       emp.reportErrors += rep.errors; 
-                      let ptPenalty = 0; let penalty = 0;
-                      if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenalty = rep.errors * ptsCfg.price; penalty = rep.errors * kpiCfg.price; } 
-                      else if (rep.title.includes("Ревизия")) { ptPenalty = rep.errors * ptsCfg.revsn; penalty = rep.errors * kpiCfg.revsn; } 
-                      else if (rep.title.includes("уборка")) { ptPenalty = rep.errors * ptsCfg.ub; penalty = rep.errors * kpiCfg.ub; } 
-                      else if (rep.title.includes("Отзыв")) { ptPenalty = rep.errors * ptsCfg.rev; penalty = rep.errors * kpiCfg.rev; }
+                      let ptPenPerErr = 0; let kpiPenPerErr = 0;
                       
-                      // Передаем правильную дату из БД для КФ. ЭФФ.
-                      if (penalty !== 0) { emp.kpi += penalty; emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: penalty, date: rep.date || "" }); }
+                      if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenPerErr = ptsCfg.price; kpiPenPerErr = kpiCfg.price; } 
+                      else if (rep.title.includes("Ревизия")) { ptPenPerErr = ptsCfg.revsn; kpiPenPerErr = kpiCfg.revsn; } 
+                      else if (rep.title.includes("уборка")) { ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; } 
+                      else if (rep.title.includes("Отзыв")) { ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; }
                       
-                      if (ptPenalty !== 0) {
-                          // Берем дату напрямую из отчета (или ставим сегодня, если ее нет)
-                          let rDate = rep.date || formatDateLocal(new Date());
-                          // Если в БД есть описание, берем его, иначе ставим "Отсутствие отчета"
-                          let rReason = rep.desc ? rep.desc : (rep.errors > 1 ? `Отсутствие отчета (${rep.errors} шт)` : "Отсутствие отчета");
-                          
-                          // Формируем красивый элемент для Истории баллов
-                          let histItem = { date: rDate, type: "Штраф", source: rep.title, reason: rReason, val: ptPenalty, approver: "", moneyFine: 0, kpiChange: penalty };
-                          emp.ptsHistory.push(histItem);
-                          emp.pts.fin += Math.abs(ptPenalty); 
+                      let totalKpiPenalty = rep.errors * kpiPenPerErr;
+                      if (totalKpiPenalty !== 0) { 
+                          emp.kpi += totalKpiPenalty; 
+                          emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: totalKpiPenalty, date: "" }); 
+                      }
+                      
+                      if (ptPenPerErr !== 0 && rep.values && rep.headers) {
+                          let currentYear = new Date().getFullYear();
+                          rep.values.forEach((v, idx) => {
+                              // Ищем крестики в массиве отчета
+                              if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
+                                  let rawDate = rep.headers[idx] || "";
+                                  // Если дата короткая (напр. 29.05), добавляем год (29.05.2026)
+                                  let rDate = rawDate.length === 5 ? `${rawDate}.${currentYear}` : rawDate;
+                                  
+                                  let histItem = { 
+                                      date: rDate || formatDateLocal(new Date()), 
+                                      type: "Списание", // Указываем Списание, чтобы оно красиво рендерилось с названием источника
+                                      source: rep.title, 
+                                      reason: "Отсутствие отчета", 
+                                      val: -Math.abs(ptPenPerErr), 
+                                      approver: "", 
+                                      moneyFine: 0, 
+                                      kpiChange: kpiPenPerErr 
+                                  };
+                                  emp.ptsHistory.push(histItem);
+                                  emp.pts.fin += Math.abs(ptPenPerErr);
+                              }
+                          });
                       }
                   });
 
@@ -885,7 +902,7 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
   }
 }
 
-function generateHorizontalGrid(dataObj) { if (!dataObj.headers || dataObj.headers.length === 0) return "<div style='padding:8px;text-align:center;color:gray;font-size:12px;'>Нет данных</div>"; let gridCols = `repeat(${dataObj.headers.length}, 1fr)`; let html = `<div class="grid-details-container inner-block"><div class="grid-details-title" style="margin-bottom: 6px;">${dataObj.title}</div><div class="grid-details-box" style="grid-template-columns: ${gridCols}; gap:3px;">`; dataObj.headers.forEach(h => { html += `<div class="grid-details-header">${h || '-'}</div>`; }); dataObj.values.forEach(v => { let displayVal = '-'; if (v === '✔') displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#27ae60;">check_circle</span>'; else if (v === '✖') displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#e74c3c;">cancel</span>'; else if (v === 'ПР') displayVal = '<span style="color:#e74c3c;font-weight:bold;">ПР</span>'; else if (v !== '' && v !== '-') displayVal = '<span style="color:#f39c12;font-weight:bold;">'+v+'</span>'; else displayVal = v || '-'; html += `<div class="grid-details-value" style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:4px 0; display:flex; align-items:center; justify-content:center; min-height:28px; width:100%; box-sizing:border-box;">${displayVal}</div>`; }); html += `</div></div>`; return html; }
+function generateHorizontalGrid(dataObj) { if (!dataObj.headers || dataObj.headers.length === 0) return "<div style='padding:8px;text-align:center;color:gray;font-size:12px;'>Нет данных</div>"; let gridCols = `repeat(${dataObj.headers.length}, 1fr)`; let badge = (dataObj.errors && dataObj.errors > 0) ? `<span style="background:#e74c3c; color:white; font-size:10px; padding:2px 6px; border-radius:8px; margin-left:8px; vertical-align:middle; display:inline-flex; align-items:center; font-weight:bold;"><span class="material-symbols-rounded" style="font-size:12px; margin-right:2px;">close</span>${dataObj.errors}</span>` : ''; let html = `<div class="grid-details-container inner-block"><div class="grid-details-title" style="margin-bottom: 6px; display:flex; align-items:center; justify-content:center;">${dataObj.title}${badge}</div><div class="grid-details-box" style="grid-template-columns: ${gridCols}; gap:3px;">`; dataObj.headers.forEach(h => { html += `<div class="grid-details-header">${h || '-'}</div>`; }); dataObj.values.forEach(v => { let displayVal = '-'; if (v === '✔') displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#27ae60;">check_circle</span>'; else if (v === '✖') displayVal = '<span class="material-symbols-rounded" style="font-size:18px; color:#e74c3c;">cancel</span>'; else if (v === 'ПР') displayVal = '<span style="color:#e74c3c;font-weight:bold;">ПР</span>'; else if (v !== '' && v !== '-') displayVal = '<span style="color:#f39c12;font-weight:bold;">'+v+'</span>'; else displayVal = v || '-'; html += `<div class="grid-details-value" style="background:var(--bg-color); border:1px solid var(--border-color); border-radius:6px; padding:4px 0; display:flex; align-items:center; justify-content:center; min-height:28px; width:100%; box-sizing:border-box;">${displayVal}</div>`; }); html += `</div></div>`; return html; }
 
 function renderHistoryItem(i, isCompact = false) { 
     let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
