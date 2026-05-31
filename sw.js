@@ -51,3 +51,54 @@ self.addEventListener('fetch', event => {
       })
   );
 });
+
+// ============================================================================
+// --- НОВОЕ: ОБРАБОТКА PUSH-УВЕДОМЛЕНИЙ ---
+// ============================================================================
+
+// 1. Слушаем сигнал с сервера (даже когда приложение закрыто)
+self.addEventListener('push', function(event) {
+    let data = {};
+    if (event.data) {
+        try {
+            data = event.data.json(); // Ожидаем JSON формат
+        } catch (e) {
+            data = { body: event.data.text() }; // Запасной вариант, если просто текст
+        }
+    }
+
+    const title = data.title || "Новое уведомление";
+    const options = {
+        body: data.body || "У вас есть новые сообщения.",
+        icon: './icon.png', // Главная иконка
+        badge: './icon.png', // Маленькая иконка для строки состояния Android
+        vibrate: [200, 100, 200, 100, 200], // Вибрация
+        data: {
+            url: data.url || '/' // URL, который откроется при клике
+        }
+    };
+
+    // Показываем системное уведомление на телефоне
+    event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// 2. Обработка клика пользователя по уведомлению
+self.addEventListener('notificationclick', function(event) {
+    event.notification.close(); // Закрываем уведомление
+
+    event.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
+            // Ищем уже открытую вкладку с приложением
+            for (var i = 0; i < windowClients.length; i++) {
+                var client = windowClients[i];
+                if (client.url && client.url.includes(self.location.origin) && 'focus' in client) {
+                    return client.focus(); // Фокусируемся на открытом приложении
+                }
+            }
+            // Если приложение было полностью закрыто, открываем его
+            if (clients.openWindow) {
+                return clients.openWindow(event.notification.data.url);
+            }
+        })
+    );
+});
