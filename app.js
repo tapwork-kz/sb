@@ -201,7 +201,7 @@ async function loadPlanHistory(isSilent = false) {
 
 async function callBackend(actionName, payloadData = {}) { 
   try { 
-    const getRoleGroup = (roleText) => { const r = (roleText || appState.role || "").toLowerCase(); if (r.includes("промоутер")) return "Промоутер"; if (r.includes("кассир")) return "Кассир"; if (r.includes("продавец")) return "Продавец"; return "Продавец"; };
+    const getRoleGroup = (roleText) => { const r = (roleText || appState.role || "").toLowerCase(); if (r.includes("промоутер")) return "Промоутер"; if (r.includes("продавец")) return "Продавец"; return "Продавец"; };
     if (actionName === "loginByIIN") {
       const { iin, password } = payloadData; const { data, error } = await supabaseClient.from('users').select('*').eq('iin', iin).single();
       if (error || !data) return { success: false, error: "Этот ИИН не найден в базе данных" };
@@ -246,20 +246,7 @@ async function callBackend(actionName, payloadData = {}) {
       const roleGroup = getRoleGroup(); const dayOfWeek = new Date().getDay() || 7; const todayStart = new Date(); todayStart.setHours(0,0,0,0); const currentHour = new Date().getHours();
       const [ { data: limitData }, { data: todayLogs } ] = await Promise.all([ supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(), supabaseClient.from('time_tracking').select('*, users(full_name, role, dept)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true }) ]);
       let activeOutsMap = {}; let myLogs = [];
-      (todayLogs || []).forEach(log => { 
-          if (log.iin === payloadData.iin) myLogs.push(log); 
-          if (log.direction === 'Уход') { 
-              activeOutsMap[log.iin] = { 
-                  iin: log.iin, 
-                  action: log.action_type, 
-                  leftAt: new Date(log.created_at).getTime(), 
-                  name: log.users ? log.users.full_name : 'Сотрудник', 
-                  // НОВОЕ: Строго приоритет колонки role_group из БД
-                  role: log.role_group || (log.users ? log.users.role : 'Сотрудник'), 
-                  dept: log.users ? log.users.dept : 'Цифра' 
-              }; 
-          } else { delete activeOutsMap[log.iin]; } 
-      });
+      (todayLogs || []).forEach(log => { if (log.iin === payloadData.iin) myLogs.push(log); if (log.direction === 'Уход') { activeOutsMap[log.iin] = { iin: log.iin, action: log.action_type, leftAt: new Date(log.created_at).getTime(), name: log.users ? log.users.full_name : 'Сотрудник', role: log.users ? log.users.role : log.role_group, dept: log.users ? log.users.dept : 'Цифра' }; } else { delete activeOutsMap[log.iin]; } });
       let myActiveAction = activeOutsMap[payloadData.iin] ? activeOutsMap[payloadData.iin].action : null; let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
       for (let key in activeOutsMap) { if (activeOutsMap[key].role.toLowerCase().includes(roleGroup.toLowerCase())) { let act = activeOutsMap[key].action; if (act && act.startsWith('Перерыв')) outByAction['Перерыв']++; else if (outByAction[act] !== undefined) outByAction[act]++; totalOut++; } }
       const tookLunch = myLogs.some(l => l.action_type === 'Обед' && l.direction === 'Уход'); const tookSnack = myLogs.some(l => l.action_type === 'Полдник' && l.direction === 'Уход');
@@ -490,23 +477,13 @@ async function callBackend(actionName, payloadData = {}) {
       let userMap = {}; let adminEmployees = []; let empMap = {};
       if (allUsers) {
           allUsers.forEach(u => {
-              userMap[u.iin] = u; 
-              
-              // --- ИСПРАВЛЕНИЕ ТУТ: добавили .trim() к обоим ИИН ---
-              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
-              // ------------------------------------------------------
-
+              userMap[u.iin] = u; let sInfo = (allSheetInfo || []).find(s => String(s.iin) === String(u.iin)) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
               let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
               let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0; let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0; let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
               
-              let uRoleLow = String(u.role || "").toLowerCase();
-              // НОВОЕ: Включаем в расчеты и Продавцов, и Кассиров!
-              if (uRoleLow.includes("продавец") || uRoleLow.includes("кассир")) {
-                  // Жестко фиксируем роль, чтобы нигде не проскакивал "Продавец"
-                  let actualRole = uRoleLow.includes("кассир") ? "Кассир" : (u.role || 'Продавец');
-                  
-                  let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: actualRole, login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
+              if (u.role.toLowerCase().includes("продавец")) {
+    let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: u.role || 'Продавец', login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
                   
                   sInfo.reports_data.forEach(rep => {
                       emp.reportErrors += rep.errors; 
@@ -662,17 +639,7 @@ async function callBackend(actionName, payloadData = {}) {
               if ((reqObj.authorIin === appState.iin || reqObj.targetIin === appState.iin) && (isClosedForUser || (reqObj.status === "pending_admin_view_remark" && reqObj.targetIin === appState.iin) || isDismissedByMe)) { if (userHistory.length < 50) userHistory.push(reqObj); }
           });
       }
-      // НОВОЕ: Умный поиск сменщика
-      let mySellers = [];
-      let currentUserRole = String(userData.role || "").toLowerCase();
-      
-      if (currentUserRole.includes("кассир")) {
-          // Кассиры видят только других кассиров (без привязки к отделу)
-          mySellers = adminEmployees.filter(e => String(e.role).toLowerCase().includes("кассир") && e.iin !== appState.iin).map(e => ({ iin: e.iin, name: e.name }));
-      } else {
-          // Продавцы видят только продавцов своего отдела
-          mySellers = adminEmployees.filter(e => e.dept === userData.dept && !String(e.role).toLowerCase().includes("кассир") && e.iin !== appState.iin).map(e => ({ iin: e.iin, name: e.name }));
-      }
+      let mySellers = adminEmployees.filter(e => e.dept === userData.dept && e.iin !== appState.iin).map(e => ({ iin: e.iin, name: e.name }));
       return { authorized: true, role: userData.role, name: userData.full_name, dept: userData.dept, isPromoter: userData.role.toLowerCase().includes("промоутер"), scItems: finalScItems, adminScItems: finalScItems, adminPlan: localData.adminPlan || null, tradeInModels: tradeInList, hotChecks: localData.hotChecks || [], promoLists: localData.promoLists || [], info: localData.info, userHistory: userHistory, userInbox: userInbox, adminInbox: adminInbox, adminHistory: adminHistory, adminEmployees: adminEmployees, sellers: mySellers, vacations: globalVacations };
     }
   } catch (error) { return { success: false, error: error.message }; }
@@ -782,10 +749,17 @@ function renderActiveOuts() {
    function updateTimers() { const now = Date.now(); list.innerHTML = globalActiveOuts.map(out => { let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
            if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); if (out.iin === appState.iin && appState.currentAction === out.action) { appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Выберите действие:"; } return ""; }
            if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
-           let actionTitle = out.action; let roleLabel = isProm ? out.role : `Продавец — ${out.dept || 'Сотрудник'}`; 
+           
+           let actionTitle = out.action; 
+           // --- ИСПРАВЛЕНИЕ: берем должность из БД (out.role) вместо жесткого "Продавец" ---
+           let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
+           let roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`; 
+           // ---------------------------------------------------------------------------------
+
            return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
        }).join(""); 
-   } updateTimers(); if (activeOutsTimer) clearInterval(activeOutsTimer); activeOutsTimer = setInterval(updateTimers, 10000); 
+   }
+   updateTimers(); if (activeOutsTimer) clearInterval(activeOutsTimer); activeOutsTimer = setInterval(updateTimers, 60000);
 }
 
 async function triggerAutoReturn(actionToReturnFrom) { if (!appState.currentAction) return; appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Очередь заполнена или лимит исчерпан"; await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isAutoReturn: true }); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); applyLimits(state); }
@@ -933,12 +907,7 @@ function renderDashboardData(data, isSilent = false) {
   let hcCard = document.getElementById("hot-check-card");
   if (hcCard) {
       hcCard.innerHTML = ""; let hasContent = false;
-      
-      // НОВОЕ: Локально проверяем, является ли пользователь кассиром
-      let isCashier = String(appState.role).toLowerCase().includes("кассир");
-
-      // НОВОЕ: Добавлено условие !isCashier, чтобы Горячие чеки не грузились для кассиров
-      if (!isCashier && data.hotChecks && data.hotChecks.length > 0) {
+      if (data.hotChecks && data.hotChecks.length > 0) {
           hasContent = true; let hcHtml = `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
           for(let sub in groups) {
               if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
@@ -950,11 +919,8 @@ function renderDashboardData(data, isSilent = false) {
               }); hcHtml += `</div>`;
           } hcCard.innerHTML += hcHtml;
       }
-      
       let promoLists = data.promoLists || [];
-      
-      // НОВОЕ: Добавлено условие !isCashier, чтобы промо-позиции (_) не грузились для кассиров
-      if (!isCashier && promoLists.length > 0) {
+      if (promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               let headerColor = list.listColor || "var(--text-color)";
@@ -1019,9 +985,7 @@ function renderDashboardData(data, isSilent = false) {
           let promoContainer = document.getElementById("promo-lists-container");
           if (promoContainer) promoContainer.innerHTML = "";
       }
-      
-      // НОВОЕ: Скрываем сам контейнер горячего чека, если кассир или нет контента
-      if (hasContent && !isCashier) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
+      if (hasContent) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
   }
     
   let savedReplies = {}; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { savedReplies[ta.id] = ta.value; });
@@ -1435,12 +1399,21 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
 function renderAdminOuts() {
   let list = globalActiveOuts || []; const now = Date.now();
   
+  function renderAdminOuts() {
+  let list = globalActiveOuts || []; const now = Date.now();
+  
   // 1. Обычные отсутствия (перерывы, обеды)
   let outsHtml = list.map(out => { 
       let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
       if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
       if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
-      let actionTitle = out.action; let roleLabel = isProm ? out.role : `Продавец — ${out.dept || 'Сотрудник'}`; 
+      
+      let actionTitle = out.action; 
+      // --- ИСПРАВЛЕНИЕ: берем должность из БД (out.role) вместо жесткого "Продавец" ---
+      let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
+      let roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`; 
+      // ---------------------------------------------------------------------------------
+
       return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
   }).join("");
   
