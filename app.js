@@ -516,6 +516,22 @@ async function callBackend(actionName, payloadData = {}) {
 
       let myPtsHistory = []; let myKpiChanges = 0;
       if (myEmp) { myPtsHistory = myPtsHistory.concat(myEmp.ptsHistory); }
+      
+      // --- НОВОЕ: Очищаем старые начисления перед новым подсчетом (чтобы не двоились) ---
+      if (localData.info && localData.info.kpiDetails) {
+          localData.info.kpiDetails = localData.info.kpiDetails.filter(k => 
+              k.source !== "Горячий чек" && k.source !== "Trade-In" && k.source !== "Продажа СЦ/Фокус" && k.source !== "Начисление"
+          );
+      }
+      for (let key in empMap) {
+          if (empMap[key].kpiDetails) {
+              empMap[key].kpiDetails = empMap[key].kpiDetails.filter(k => 
+                  k.source !== "Горячий чек" && k.source !== "Trade-In" && k.source !== "Продажа СЦ/Фокус" && k.source !== "Начисление"
+              );
+          }
+      }
+      // ---------------------------------------------------------------------------------
+
       if (allUserDetails) {
           allUserDetails.forEach(ud => {
               let d = new Date(ud.created_at); let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
@@ -790,7 +806,7 @@ function renderDashboardData(data, isSilent = false) {
   else if (isDir) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
       let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "";
-      let filteredAdminInbox = data.adminInbox ? data.adminInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const aBadge = document.getElementById("admin-badge"); if (filteredAdminInbox.length > 0) { if(aBadge) { aBadge.innerText = filteredAdminInbox.length; aBadge.classList.remove("hidden"); } if (filteredAdminInbox.length > appState.lastInboxCount) showPushNotification("Новая заявка!", "Появилась заявка в админке"); appState.lastInboxCount = filteredAdminInbox.length; } else { if(aBadge) aBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      let filteredAdminInbox = data.adminInbox ? data.adminInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const aBadge = document.getElementById("admin-badge"); if (filteredAdminInbox.length > 0) { if(aBadge) { aBadge.innerText = filteredAdminInbox.length; aBadge.classList.remove("hidden"); } if (filteredAdminInbox.length > appState.lastInboxCount); appState.lastInboxCount = filteredAdminInbox.length; } else { if(aBadge) aBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       let adminPlanList = document.getElementById("admin-plan-list"); if (adminPlanList) { let planFiltersExist = document.getElementById("plan-filter-start"); if (!planFiltersExist) { let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0)); adminPlanList.innerHTML = `<style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style><div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button><div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;"><input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button></div><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button></div><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="plan-filter-start" value="${defStart}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="plan-filter-end" value="${defEnd}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:44px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div></div></div><div id="plan-render-area"></div>`; setTimeout(() => loadPlanHistory(true), 100); } else { if (!isSensitiveState()) { loadPlanHistory(true); } } }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
@@ -1618,3 +1634,16 @@ window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefi
         if (confirm(promptMsg)) exec();
     }
 };
+
+// ==========================================
+// ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ПРИ ОТКРЫТИИ ПРИЛОЖЕНИЯ
+// ==========================================
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        // Если пользователь авторизован и открыл приложение - обновляем данные
+        if (appState && appState.iin) {
+            console.log("Приложение открыто: принудительно обновляем данные...");
+            loadDashboard(false); // false означает, что мы обновим данные "тихо", без экрана загрузки
+        }
+    }
+});
