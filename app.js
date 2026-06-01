@@ -310,7 +310,17 @@ async function callBackend(actionName, payloadData = {}) {
       if (userErr || !userData) return { authorized: false };
 
       let localData = {}; 
-      const [ { data: allUsers }, { data: allReqs }, { data: allUserDetails }, { data: kpiDataRaw }, { data: allSheetInfo }, { data: scItemsRaw }, { data: tradeInRaw } ] = await Promise.all([ supabaseClient.from('users').select('iin, full_name, role, dept'), supabaseClient.from('requests').select('*').order('created_at', { ascending: false }), supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }), supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1), supabaseClient.from('user_sheet_info').select('*'), supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1), supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }) ]);
+      const [ { data: allUsers }, { data: allReqs }, { data: allUserDetails }, { data: kpiDataRaw }, { data: allSheetInfo }, { data: scItemsRaw }, { data: tradeInRaw } ] = await Promise.all([ 
+          // --- НОВОЕ: Добавили login_status сюда ---
+          supabaseClient.from('users').select('iin, full_name, role, dept, login_status'), 
+          // -----------------------------------------
+          supabaseClient.from('requests').select('*').order('created_at', { ascending: false }), 
+          supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }), 
+          supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1), 
+          supabaseClient.from('user_sheet_info').select('*'), 
+          supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1), 
+          supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }) 
+      ]);
 
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : []; let tradeInList = (tradeInRaw && tradeInRaw.length > 0) ? tradeInRaw.map(item => item.model_name) : [];
       
