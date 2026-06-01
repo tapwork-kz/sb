@@ -1416,10 +1416,10 @@ function renderAdminOuts() {
 
       return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
   }).join("");
-  
-  if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
-  document.getElementById('admin-outs-list').innerHTML = outsHtml;
 
+  document.getElementById("admin-outs-list").innerHTML = outsHtml || "<p style='text-align:center; color:gray; font-size:12px; padding:15px 0;'>Все на местах</p>";
+}
+  
   // 2. Блок отпусков
   let activeVacations = [];
   (window.adminVacationsGlobal || []).forEach(v => {
