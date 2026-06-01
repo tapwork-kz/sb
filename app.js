@@ -194,15 +194,21 @@ async function loadPlanHistory(isSilent = false) {
 }
 
 async function callBackend(actionName, payloadData = {}) { 
-  try { 
-    const getRoleGroup = (roleText) => { const r = (roleText || appState.role || "").toLowerCase(); if (r.includes("промоутер")) return "Промоутер"; if (r.includes("продавец")) return "Продавец"; return "Продавец"; };
-    if (actionName === "loginByIIN") {
-      const { iin, password } = payloadData; const { data, error } = await supabaseClient.from('users').select('*').eq('iin', iin).single();
-      if (error || !data) return { success: false, error: "Этот ИИН не найден в базе данных" };
-      if (String(data.password) !== String(password)) return { success: false, error: "Неверный пароль" };
-      if (data.login_status === false || data.login_status === 'FALSE' || data.login_status === 'false') { return { success: false, error: "Доступ запрещен" }; }
-      return { success: true, token: 'sb_' + data.iin, iin: data.iin, firstName: data.full_name, role: data.role, dept: data.dept, gender: data.gender, isPromoter: data.role.toLowerCase().includes("промоутер") };
-    }
+  try { 
+    const getRoleGroup = (roleText) => { const r = (roleText || appState.role || "").toLowerCase(); if (r.includes("промоутер")) return "Промоутер"; if (r.includes("продавец")) return "Продавец"; return "Продавец"; };
+    if (actionName === "loginByIIN") {
+      const { iin, password } = payloadData; const { data, error } = await supabaseClient.from('users').select('*').eq('iin', iin).single();
+      if (error || !data) return { success: false, error: "Этот ИИН не найден в базе данных" };
+      if (String(data.password) !== String(password)) return { success: false, error: "Неверный пароль" };
+      
+      // --- НОВОЕ: Надежная проверка блокировки сотрудника ---
+      if (String(data.login_status).toUpperCase() === 'FALSE') { 
+          return { success: false, error: "Учетная запись заблокирована" }; 
+      }
+      // --------------------------------------------------------
+
+      return { success: true, token: 'sb_' + data.iin, iin: data.iin, firstName: data.full_name, role: data.role, dept: data.dept, gender: data.gender, isPromoter: data.role.toLowerCase().includes("промоутер") };
+    }
     
     if (actionName === "recordAction") {
       const { iin, actionType, isReturn, isAutoReturn } = payloadData; const roleGroup = getRoleGroup(); const exactRole = appState.role; 
@@ -1360,9 +1366,18 @@ function submitVacation() {
 }
 
 function renderAdminEmps(dept, btnElement) {
-   currentEmpDept = dept; if (btnElement) { document.getElementById('flt-emp-cifra').classList.remove('active-flt'); document.getElementById('flt-emp-mbt').classList.remove('active-flt'); document.getElementById('flt-emp-kbt').classList.remove('active-flt'); btnElement.classList.add('active-flt'); }
-   let container = document.getElementById("admin-emp-list"); let filtered = allEmployeesData.filter(e => e.dept.toLowerCase().includes(dept.toLowerCase())); let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
-   container.innerHTML = filtered.map(e => { 
+   currentEmpDept = dept; if (btnElement) { document.getElementById('flt-emp-cifra').classList.remove('active-flt'); document.getElementById('flt-emp-mbt').classList.remove('active-flt'); document.getElementById('flt-emp-kbt').classList.remove('active-flt'); btnElement.classList.add('active-flt'); }
+   let container = document.getElementById("admin-emp-list"); 
+   
+   // --- НОВОЕ: Скрываем заблокированных сотрудников (у которых login_status === FALSE) ---
+   let filtered = allEmployeesData.filter(e => 
+       String(e.login_status).toUpperCase() !== 'FALSE' && 
+       e.dept.toLowerCase().includes(dept.toLowerCase())
+   ); 
+   // --------------------------------------------------------------------------------------
+   
+   let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
+   container.innerHTML = filtered.map(e => { 
            let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
            let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
            let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
