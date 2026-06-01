@@ -1122,7 +1122,7 @@ function openDetails(type) {
       let rem = document.getElementById("pt-rem") ? document.getElementById("pt-rem").innerText : 0;
       let fin = document.getElementById("pt-fin") ? document.getElementById("pt-fin").innerText : 0;
 
-      let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:12px;">
+      let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:12px; background:var(--card-bg); border:1px solid rgba(150,150,150,0.2); border-radius:12px; margin-bottom:8px;">
           <div id="my-flt-pts-acc" onclick="window.triggerMyPtsReload('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
               <span style="color:gray; font-size:10px;">Нач.</span><b style="font-size:13px; color:var(--text-color);">${acc}</b>
           </div>
@@ -1135,9 +1135,10 @@ function openDetails(type) {
           <div id="my-flt-pts-fin" onclick="window.triggerMyPtsReload('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
               <span style="color:gray; font-size:10px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${fin}</b>
           </div>
-      </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`;
+      </div>`;
       
-      listHtml = generateDatePanelHTML('my-pts', 'window.triggerMyPtsReload', pointsHeader); 
+      // Убираем extraHtml из вызова функции дат, так как мы вывели баллы отдельным блоком выше
+      listHtml = pointsHeader + generateDatePanelHTML('my-pts', 'window.triggerMyPtsReload', ""); 
       listHtml += "<div id='my-pts-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; 
       document.getElementById("details-list").innerHTML = listHtml; 
       
@@ -1214,7 +1215,7 @@ function renderEmpDetailTab(tab, iin) {
   let content = document.getElementById('emp-detail-content'); content.classList.remove("slide-up-fade"); void content.offsetWidth; content.classList.add("slide-up-fade"); let html = "";
   if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
   else if (tab === 'pts') { 
-    let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:12px;">
+    let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:12px; background:var(--card-bg); border:1px solid rgba(150,150,150,0.2); border-radius:12px; margin-bottom:8px;">
         <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
             <span style="color:gray; font-size:10px;">Нач.</span><b style="font-size:13px; color:var(--text-color);">${emp.pts.acc || 0}</b>
         </div>
@@ -1227,9 +1228,10 @@ function renderEmpDetailTab(tab, iin) {
         <div id="flt-pts-fin" onclick="window.triggerEmpPtsReload_${iin}('filter', 'fin')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:32px; box-sizing:border-box; gap:4px;">
             <span style="color:gray; font-size:10px;">Штрф.</span><b style="font-size:13px; color:#e74c3c;">${emp.pts.fin || 0}</b>
         </div>
-    </div><div style="border-bottom:1px solid rgba(150,150,150,0.1); margin:0 -12px 12px -12px;"></div>`; 
+    </div>`; 
     
-    html = generateDatePanelHTML('emp-pts', `window.triggerEmpPtsReload_${iin}`, pointsHeader); 
+    // Склеиваем блоки, передаем пустую строку в extraHtml
+    html = pointsHeader + generateDatePanelHTML('emp-pts', `window.triggerEmpPtsReload_${iin}`, ""); 
     html += `<div id="emp-pts-render-area" class="card" style="padding:0; overflow:hidden;"></div>`;
     
     window.currentEmpPtsFilter = 'all'; 
