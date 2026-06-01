@@ -246,7 +246,20 @@ async function callBackend(actionName, payloadData = {}) {
       const roleGroup = getRoleGroup(); const dayOfWeek = new Date().getDay() || 7; const todayStart = new Date(); todayStart.setHours(0,0,0,0); const currentHour = new Date().getHours();
       const [ { data: limitData }, { data: todayLogs } ] = await Promise.all([ supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(), supabaseClient.from('time_tracking').select('*, users(full_name, role, dept)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true }) ]);
       let activeOutsMap = {}; let myLogs = [];
-      (todayLogs || []).forEach(log => { if (log.iin === payloadData.iin) myLogs.push(log); if (log.direction === 'Уход') { activeOutsMap[log.iin] = { iin: log.iin, action: log.action_type, leftAt: new Date(log.created_at).getTime(), name: log.users ? log.users.full_name : 'Сотрудник', role: log.users ? log.users.role : log.role_group, dept: log.users ? log.users.dept : 'Цифра' }; } else { delete activeOutsMap[log.iin]; } });
+      (todayLogs || []).forEach(log => { 
+          if (log.iin === payloadData.iin) myLogs.push(log); 
+          if (log.direction === 'Уход') { 
+              activeOutsMap[log.iin] = { 
+                  iin: log.iin, 
+                  action: log.action_type, 
+                  leftAt: new Date(log.created_at).getTime(), 
+                  name: log.users ? log.users.full_name : 'Сотрудник', 
+                  // НОВОЕ: Строго приоритет колонки role_group из БД
+                  role: log.role_group || (log.users ? log.users.role : 'Сотрудник'), 
+                  dept: log.users ? log.users.dept : 'Цифра' 
+              }; 
+          } else { delete activeOutsMap[log.iin]; } 
+      });
       let myActiveAction = activeOutsMap[payloadData.iin] ? activeOutsMap[payloadData.iin].action : null; let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
       for (let key in activeOutsMap) { if (activeOutsMap[key].role.toLowerCase().includes(roleGroup.toLowerCase())) { let act = activeOutsMap[key].action; if (act && act.startsWith('Перерыв')) outByAction['Перерыв']++; else if (outByAction[act] !== undefined) outByAction[act]++; totalOut++; } }
       const tookLunch = myLogs.some(l => l.action_type === 'Обед' && l.direction === 'Уход'); const tookSnack = myLogs.some(l => l.action_type === 'Полдник' && l.direction === 'Уход');
@@ -477,18 +490,23 @@ async function callBackend(actionName, payloadData = {}) {
       let userMap = {}; let adminEmployees = []; let empMap = {};
       if (allUsers) {
           allUsers.forEach(u => {
-              userMap[u.iin] = u; let sInfo = (allSheetInfo || []).find(s => String(s.iin) === String(u.iin)) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
+              userMap[u.iin] = u; 
+              
+              // --- ИСПРАВЛЕНИЕ ТУТ: добавили .trim() к обоим ИИН ---
+              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
+              // ------------------------------------------------------
+
               let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
               let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0; let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0; let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
               
               let uRoleLow = String(u.role || "").toLowerCase();
-              // НОВОЕ: Включаем в расчеты и Продавцов, и Кассиров!
-              if (uRoleLow.includes("продавец") || uRoleLow.includes("кассир")) {
+              // НОВОЕ: Включаем в расчеты и Продавцов, и Кассиров!
+              if (uRoleLow.includes("продавец") || uRoleLow.includes("кассир")) {
                   // Жестко фиксируем роль, чтобы нигде не проскакивал "Продавец"
                   let actualRole = uRoleLow.includes("кассир") ? "Кассир" : (u.role || 'Продавец');
                   
-                  let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: actualRole, login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
+                  let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: actualRole, login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
                   
                   sInfo.reports_data.forEach(rep => {
                       emp.reportErrors += rep.errors; 
