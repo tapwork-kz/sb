@@ -1676,3 +1676,15 @@ document.addEventListener('visibilitychange', () => {
 window.addEventListener('load', () => {
     setTimeout(checkNotificationRoute, 1000); // Даем время интерфейсу загрузиться
 });
+
+// Прием мгновенных команд от Service Worker (для PUSH уведомлений)
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.action === 'navigate') {
+            // Тихо меняем URL
+            window.location.hash = event.data.url.replace('/', ''); 
+            // Мгновенно переключаем вкладку (функция, которую мы добавили ранее)
+            checkNotificationRoute(); 
+        }
+    });
+}
