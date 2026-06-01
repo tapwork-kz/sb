@@ -814,8 +814,33 @@ function formatRemarkAuthor(name, role) { let r = String(role || "руковод
 function formatRemarkText(text, targetName = null) { if (!text) return ""; let str = String(text); let splitRegex = /\n\n>\s*(.*?)\n/i; let parts = str.split(splitRegex); if (parts.length >= 3) { let main = parts[0]; let authorLabel = parts[1]; let quote = parts.slice(2).join(""); return `${main}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${authorLabel}</b><br>${quote}</div>`; } let oldRegex = /(Ответ.*?:\s*)/i; let oldParts = str.split(oldRegex); if (oldParts.length >= 3) { return `${oldParts[0]}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${oldParts[1]}</b><br>${oldParts.slice(2).join("")}</div>`; } if (targetName) { let targetShort = targetName; let tParts = String(targetName).trim().split(/\s+/); if (tParts.length > 1 && tParts[1]) targetShort = tParts[0] + " " + tParts[1].charAt(0).toUpperCase() + "."; return `${str}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid gray; border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:gray; font-style:normal;">${targetShort}</b><br><span style="color:gray;">Ожидает ответа...</span></div>`; } return str; }
 
 function renderDashboardData(data, isSilent = false) {
-  if (!data) return; isUserPromoter = data.isPromoter || false; appState.role = data.role || "Продавец"; appState.dept = (data.info && data.info.dept) ? data.info.dept : "Цифра"; saveMemory("userRole", appState.role); saveMemory("userDept", appState.dept); 
-  let roleStr = String(appState.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); let isZavSklad = roleStr.includes("заведующий складом"); let isSeller = !isUserPromoter && !isDir && !isZavSklad; let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
+  if (!data) return; isUserPromoter = data.isPromoter || false; appState.role = data.role || "Продавец"; appState.dept = (data.info && data.info.dept) ? data.info.dept : "Цифра"; saveMemory("userRole", appState.role); saveMemory("userDept", appState.dept); 
+  let roleStr = String(appState.role).toLowerCase(); 
+  let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
+  let isZavSklad = roleStr.includes("заведующий складом"); 
+  let isCashier = roleStr.includes("кассир"); // НОВОЕ: Определение кассира
+  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier; // Продавец - это кто не промоутер, не дир, не завсклад и НЕ кассир
+  
+  let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
+  
+  // НОВОЕ: Скрываем ненужные элементы интерфейса для кассира
+  if (isCashier) {
+      let scBlock = document.querySelector(".info-box[onclick=\"openDetails('sc')\"]");
+      if (scBlock) scBlock.style.display = "none"; // Скрываем блок СЦ на главной
+      
+      let btnFormSc = document.querySelector("button[onclick=\"openForm('sc')\"]");
+      if (btnFormSc) btnFormSc.style.display = "none"; // Скрываем кнопку СЦ в меню
+      
+      let btnFormTradeIn = document.querySelector("button[onclick=\"openForm('tradein')\"]");
+      if (btnFormTradeIn) btnFormTradeIn.style.display = "none"; // Скрываем Trade-In
+  } else {
+      let scBlock = document.querySelector(".info-box[onclick=\"openDetails('sc')\"]");
+      if (scBlock) scBlock.style.display = ""; 
+      let btnFormSc = document.querySelector("button[onclick=\"openForm('sc')\"]");
+      if (btnFormSc) btnFormSc.style.display = ""; 
+      let btnFormTradeIn = document.querySelector("button[onclick=\"openForm('tradein')\"]");
+      if (btnFormTradeIn) btnFormTradeIn.style.display = ""; 
+  }
   
   if (isZavSklad) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
@@ -832,8 +857,31 @@ function renderDashboardData(data, isSilent = false) {
       let adminPlanList = document.getElementById("admin-plan-list"); if (adminPlanList) { let planFiltersExist = document.getElementById("plan-filter-start"); if (!planFiltersExist) { let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0)); adminPlanList.innerHTML = `<style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style><div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button><div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;"><input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button></div><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button></div><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="plan-filter-start" value="${defStart}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="plan-filter-end" value="${defEnd}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:44px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div></div></div><div id="plan-render-area"></div>`; setTimeout(() => loadPlanHistory(true), 100); } else { if (!isSensitiveState()) { loadPlanHistory(true); } } }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
-      if (isUserPromoter) { document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); let db = document.getElementById("desc-break"); if(db) db.innerText = "15 мин"; let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "1 час"; let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; if(dash) dash.classList.add("hidden"); } 
-      else { document.getElementById("nav-time-icon")?.classList.remove("hidden"); document.getElementById("nav-create-icon")?.classList.remove("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); let db = document.getElementById("desc-break"); if(db) db.innerText = "10 мин"; let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "40 мин"; let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; if (isSeller && document.querySelectorAll("#content-adm-main:not(.hidden)").length === 0 && document.querySelectorAll("#content-details:not(.hidden)").length === 0 && !isAnyFormActive) { if (dash && dash.classList.contains("hidden")) { dash.classList.remove("hidden"); dash.classList.remove("fade-in", "slide-up-fade"); dash.classList.add("slide-down-fade"); } } else { if(dash) dash.classList.add("hidden"); } }
+      if (isUserPromoter) { 
+          document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); 
+          let db = document.getElementById("desc-break"); if(db) db.innerText = "15 мин"; 
+          let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "1 час"; 
+          let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; 
+          if(dash) dash.classList.add("hidden"); 
+      } else { 
+          // НОВОЕ: Логика для Продавцов и Кассиров (и те, и другие видят нижние кнопки и дашборд)
+          document.getElementById("nav-time-icon")?.classList.remove("hidden"); 
+          document.getElementById("nav-create-icon")?.classList.remove("hidden"); 
+          document.getElementById("inbox-icon")?.classList.remove("hidden"); 
+          let db = document.getElementById("desc-break"); if(db) db.innerText = "10 мин"; 
+          let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "40 мин"; 
+          let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; 
+          
+          if ((isSeller || isCashier) && document.querySelectorAll("#content-adm-main:not(.hidden)").length === 0 && document.querySelectorAll("#content-details:not(.hidden)").length === 0 && !isAnyFormActive) { 
+              if (dash && dash.classList.contains("hidden")) { 
+                  dash.classList.remove("hidden"); 
+                  dash.classList.remove("fade-in", "slide-up-fade"); 
+                  dash.classList.add("slide-down-fade"); 
+              } 
+          } else { 
+              if(dash) dash.classList.add("hidden"); 
+          } 
+      }
       document.getElementById("nav-adm-outs")?.classList.add("hidden"); document.getElementById("nav-adm-main")?.classList.add("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "Непрочитанные сообщения"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) switchTab('time');
@@ -1195,7 +1243,26 @@ function openDetails(type) {
       return; 
   }
   else if (type === 'kpi') { document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date)); currentKpi.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: k.source, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); }); listHtml += "</div>"; }
-  else if (type === 'report') { document.getElementById("details-title").innerText = "Мои отчеты"; listHtml = "<div style='padding-top:5px;'>"; listHtml += myReports.map(generateHorizontalGrid).join(''); listHtml += "</div>"; }
+  else if (type === 'report') { 
+      document.getElementById("details-title").innerText = "Мои отчеты"; 
+      listHtml = "<div style='padding-top:5px;'>"; 
+      
+      let roleStr = String(appState.role).toLowerCase();
+      let isCashier = roleStr.includes("кассир");
+      
+      // Фильтруем отчеты: если кассир, оставляем только те, где в названии есть "Отзыв"
+      let displayReports = myReports;
+      if (isCashier) {
+          displayReports = myReports.filter(rep => rep.title && rep.title.toLowerCase().includes("отзыв"));
+      }
+      
+      if (displayReports.length > 0) {
+          listHtml += displayReports.map(generateHorizontalGrid).join(''); 
+      } else {
+          listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Нет отчетов для отображения</div>";
+      }
+      listHtml += "</div>"; 
+  }
   else if (type === 'tabel') { document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); document.getElementById("details-title").innerText = "Нарушения (Штрафы и Замечания)"; listHtml = "<div style='padding-top:5px;'>"; let currentFines = myMoneyFinesHistory.filter(i => isCurrentMonth(i.date)); currentFines.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); if (currentFines.length > 0) listHtml += currentFines.map(i => renderMoneyFineItem(i)).join(""); else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Штрафов в этом месяце нет</div>"; let myRemarks = JSON.parse(localStorage.getItem("dashData_" + appState.iin))?.info?.remarks || []; if (myRemarks.length > 0) { listHtml += `<div class="grid-details-title" style="color:#f39c12; margin-top:10px;">Замечания</div>` + groupAndRenderByMonth(myRemarks, r => { let authorStr = formatRemarkAuthor(r.authorName, r.authorRole); return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="color:#f39c12; font-size:12px;">${authorStr} <span style="float:right; color:gray; font-size:10px;">${r.date}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${formatRemarkText(r.details)}</div></div>`; }); } listHtml += "</div>"; }
   document.getElementById("details-list").innerHTML = listHtml;
 }
