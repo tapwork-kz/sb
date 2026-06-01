@@ -85,6 +85,7 @@ self.addEventListener('push', function(event) {
 // 2. Обработка клика пользователя по уведомлению
 self.addEventListener('notificationclick', function(event) {
     event.notification.close(); // Закрываем уведомление
+    const targetUrl = event.notification.data.url || '/';
 
     event.waitUntil(
         clients.matchAll({ type: 'window', includeUncontrolled: true }).then(windowClients => {
@@ -92,14 +93,15 @@ self.addEventListener('notificationclick', function(event) {
             for (var i = 0; i < windowClients.length; i++) {
                 var client = windowClients[i];
                 if (client.url && client.url.includes(self.location.origin) && 'focus' in client) {
-                    // Перенаправляем на нужную вкладку и фокусируемся
-                    client.navigate(event.notification.data.url);
-                    return client.focus(); 
+                    client.focus(); // Разворачиваем свернутое приложение
+                    // МГНОВЕННО отправляем команду внутрь app.js без перезагрузки
+                    client.postMessage({ action: 'navigate', url: targetUrl });
+                    return; 
                 }
             }
-            // Если приложение было полностью закрыто, открываем его
+            // Если приложение было полностью закрыто (выгружено из памяти), открываем его
             if (clients.openWindow) {
-                return clients.openWindow(event.notification.data.url);
+                return clients.openWindow(targetUrl);
             }
         })
     );
