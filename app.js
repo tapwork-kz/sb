@@ -749,17 +749,12 @@ function renderActiveOuts() {
    function updateTimers() { const now = Date.now(); list.innerHTML = globalActiveOuts.map(out => { let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
            if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); if (out.iin === appState.iin && appState.currentAction === out.action) { appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Выберите действие:"; } return ""; }
            if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
-           
            let actionTitle = out.action; 
-           // --- ИСПРАВЛЕНИЕ: берем должность из БД (out.role) вместо жесткого "Продавец" ---
            let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
-           let roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`; 
-           // ---------------------------------------------------------------------------------
-
+           let roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`;
            return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
        }).join(""); 
-   }
-   updateTimers(); if (activeOutsTimer) clearInterval(activeOutsTimer); activeOutsTimer = setInterval(updateTimers, 60000);
+   } updateTimers(); if (activeOutsTimer) clearInterval(activeOutsTimer); activeOutsTimer = setInterval(updateTimers, 10000); 
 }
 
 async function triggerAutoReturn(actionToReturnFrom) { if (!appState.currentAction) return; appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Очередь заполнена или лимит исчерпан"; await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isAutoReturn: true }); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); applyLimits(state); }
@@ -1399,27 +1394,20 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
 function renderAdminOuts() {
   let list = globalActiveOuts || []; const now = Date.now();
   
-  function renderAdminOuts() {
-  let list = globalActiveOuts || []; const now = Date.now();
-  
   // 1. Обычные отсутствия (перерывы, обеды)
   let outsHtml = list.map(out => { 
       let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
       if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
       if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
-      
       let actionTitle = out.action; 
-      // --- ИСПРАВЛЕНИЕ: берем должность из БД (out.role) вместо жесткого "Продавец" ---
       let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
-      let roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`; 
-      // ---------------------------------------------------------------------------------
-
+      let roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`;
       return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
   }).join("");
-
-  document.getElementById("admin-outs-list").innerHTML = outsHtml || "<p style='text-align:center; color:gray; font-size:12px; padding:15px 0;'>Все на местах</p>";
-}
   
+  if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
+  document.getElementById('admin-outs-list').innerHTML = outsHtml;
+
   // 2. Блок отпусков
   let activeVacations = [];
   (window.adminVacationsGlobal || []).forEach(v => {
