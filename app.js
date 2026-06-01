@@ -201,7 +201,7 @@ async function loadPlanHistory(isSilent = false) {
 
 async function callBackend(actionName, payloadData = {}) { 
   try { 
-    const getRoleGroup = (roleText) => { const r = (roleText || appState.role || "").toLowerCase(); if (r.includes("промоутер")) return "Промоутер"; if (r.includes("продавец")) return "Продавец"; return "Продавец"; };
+    const getRoleGroup = (roleText) => { const r = (roleText || appState.role || "").toLowerCase(); if (r.includes("промоутер")) return "Промоутер"; if (r.includes("кассир")) return "Кассир"; if (r.includes("продавец")) return "Продавец"; return "Продавец"; };
     if (actionName === "loginByIIN") {
       const { iin, password } = payloadData; const { data, error } = await supabaseClient.from('users').select('*').eq('iin', iin).single();
       if (error || !data) return { success: false, error: "Этот ИИН не найден в базе данных" };
@@ -482,7 +482,7 @@ async function callBackend(actionName, payloadData = {}) {
               let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0; let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0; let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
               
-              if (u.role.toLowerCase().includes("продавец")) {
+              if (u.role.toLowerCase().includes("продавец") || u.role.toLowerCase().includes("кассир")) {
     let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: u.role || 'Продавец', login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
                   
                   sInfo.reports_data.forEach(rep => {
@@ -900,7 +900,12 @@ function renderDashboardData(data, isSilent = false) {
   let hcCard = document.getElementById("hot-check-card");
   if (hcCard) {
       hcCard.innerHTML = ""; let hasContent = false;
-      if (data.hotChecks && data.hotChecks.length > 0) {
+      
+      // НОВОЕ: Локально проверяем, является ли пользователь кассиром
+      let isCashier = String(appState.role).toLowerCase().includes("кассир");
+
+      // НОВОЕ: Добавлено условие !isCashier, чтобы Горячие чеки не грузились для кассиров
+      if (!isCashier && data.hotChecks && data.hotChecks.length > 0) {
           hasContent = true; let hcHtml = `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
           for(let sub in groups) {
               if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
@@ -912,8 +917,11 @@ function renderDashboardData(data, isSilent = false) {
               }); hcHtml += `</div>`;
           } hcCard.innerHTML += hcHtml;
       }
+      
       let promoLists = data.promoLists || [];
-      if (promoLists.length > 0) {
+      
+      // НОВОЕ: Добавлено условие !isCashier, чтобы промо-позиции (_) не грузились для кассиров
+      if (!isCashier && promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               let headerColor = list.listColor || "var(--text-color)";
@@ -978,7 +986,9 @@ function renderDashboardData(data, isSilent = false) {
           let promoContainer = document.getElementById("promo-lists-container");
           if (promoContainer) promoContainer.innerHTML = "";
       }
-      if (hasContent) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
+      
+      // НОВОЕ: Скрываем сам контейнер горячего чека, если кассир или нет контента
+      if (hasContent && !isCashier) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
   }
     
   let savedReplies = {}; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { savedReplies[ta.id] = ta.value; });
