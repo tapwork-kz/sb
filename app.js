@@ -910,7 +910,8 @@ function renderDashboardData(data, isSilent = false) {
   let hcCard = document.getElementById("hot-check-card");
   if (hcCard) {
       hcCard.innerHTML = ""; let hasContent = false;
-      if (data.hotChecks && data.hotChecks.length > 0) {
+      let isCashierLocal = String(appState.role).toLowerCase().includes("кассир");
+      if (!isCashierLocal && data.hotChecks && data.hotChecks.length > 0) {
           hasContent = true; let hcHtml = `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
           for(let sub in groups) {
               if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
@@ -923,7 +924,7 @@ function renderDashboardData(data, isSilent = false) {
           } hcCard.innerHTML += hcHtml;
       }
       let promoLists = data.promoLists || [];
-      if (promoLists.length > 0) {
+      if (!isCashierLocal && promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               let headerColor = list.listColor || "var(--text-color)";
@@ -988,7 +989,7 @@ function renderDashboardData(data, isSilent = false) {
           let promoContainer = document.getElementById("promo-lists-container");
           if (promoContainer) promoContainer.innerHTML = "";
       }
-      if (hasContent) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
+      if (hasContent && !isCashierLocal) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
   }
     
   let savedReplies = {}; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { savedReplies[ta.id] = ta.value; });
