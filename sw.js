@@ -92,7 +92,9 @@ self.addEventListener('notificationclick', function(event) {
             for (var i = 0; i < windowClients.length; i++) {
                 var client = windowClients[i];
                 if (client.url && client.url.includes(self.location.origin) && 'focus' in client) {
-                    return client.focus(); // Фокусируемся на открытом приложении
+                    // Перенаправляем на нужную вкладку и фокусируемся
+                    client.navigate(event.notification.data.url);
+                    return client.focus(); 
                 }
             }
             // Если приложение было полностью закрыто, открываем его
