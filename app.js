@@ -1636,14 +1636,43 @@ window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefi
 };
 
 // ==========================================
-// ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ПРИ ОТКРЫТИИ ПРИЛОЖЕНИЯ
+// РОУТИНГ И ПРИНУДИТЕЛЬНОЕ ОБНОВЛЕНИЕ ПРИ ОТКРЫТИИ
 // ==========================================
+
+// Функция, которая проверяет URL и открывает нужную вкладку
+function checkNotificationRoute() {
+    if (window.location.hash === '#inbox') {
+        
+        let userInboxBtn = document.getElementById('inbox-icon');
+        let adminInboxBtn = document.getElementById('nav-adm-inbox');
+        
+        // Проверяем, какая из кнопок сейчас активна (не скрыта классом hidden)
+        if (adminInboxBtn && !adminInboxBtn.classList.contains('hidden')) {
+            adminInboxBtn.click(); // Открываем админскую вкладку
+        } else if (userInboxBtn && !userInboxBtn.classList.contains('hidden')) {
+            userInboxBtn.click(); // Открываем вкладку сотрудника
+        }
+        
+        // Стираем хэш, чтобы при обычном обновлении страницы вкладка не открывалась снова
+        history.replaceState(null, null, window.location.pathname); 
+    }
+}
+
+// Слушаем изменения адреса (когда приложение УЖЕ открыто и пришел PUSH)
+window.addEventListener('hashchange', checkNotificationRoute);
+
+// Принудительное обновление данных и проверка роутинга при разворачивании приложения
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
-        // Если пользователь авторизован и открыл приложение - обновляем данные
         if (appState && appState.iin) {
             console.log("Приложение открыто: принудительно обновляем данные...");
-            loadDashboard(false); // false означает, что мы обновим данные "тихо", без экрана загрузки
+            loadDashboard(false);
+            checkNotificationRoute();
         }
     }
+});
+
+// Если приложение запускается с нуля (после закрытия)
+window.addEventListener('load', () => {
+    setTimeout(checkNotificationRoute, 1000); // Даем время интерфейсу загрузиться
 });
