@@ -972,18 +972,19 @@ function formatRemarkAuthor(name, role) { let r = String(role || "руковод
 function formatRemarkText(text, targetName = null) { if (!text) return ""; let str = String(text); let splitRegex = /\n\n>\s*(.*?)\n/i; let parts = str.split(splitRegex); if (parts.length >= 3) { let main = parts[0]; let authorLabel = parts[1]; let quote = parts.slice(2).join(""); return `${main}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${authorLabel}</b><br>${quote}</div>`; } let oldRegex = /(Ответ.*?:\s*)/i; let oldParts = str.split(oldRegex); if (oldParts.length >= 3) { return `${oldParts[0]}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${oldParts[1]}</b><br>${oldParts.slice(2).join("")}</div>`; } if (targetName) { let targetShort = targetName; let tParts = String(targetName).trim().split(/\s+/); if (tParts.length > 1 && tParts[1]) targetShort = tParts[0] + " " + tParts[1].charAt(0).toUpperCase() + "."; return `${str}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid gray; border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:gray; font-style:normal;">${targetShort}</b><br><span style="color:gray;">Ожидает ответа...</span></div>`; } return str; }
 
 function renderDashboardData(data, isSilent = false) {
-  if (!data) return; isUserPromoter = data.isPromoter || false; appState.role = data.role || "Продавец"; appState.dept = (data.info && data.info.dept) ? data.info.dept : "Цифра"; saveMemory("userRole", appState.role); saveMemory("userDept", appState.dept); 
-  let roleStr = String(appState.role).toLowerCase(); 
+  if (!data) return; isUserPromoter = data.isPromoter || false; appState.role = data.role || "Продавец"; appState.dept = (data.info && data.info.dept) ? data.info.dept : "Цифра"; saveMemory("userRole", appState.role); saveMemory("userDept", appState.dept); 
+  let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
   let isZavSklad = roleStr.includes("заведующий складом"); 
-  let isCashier = roleStr.includes("кассир"); // НОВОЕ: Определение кассира
+  let isCashier = roleStr.includes("кассир"); 
   let isInfoConsultant = roleStr.includes("инфо-консультант");
-  // ИСПРАВЛЕНО: Теперь инфо-консультант надежно вырезан из списка обычных продавцов
+  
+  // ИСПРАВЛЕНО: Инфо-консультант теперь полностью исключен из продавцов
   let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant; 
   
   let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
   
-  // НОВОЕ: Скрываем ненужные элементы интерфейса для кассира
+  // Скрываем ненужные элементы интерфейса для кассира
   if (isCashier) {
       let scBlock = document.querySelector(".info-box[onclick=\"openDetails('sc')\"]");
       if (scBlock) scBlock.style.display = "none"; 
@@ -1002,7 +1003,7 @@ function renderDashboardData(data, isSilent = false) {
       if (btnFormTradeIn) btnFormTradeIn.style.display = ""; 
   }
   
-  // ИСПРАВЛЕНО: Конструкция завязана в жесткую единую цепь через else if
+  // ИСПРАВЛЕНО: Жесткая цепь условий через else if предотвращает смешивание интерфейсов
   if (isZavSklad) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
@@ -1024,14 +1025,13 @@ function renderDashboardData(data, isSilent = false) {
           
           let gridBtns = formSwap.querySelector(".grid-btns");
           if (gridBtns) gridBtns.style.display = "none";
-
-          // На всякий случай сбрасываем скрытие блоков (если до этого заходили под инфо-консультантом)
           formSwap.querySelectorAll(".inner-block.card").forEach(b => b.style.display = "");
       }
 
+      // ИСПРАВЛЕНО: Защита от дёрганья. Запрос в БД пойдёт только если список ещё пуст
       let selectTarget = document.getElementById("fs-target");
-      if (selectTarget) {
-          selectTarget.innerHTML = `<option value="" disabled selected>Загрузка заведующих...</option>`;
+      if (selectTarget && selectTarget.children.length <= 1) {
+          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
           
           (async () => {
               try {
@@ -1048,17 +1048,15 @@ function renderDashboardData(data, isSilent = false) {
 
                       if (activeZavs.length > 0) {
                           activeZavs.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
-                          selectTarget.innerHTML = `<option value="" disabled selected>Выберите заведующего</option>` + 
+                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>` + 
                               activeZavs.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
                       } else {
-                          selectTarget.innerHTML = `<option value="" disabled selected>Заведующие складом не найдены</option>`;
+                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Заведующие не найдены</option>`;
                       }
-                  } else {
-                      selectTarget.innerHTML = `<option value="" disabled selected>Ошибка: Клиент БД не найден</option>`;
                   }
               } catch (err) {
-                  console.error("Ошибка при получении заведующих из Supabase:", err);
-                  selectTarget.innerHTML = `<option value="" disabled selected>Ошибка загрузки списка из БД</option>`;
+                  console.error(err);
+                  selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Ошибка загрузки</option>`;
               }
           })();
       }
@@ -1070,7 +1068,7 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
-  else if (isInfoConsultant) { // ИСПРАВЛЕНО: Тепереь это часть одной цепочки else if
+  else if (isInfoConsultant) { // ИСПРАВЛЕНО: Теперь этот блок не конфликтует с заведующими
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
       let btnPlan = document.getElementById("btn-adm-plan"); 
@@ -1092,7 +1090,6 @@ function renderDashboardData(data, isSilent = false) {
           let gridBtns = formSwap.querySelector(".grid-btns");
           if (gridBtns) gridBtns.style.display = "none";
 
-          // Оставляем ТОЛЬКО заявку в отпуск, скрывая исправление и обмен сменами
           let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
           innerBlocks.forEach(block => {
               let h3 = block.querySelector("h3");
@@ -1107,9 +1104,10 @@ function renderDashboardData(data, isSilent = false) {
           });
       }
 
+      // ИСПРАВЛЕНО: Защита от дёрганья списка для инфо-консультантов
       let selectTarget = document.getElementById("fs-target");
-      if (selectTarget) {
-          selectTarget.innerHTML = `<option value="" disabled selected>Загрузка списка...</option>`;
+      if (selectTarget && selectTarget.children.length <= 1) {
+          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
           
           (async () => {
               try {
@@ -1126,17 +1124,15 @@ function renderDashboardData(data, isSilent = false) {
 
                       if (activeConsultants.length > 0) {
                           activeConsultants.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
-                          selectTarget.innerHTML = `<option value="" disabled selected>Выберите инфо-консультанта</option>` + 
+                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>` + 
                               activeConsultants.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
                       } else {
-                          selectTarget.innerHTML = `<option value="" disabled selected>Инфо-консультанты не найдены</option>`;
+                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Инфо-консультанты не найдены</option>`;
                       }
-                  } else {
-                      selectTarget.innerHTML = `<option value="" disabled selected>Ошибка: Клиент БД не найден</option>`;
                   }
               } catch (err) {
-                  console.error("Ошибка при получении инфо-консультантов из Supabase:", err);
-                  selectTarget.innerHTML = `<option value="" disabled selected>Ошибка загрузки списка из БД</option>`;
+                  console.error(err);
+                  selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Ошибка загрузки</option>`;
               }
           })();
       }
@@ -1144,94 +1140,6 @@ function renderDashboardData(data, isSilent = false) {
       let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
       if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
       
-      let match = roleStr.match(/инфо-консультант\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
-      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
-  }
-  if (isInfoConsultant) {
-      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
-      
-      // 1. Переименовываем кнопку "План" в "Смена" и принудительно показываем её
-      let btnPlan = document.getElementById("btn-adm-plan"); 
-      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
-      
-      // 2. Встраиваем оригинальную форму и ВСЕГДА очищаем класс hidden
-      let adminPlanList = document.getElementById("admin-plan-list");
-      let formSwap = document.getElementById("form-swap");
-      if (adminPlanList && formSwap) {
-          if (!adminPlanList.contains(formSwap)) {
-              adminPlanList.innerHTML = ""; 
-              adminPlanList.appendChild(formSwap); 
-          }
-          formSwap.classList.remove("hidden", "card", "form-dark");
-          formSwap.style.padding = "0";
-          formSwap.style.background = "transparent";
-          formSwap.style.border = "none";
-          formSwap.style.boxShadow = "none";
-          
-          // Скрываем внутреннюю кнопку закрытия модалки
-          let gridBtns = formSwap.querySelector(".grid-btns");
-          if (gridBtns) gridBtns.style.display = "none";
-
-          // НОВОЕ: Оставляем ТОЛЬКО заявку в отпуск, скрывая исправление и обмен сменами
-          let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
-          innerBlocks.forEach(block => {
-              let h3 = block.querySelector("h3");
-              if (h3) {
-                  let txt = h3.innerText.toLowerCase();
-                  if (txt.includes("исправ") || txt.includes("обмен")) {
-                      block.style.display = "none"; // Прячем лишнее
-                  } else {
-                      block.style.display = ""; // Показываем отпуск
-                  }
-              }
-          });
-      }
-
-      // 3. ТОЧНЫЙ ЗАПРОС К Supabase ДЛЯ ИНФО-КОНСУЛЬТАНТОВ
-      let selectTarget = document.getElementById("fs-target");
-      if (selectTarget) {
-          selectTarget.innerHTML = `<option value="" disabled selected>Загрузка списка...</option>`;
-          
-          (async () => {
-              try {
-                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-                      // Ищем в БД сотрудников с должностью "Инфо-консультант"
-                      let { data: dbUsers, error } = await supabaseClient
-                          .from('users')
-                          .select('iin, full_name, role, login_status')
-                          .ilike('role', '%Инфо-консультант%')
-                          .neq('iin', appState.iin);
-
-                      if (error) throw error;
-
-                      // Отсекаем заблокированных
-                      let activeConsultants = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
-
-                      if (activeConsultants.length > 0) {
-                          activeConsultants.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
-                          
-                          selectTarget.innerHTML = `<option value="" disabled selected>Выберите инфо-консультанта</option>` + 
-                              activeConsultants.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
-                      } else {
-                          selectTarget.innerHTML = `<option value="" disabled selected>Инфо-консультанты не найдены</option>`;
-                      }
-                  } else {
-                      selectTarget.innerHTML = `<option value="" disabled selected>Ошибка: Клиент БД не найден</option>`;
-                  }
-              } catch (err) {
-                  console.error("Ошибка при получении инфо-консультантов из Supabase:", err);
-                  selectTarget.innerHTML = `<option value="" disabled selected>Ошибка загрузки списка из БД</option>`;
-              }
-          })();
-      }
-
-      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
-      
-      // По умолчанию открываем именно вкладку "Смена" (plan)
-      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
-      
-      // Автоматическое определение отдела для Инфо-консультанта
       let match = roleStr.match(/инфо-консультант\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
