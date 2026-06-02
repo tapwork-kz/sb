@@ -694,7 +694,41 @@ document.addEventListener("DOMContentLoaded", async () => {
   } catch (err) { alert("Сбой загрузки: очищаю кэш"); clearMemory(); hideLoader(); document.getElementById("auth-screen").classList.remove("hidden"); }
 });
 
-function initSwipe() { let startX = 0, startY = 0; const scrollArea = document.getElementById('scrollable-body'); if (!scrollArea) return; scrollArea.addEventListener('touchstart', e => { if (e.target.closest('.no-swipe')) return; startX = e.changedTouches[0].screenX; startY = e.changedTouches[0].screenY; }, {passive: true}); scrollArea.addEventListener('touchend', e => { if (e.target.closest('.no-swipe')) return; let endX = e.changedTouches[0].screenX; let endY = e.changedTouches[0].screenY; let diffX = endX - startX; let diffY = Math.abs(endY - startY); if (diffY < 60 && Math.abs(diffX) > 80) { let roleStr = String(appState.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); let isZavSklad = roleStr.includes("заведующий складом"); let tabs = isDir ? ['adm-outs', 'adm-main', 'adm-inbox'] : isZavSklad ? ['adm-outs', 'adm-main', 'inbox'] : ['time', 'create', 'inbox']; let currentIdx = tabs.indexOf(lastActiveTab); if (currentIdx !== -1) { if (diffX < 0 && currentIdx < tabs.length - 1) switchTab(tabs[currentIdx + 1], 'right'); else if (diffX > 0 && currentIdx > 0) switchTab(tabs[currentIdx - 1], 'left'); } } }, {passive: true}); }
+function initSwipe() { 
+    let startX = 0, startY = 0; 
+    const scrollArea = document.getElementById('scrollable-body'); 
+    if (!scrollArea) return; 
+    
+    scrollArea.addEventListener('touchstart', e => { 
+        if (e.target.closest('.no-swipe')) return; 
+        startX = e.changedTouches[0].screenX; 
+        startY = e.changedTouches[0].screenY; 
+    }, {passive: true}); 
+    
+    scrollArea.addEventListener('touchend', e => { 
+        if (e.target.closest('.no-swipe')) return; 
+        let endX = e.changedTouches[0].screenX; 
+        let endY = e.changedTouches[0].screenY; 
+        let diffX = endX - startX; 
+        let diffY = Math.abs(endY - startY); 
+        
+        if (diffY < 60 && Math.abs(diffX) > 80) { 
+            let roleStr = String(appState.role).toLowerCase(); 
+            let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
+            let isZavSklad = roleStr.includes("заведующий складом"); 
+            let isInfoConsultant = roleStr.includes("инфо-консультант"); // ДОБАВЛЕНО
+            
+            // ИСПРАВЛЕНО: Инфо-консультант теперь использует ту же цепочку вкладок, что и заведующий
+            let tabs = isDir ? ['adm-outs', 'adm-main', 'adm-inbox'] : (isZavSklad || isInfoConsultant) ? ['adm-outs', 'adm-main', 'inbox'] : ['time', 'create', 'inbox']; 
+            
+            let currentIdx = tabs.indexOf(lastActiveTab); 
+            if (currentIdx !== -1) { 
+                if (diffX < 0 && currentIdx < tabs.length - 1) switchTab(tabs[currentIdx + 1], 'right'); 
+                else if (diffX > 0 && currentIdx > 0) switchTab(tabs[currentIdx - 1], 'left'); 
+            } 
+        } 
+    }, {passive: true}); 
+}
 
 function hideLoader() { const loader = document.getElementById("loader-screen"); loader.style.opacity = '0'; setTimeout(() => loader.classList.add("hidden"), 600); }
 function showLoader() { const loader = document.getElementById("loader-screen"); loader.classList.remove("hidden"); setTimeout(() => loader.style.opacity = '1', 10); }
@@ -768,18 +802,26 @@ function switchTab(tab, direction = null) {
   if(appState.token) loadDashboard(true);
   
   document.querySelectorAll('#main-tabs .icon-btn').forEach(btn => btn.classList.remove('active-tab')); 
-  if(tab === 'time') document.getElementById('nav-time-icon').classList.add('active-tab'); if(tab === 'create') document.getElementById('nav-create-icon').classList.add('active-tab'); if(tab === 'inbox') document.getElementById('inbox-icon').classList.add('active-tab'); if(tab === 'adm-outs') document.getElementById('nav-adm-outs').classList.add('active-tab'); if(tab === 'adm-main') document.getElementById('nav-adm-main').classList.add('active-tab'); if(tab === 'adm-inbox') document.getElementById('nav-adm-inbox').classList.add('active-tab');
+  if(tab === 'time') document.getElementById('nav-time-icon').classList.add('active-tab'); 
+  if(tab === 'create') document.getElementById('nav-create-icon').classList.add('active-tab'); 
+  if(tab === 'inbox') document.getElementById('inbox-icon').classList.add('active-tab'); 
+  if(tab === 'adm-outs') document.getElementById('nav-adm-outs').classList.add('active-tab'); 
+  if(tab === 'adm-main') document.getElementById('nav-adm-main').classList.add('active-tab'); 
+  if(tab === 'adm-inbox') document.getElementById('nav-adm-inbox').classList.add('active-tab');
   
   document.querySelectorAll('#scrollable-body > div').forEach(el => el.classList.add("hidden"));
   let sections = document.querySelectorAll('#scrollable-body > div'); let animClass = 'slide-up-fade'; if (direction === 'right') animClass = 'slide-in-right'; else if (direction === 'left') animClass = 'slide-in-left';
   sections.forEach(s => { s.classList.remove('fade-in', 'slide-up-fade', 'slide-in-right', 'slide-in-left'); s.style.animation = 'none'; s.offsetHeight; s.style.animation = null; });
   
-  // 3. ПРАВИЛЬНЫЙ РЕНДЕР ДЛЯ КАССИРОВ
+  // 3. СИСТЕМНОЕ РАЗДЕЛЕНИЕ РОЛЕЙ И ОТОБРАЖЕНИЕ ИНТЕРФЕЙСА
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
   let isZavSklad = roleStr.includes("заведующий складом"); 
   let isCashier = roleStr.includes("кассир");
-  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier; 
+  let isInfoConsultant = roleStr.includes("инфо-консультант"); // ДОБАВЛЕНО
+  
+  // ИСПРАВЛЕНО: Инфо-консультант и Заведующий складом теперь корректно исключены из обычных продавцов
+  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant; 
   
   let isCreateTabActive = (tab === 'create'); let isAnyFormActive = isCreateTabActive && document.getElementById("menu-list").classList.contains("hidden"); let dash = document.getElementById("info-dashboard"); 
   if ((isSeller || isCashier) && tab !== 'details' && !tab.startsWith('adm') && !isAnyFormActive) { 
@@ -790,9 +832,20 @@ function switchTab(tab, direction = null) {
   
   let targetEl = document.getElementById("content-" + tab); if(targetEl) { targetEl.classList.remove("hidden"); targetEl.classList.add(animClass); }
   
-  if(tab === 'adm-outs') renderAdminOuts(); if(tab === 'adm-main') { if (isZavSklad && window.currentAdminMainView === 'plan') window.currentAdminMainView = 'emps'; if (typeof window.currentAdminMainView === 'undefined') window.currentAdminMainView = isZavSklad ? 'emps' : 'plan'; toggleAdminMain(window.currentAdminMainView); } if(tab === 'adm-inbox') renderAdminHistory(currentHistFilter);
+  if(tab === 'adm-outs') renderAdminOuts(); 
   
-  // 4. ВОССТАНОВЛЕНИЕ СКРОЛЛА
+  if(tab === 'adm-main') { 
+      // ИСПРАВЛЕНО: Полностью удален баг принудительного сброса на 'emps'.
+      // Система плавно сохраняет текущий открытый вид подразделов (Смена/Сотрудники/Товары)
+      if (typeof window.currentAdminMainView === 'undefined' || !window.currentAdminMainView) { 
+          window.currentAdminMainView = 'plan'; 
+      } 
+      toggleAdminMain(window.currentAdminMainView); 
+  } 
+  
+  if(tab === 'adm-inbox') renderAdminHistory(currentHistFilter);
+  
+  // 4. ВОССТАНОВЛЕНИЕ И ТРЕКИНГ СКРОЛЛА
   if (scroller) { 
       if (!window.scrollListenerAdded) {
           window.scrollListenerAdded = true;
@@ -881,17 +934,19 @@ async function loadDashboard(isSilent = false) {
               let savedT = localStorage.getItem("savedTab_" + appState.iin);
               let targetT = (hashT && document.getElementById("content-" + hashT)) ? hashT : ((savedT && document.getElementById("content-" + savedT)) ? savedT : null);
               
+              let isInfoConsultant = roleStr.includes("инфо-консультант"); // Добавлено определение роли
+              
               if (targetT) {
                   if (targetT === 'adm-main') {
                       let savedV = localStorage.getItem("savedAdminView_" + appState.iin);
-                      switchTab(targetT); toggleAdminMain(savedV || (isZavSklad ? 'emps' : 'plan'));
+                      switchTab(targetT); toggleAdminMain(savedV || ((isZavSklad || isInfoConsultant) ? 'plan' : 'plan'));
                   } else {
                       switchTab(targetT);
                   }
               } else {
                   // Только если памяти нет, грузим дефолтные вкладки
                   if (isDir) { switchTab('adm-main'); toggleAdminMain('plan'); } 
-                  else if (isZavSklad) { switchTab('adm-main'); toggleAdminMain('emps'); } 
+                  else if (isZavSklad || isInfoConsultant) { switchTab('adm-main'); toggleAdminMain('plan'); } // ИСПРАВЛЕНО: Инфо и Завсклад по умолчанию открывают «Смена»
                   else { switchTab('time'); } 
               }
               
