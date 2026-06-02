@@ -868,7 +868,39 @@ async function openAdminPanel() { switchTab('adm-main'); toggleAdminMain('plan')
 
 async function loadDashboard(isSilent = false) { 
   let cachedData = localStorage.getItem("dashData_" + appState.iin); 
-  if (!isSilent) { if (cachedData) { try { renderDashboardData(JSON.parse(cachedData), true); let roleStr = String(appState.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); let isZavSklad = roleStr.includes("заведующий складом"); if (isDir) { switchTab('adm-main'); toggleAdminMain('plan'); } else if (isZavSklad) { switchTab('adm-main'); toggleAdminMain('emps'); } else { switchTab('time'); } hideLoader(); isSilent = true; } catch(e) { localStorage.removeItem("dashData_" + appState.iin); showLoader(); } } else showLoader(); } 
+  if (!isSilent) { 
+      if (cachedData) { 
+          try { 
+              renderDashboardData(JSON.parse(cachedData), true); 
+              let roleStr = String(appState.role).toLowerCase(); 
+              let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
+              let isZavSklad = roleStr.includes("заведующий складом"); 
+              
+              // Умная проверка памяти прямо при загрузке кэша
+              let hashT = window.location.hash.replace('#', '').split('?')[0];
+              let savedT = localStorage.getItem("savedTab_" + appState.iin);
+              let targetT = (hashT && document.getElementById("content-" + hashT)) ? hashT : ((savedT && document.getElementById("content-" + savedT)) ? savedT : null);
+              
+              if (targetT) {
+                  if (targetT === 'adm-main') {
+                      let savedV = localStorage.getItem("savedAdminView_" + appState.iin);
+                      switchTab(targetT); toggleAdminMain(savedV || (isZavSklad ? 'emps' : 'plan'));
+                  } else {
+                      switchTab(targetT);
+                  }
+              } else {
+                  // Только если памяти нет, грузим дефолтные вкладки
+                  if (isDir) { switchTab('adm-main'); toggleAdminMain('plan'); } 
+                  else if (isZavSklad) { switchTab('adm-main'); toggleAdminMain('emps'); } 
+                  else { switchTab('time'); } 
+              }
+              
+              hideLoader(); isSilent = true; 
+          } catch(e) { 
+              localStorage.removeItem("dashData_" + appState.iin); showLoader(); 
+          } 
+      } else showLoader(); 
+  } 
   let data = await callBackend('getDashboardData', { token: appState.token }); 
   if (!data || data.error === "Оффлайн режим") { if (!isSilent) hideLoader(); return; } if (data.authorized === false) { forceLogout(); return; } 
   let activeEl = document.activeElement; let isTyping = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT'); let hasUnsavedText = false; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { if (ta.value.length > 0) hasUnsavedText = true; });
