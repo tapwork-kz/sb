@@ -716,10 +716,14 @@ function initSwipe() {
             let roleStr = String(appState.role).toLowerCase(); 
             let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
             let isZavSklad = roleStr.includes("заведующий складом"); 
-            let isInfoConsultant = roleStr.includes("инфо-консультант"); // ДОБАВЛЕНО
+            let isInfoConsultant = roleStr.includes("инфо-консультант");
+            let isSeniorCashier = roleStr.includes("старший кассир"); // ДОБАВЛЕНО
             
-            // ИСПРАВЛЕНО: Инфо-консультант теперь использует ту же цепочку вкладок, что и заведующий
-            let tabs = isDir ? ['adm-outs', 'adm-main', 'adm-inbox'] : (isZavSklad || isInfoConsultant) ? ['adm-outs', 'adm-main', 'inbox'] : ['time', 'create', 'inbox']; 
+            // ИСПРАВЛЕНО: Старший кассир добавлен в группу админских вкладок ['adm-outs', 'adm-main', 'inbox']
+            let tabs = isDir ? 
+                ['adm-outs', 'adm-main', 'adm-inbox'] : 
+                (isZavSklad || isInfoConsultant || isSeniorCashier) ? ['adm-outs', 'adm-main', 'inbox'] : 
+                ['time', 'create', 'inbox']; 
             
             let currentIdx = tabs.indexOf(lastActiveTab); 
             if (currentIdx !== -1) { 
