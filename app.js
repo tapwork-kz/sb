@@ -917,19 +917,18 @@ function formatRemarkAuthor(name, role) { let r = String(role || "руковод
 function formatRemarkText(text, targetName = null) { if (!text) return ""; let str = String(text); let splitRegex = /\n\n>\s*(.*?)\n/i; let parts = str.split(splitRegex); if (parts.length >= 3) { let main = parts[0]; let authorLabel = parts[1]; let quote = parts.slice(2).join(""); return `${main}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${authorLabel}</b><br>${quote}</div>`; } let oldRegex = /(Ответ.*?:\s*)/i; let oldParts = str.split(oldRegex); if (oldParts.length >= 3) { return `${oldParts[0]}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid var(--btn-color); border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:var(--btn-color); font-style:normal;">${oldParts[1]}</b><br>${oldParts.slice(2).join("")}</div>`; } if (targetName) { let targetShort = targetName; let tParts = String(targetName).trim().split(/\s+/); if (tParts.length > 1 && tParts[1]) targetShort = tParts[0] + " " + tParts[1].charAt(0).toUpperCase() + "."; return `${str}<div style="margin-top:8px; padding:8px 12px; background:var(--inner-bg); border-left:3px solid gray; border-radius:0 8px 8px 0; font-style:italic; font-size:12px;"><b style="color:gray; font-style:normal;">${targetShort}</b><br><span style="color:gray;">Ожидает ответа...</span></div>`; } return str; }
 
 function renderDashboardData(data, isSilent = false) {
-  if (!data) return; isUserPromoter = data.isPromoter || false; appState.role = data.role || "Продавец"; appState.dept = (data.info && data.info.dept) ? data.info.dept : "Цифра"; saveMemory("userRole", appState.role); saveMemory("userDept", appState.dept); 
-  let roleStr = String(appState.role).toLowerCase(); 
+  if (!data) return; isUserPromoter = data.isPromoter || false; appState.role = data.role || "Продавец"; appState.dept = (data.info && data.info.dept) ? data.info.dept : "Цифра"; saveMemory("userRole", appState.role); saveMemory("userDept", appState.dept); 
+  let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
   let isZavSklad = roleStr.includes("заведующий складом"); 
-  let isCashier = roleStr.includes("кассир"); 
+  let isCashier = roleStr.includes("кассир"); // НОВОЕ: Определение кассира
   let isInfoConsultant = roleStr.includes("инфо-консультант");
-  
-  // ИСПРАВЛЕНО: Инфо-консультант теперь полностью отделен от простых продавцов
+  // ИСПРАВЛЕНО: Теперь инфо-консультант надежно вырезан из списка обычных продавцов
   let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant; 
   
   let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
   
-  // Скрываем ненужные элементы интерфейса для кассира
+  // НОВОЕ: Скрываем ненужные элементы интерфейса для кассира
   if (isCashier) {
       let scBlock = document.querySelector(".info-box[onclick=\"openDetails('sc')\"]");
       if (scBlock) scBlock.style.display = "none"; 
@@ -948,9 +947,7 @@ function renderDashboardData(data, isSilent = false) {
       if (btnFormTradeIn) btnFormTradeIn.style.display = ""; 
   }
   
-  // =========================================================================
-  // НАЧАЛО ЕДИНОЙ ЦЕПОЧКИ РОЛЕЙ (Каждый блок изолирован через else if)
-  // =========================================================================
+  // ИСПРАВЛЕНО: Конструкция завязана в жесткую единую цепь через else if
   if (isZavSklad) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
@@ -972,14 +969,15 @@ function renderDashboardData(data, isSilent = false) {
           
           let gridBtns = formSwap.querySelector(".grid-btns");
           if (gridBtns) gridBtns.style.display = "none";
-          
-          // Показываем все скрытые блоки (на случай, если до этого заходили под Инфо-консультантом)
+
+          // На всякий случай сбрасываем скрытие блоков (если до этого заходили под инфо-консультантом)
           formSwap.querySelectorAll(".inner-block.card").forEach(b => b.style.display = "");
       }
 
       let selectTarget = document.getElementById("fs-target");
       if (selectTarget) {
           selectTarget.innerHTML = `<option value="" disabled selected>Загрузка заведующих...</option>`;
+          
           (async () => {
               try {
                   if (typeof supabaseClient !== 'undefined' && supabaseClient) {
@@ -1017,7 +1015,7 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
-  else if (isInfoConsultant) { // КРИТИЧЕСКИ ВАЖНО: теперь это жесткая ветка else if
+  else if (isInfoConsultant) { // ИСПРАВЛЕНО: Тепереь это часть одной цепочки else if
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
       let btnPlan = document.getElementById("btn-adm-plan"); 
@@ -1046,9 +1044,9 @@ function renderDashboardData(data, isSilent = false) {
               if (h3) {
                   let txt = h3.innerText.toLowerCase();
                   if (txt.includes("исправ") || txt.includes("обмен")) {
-                      block.style.style.display = "none"; 
+                      block.style.display = "none"; 
                   } else {
-                      block.style.style.display = ""; 
+                      block.style.display = ""; 
                   }
               }
           });
@@ -1057,6 +1055,7 @@ function renderDashboardData(data, isSilent = false) {
       let selectTarget = document.getElementById("fs-target");
       if (selectTarget) {
           selectTarget.innerHTML = `<option value="" disabled selected>Загрузка списка...</option>`;
+          
           (async () => {
               try {
                   if (typeof supabaseClient !== 'undefined' && supabaseClient) {
@@ -1094,6 +1093,94 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
+  if (isInfoConsultant) {
+      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+      
+      // 1. Переименовываем кнопку "План" в "Смена" и принудительно показываем её
+      let btnPlan = document.getElementById("btn-adm-plan"); 
+      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
+      
+      // 2. Встраиваем оригинальную форму и ВСЕГДА очищаем класс hidden
+      let adminPlanList = document.getElementById("admin-plan-list");
+      let formSwap = document.getElementById("form-swap");
+      if (adminPlanList && formSwap) {
+          if (!adminPlanList.contains(formSwap)) {
+              adminPlanList.innerHTML = ""; 
+              adminPlanList.appendChild(formSwap); 
+          }
+          formSwap.classList.remove("hidden", "card", "form-dark");
+          formSwap.style.padding = "0";
+          formSwap.style.background = "transparent";
+          formSwap.style.border = "none";
+          formSwap.style.boxShadow = "none";
+          
+          // Скрываем внутреннюю кнопку закрытия модалки
+          let gridBtns = formSwap.querySelector(".grid-btns");
+          if (gridBtns) gridBtns.style.display = "none";
+
+          // НОВОЕ: Оставляем ТОЛЬКО заявку в отпуск, скрывая исправление и обмен сменами
+          let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
+          innerBlocks.forEach(block => {
+              let h3 = block.querySelector("h3");
+              if (h3) {
+                  let txt = h3.innerText.toLowerCase();
+                  if (txt.includes("исправ") || txt.includes("обмен")) {
+                      block.style.display = "none"; // Прячем лишнее
+                  } else {
+                      block.style.display = ""; // Показываем отпуск
+                  }
+              }
+          });
+      }
+
+      // 3. ТОЧНЫЙ ЗАПРОС К Supabase ДЛЯ ИНФО-КОНСУЛЬТАНТОВ
+      let selectTarget = document.getElementById("fs-target");
+      if (selectTarget) {
+          selectTarget.innerHTML = `<option value="" disabled selected>Загрузка списка...</option>`;
+          
+          (async () => {
+              try {
+                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+                      // Ищем в БД сотрудников с должностью "Инфо-консультант"
+                      let { data: dbUsers, error } = await supabaseClient
+                          .from('users')
+                          .select('iin, full_name, role, login_status')
+                          .ilike('role', '%Инфо-консультант%')
+                          .neq('iin', appState.iin);
+
+                      if (error) throw error;
+
+                      // Отсекаем заблокированных
+                      let activeConsultants = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
+
+                      if (activeConsultants.length > 0) {
+                          activeConsultants.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
+                          
+                          selectTarget.innerHTML = `<option value="" disabled selected>Выберите инфо-консультанта</option>` + 
+                              activeConsultants.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
+                      } else {
+                          selectTarget.innerHTML = `<option value="" disabled selected>Инфо-консультанты не найдены</option>`;
+                      }
+                  } else {
+                      selectTarget.innerHTML = `<option value="" disabled selected>Ошибка: Клиент БД не найден</option>`;
+                  }
+              } catch (err) {
+                  console.error("Ошибка при получении инфо-консультантов из Supabase:", err);
+                  selectTarget.innerHTML = `<option value="" disabled selected>Ошибка загрузки списка из БД</option>`;
+              }
+          })();
+      }
+
+      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
+      
+      // По умолчанию открываем именно вкладку "Смена" (plan)
+      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
+      
+      // Автоматическое определение отдела для Инфо-консультанта
+      let match = roleStr.match(/инфо-консультант\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
+  }
   else if (isDir) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
       let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "";
@@ -1101,13 +1188,14 @@ function renderDashboardData(data, isSilent = false) {
       let adminPlanList = document.getElementById("admin-plan-list"); if (adminPlanList) { let planFiltersExist = document.getElementById("plan-filter-start"); if (!planFiltersExist) { let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0)); adminPlanList.innerHTML = `<style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style><div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button><div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;"><input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button></div><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button></div><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="plan-filter-start" value="${defStart}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="plan-filter-end" value="${defEnd}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:44px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div></div></div><div id="plan-render-area"></div>`; setTimeout(() => loadPlanHistory(true), 100); } else { if (!isSensitiveState()) { loadPlanHistory(true); } } }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
-      if (isUserPromoter) { 
+      if (isUserPromoter) { 
           document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); 
           let db = document.getElementById("desc-break"); if(db) db.innerText = "15 мин"; 
           let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "1 час"; 
           let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; 
           if(dash) dash.classList.add("hidden"); 
       } else { 
+          // НОВОЕ: Логика для Продавцов и Кассиров (и те, и другие видят нижние кнопки и дашборд)
           document.getElementById("nav-time-icon")?.classList.remove("hidden"); 
           document.getElementById("nav-create-icon")?.classList.remove("hidden"); 
           document.getElementById("inbox-icon")?.classList.remove("hidden"); 
@@ -1129,11 +1217,7 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "Непрочитанные сообщения"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) switchTab('time');
   }
-  // =========================================================================
-  // КОНЕЦ ЕДИНОЙ ЦЕПОЧКИ РОЛЕЙ
-  // =========================================================================
 
-  // ИСПРАВЛЕНО: Всё, что ниже — СНАРУЖИ, выполняется для КАЖДОГО пользователя!
   let pAcc = document.getElementById("pt-acc"); if(pAcc) pAcc.innerText = data.info?.ptsAccrued ?? '-'; let pUse = document.getElementById("pt-use"); if(pUse) pUse.innerText = data.info?.ptsUsed ?? '-'; const remVal = parseFloat(String(data.info?.ptsLeft).replace(',','.')) || 0; const ptRemEl = document.getElementById("pt-rem"); if(ptRemEl) { ptRemEl.innerText = data.info?.ptsLeft ?? '-'; ptRemEl.style.color = remVal >= 0 ? "#27ae60" : "#e67e22"; } let pFin = document.getElementById("pt-fin"); if(pFin) pFin.innerText = data.info?.ptsFine ?? '-'; 
   let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0; let kValEl = document.getElementById("kpi-val"); if(kValEl) kValEl.innerText = kpiValue + '%'; setKpiColor(kpiValue, document.getElementById("kpi-circle"), document.getElementById("kpi-val")); myKpiDetails = data.info?.kpiDetails || [];
   let infoTabel = document.getElementById("info-tabel"); if(infoTabel) { infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div>`; }
@@ -1148,7 +1232,7 @@ function renderDashboardData(data, isSilent = false) {
   if (hcCard) {
       hcCard.innerHTML = ""; let hasContent = false;
       let isCashierLocal = String(appState.role).toLowerCase().includes("кассир");
-      if (isSeller && data.hotChecks && data.hotChecks.length > 0) {
+      if (!isCashierLocal && data.hotChecks && data.hotChecks.length > 0) {
           hasContent = true; let hcHtml = `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
           for(let sub in groups) {
               if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
@@ -1160,14 +1244,14 @@ function renderDashboardData(data, isSilent = false) {
               }); hcHtml += `</div>`;
           } hcCard.innerHTML += hcHtml;
       }
-      
       let promoLists = data.promoLists || [];
-      if (isSeller && promoLists.length > 0) { 
+      if (!isCashierLocal && promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               let headerColor = list.listColor || "var(--text-color)";
               
               promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 14px 12px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative;">`;
+              // Применяем спарсенный цвет к заголовку списка
               promoHtml += `<div style="font-size:14px; font-weight:bold; color:${headerColor}; margin-bottom: 14px;">${list.title}</div>`;
               promoHtml += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
               
@@ -1196,9 +1280,13 @@ function renderDashboardData(data, isSilent = false) {
                       badgeHtml += `</div>`; 
                   }
                   
+                  // Добавляем символы, чтобы сбить перехват ссылки нативными приложениями
                   let bypassLink = link ? (link + (link.includes('?') ? '&' : '?') + 'force_browser_bypass=1#web') : '';
+                  
+                  // Безопасный клик через div и stopPropagation, чтобы Telegram не дублировал открытие
                   let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) { window.Telegram.WebApp.openLink('${bypassLink}'); } else { window.open('${bypassLink}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; width:22px; height:22px; border-radius:5px; margin-right:8px; flex-shrink:0; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;"><span class="material-symbols-rounded" style="font-size:16px;">open_in_new</span></div>` : '';
                   
+                  // Текст товара: используем адаптивный var(--text-color) для совместимости с темной темой
                   promoHtml += `
                   <div id="promo-item-${lIdx}-${iIdx}" style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
                       ${linkBtn}
@@ -1222,14 +1310,8 @@ function renderDashboardData(data, isSilent = false) {
           let promoContainer = document.getElementById("promo-lists-container");
           if (promoContainer) promoContainer.innerHTML = "";
       }
-      if (hasContent && isSeller) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
+      if (hasContent && !isCashierLocal) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
   }
-
-  // Наполнение глобальных системных массивов
-  window.adminHistoryGlobal = data.adminHistory || []; if(isDir && typeof renderAdminHistory === "function") renderAdminHistory();
-  adminScItemsGlobal = data.adminScItems || []; globalSellers = data.sellers || []; globalScItems = data.scItems || []; allEmployeesData = data.adminEmployees || []; tradeInModelsGlobal = data.tradeInModels || []; window.adminVacationsGlobal = data.vacations || [];
-  if ((isDir || isZavSklad) && typeof renderAdminEmps === "function") renderAdminEmps(currentEmpDept, null);
-}
     
   let savedReplies = {}; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { savedReplies[ta.id] = ta.value; });
   let uInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; let inboxList = document.getElementById("inbox-list");
