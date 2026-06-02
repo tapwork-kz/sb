@@ -952,14 +952,26 @@ function renderDashboardData(data, isSilent = false) {
       let btnPlan = document.getElementById("btn-adm-plan"); 
       if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
       
-      // 2. Вставляем ту самую оригинальную оранжевую кнопку как у продавцов
+      // 2. УМНЫЙ ПЕРЕНОС: Берем оригинальную форму со всеми скриптами и встраиваем её прямо в раздел!
       let adminPlanList = document.getElementById("admin-plan-list");
-      if (adminPlanList) {
-          adminPlanList.innerHTML = `
-          <div style="padding: 20px 12px; display: flex; flex-direction: column; align-items: center;">
-              <p style="color: gray; font-size: 13px; margin-bottom: 15px; text-align: center;">Управление сменой и заявки на отпуск</p>
-              <button onclick="openForm('swap')" class="btn-orange" style="width: 100%; padding: 14px; font-size: 15px; border-radius: 12px; margin: 0;">Рабочая смена</button>
-          </div>`;
+      let formSwap = document.getElementById("form-swap");
+      if (adminPlanList && formSwap) {
+          // Если форма еще не перенесена, переносим её
+          if (!adminPlanList.contains(formSwap)) {
+              adminPlanList.innerHTML = ""; // Очищаем контейнер
+              adminPlanList.appendChild(formSwap); // Перемещаем саму форму
+              
+              // Снимаем стили всплывающего окна, чтобы она выглядела как часть вкладки
+              formSwap.classList.remove("hidden", "card", "form-dark");
+              formSwap.style.padding = "0";
+              formSwap.style.background = "transparent";
+              formSwap.style.border = "none";
+              formSwap.style.boxShadow = "none";
+              
+              // Прячем кнопку "Закрыть окно", так как закрывать больше нечего
+              let gridBtns = formSwap.querySelector(".grid-btns");
+              if (gridBtns) gridBtns.style.display = "none";
+          }
       }
 
       let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
