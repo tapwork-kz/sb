@@ -946,55 +946,73 @@ function renderDashboardData(data, isSilent = false) {
   }
   
   if (isZavSklad) {
-      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
-      
-      // 1. Переименовываем кнопку "План" в "Смена" и принудительно показываем её
-      let btnPlan = document.getElementById("btn-adm-plan"); 
-      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
-      
-      // 2. Встраиваем оригинальную форму и ВСЕГДА очищаем класс hidden (исправляет баг пустого экрана после отправки)
-      let adminPlanList = document.getElementById("admin-plan-list");
-      let formSwap = document.getElementById("form-swap");
-      if (adminPlanList && formSwap) {
-          if (!adminPlanList.contains(formSwap)) {
-              adminPlanList.innerHTML = ""; 
-              adminPlanList.appendChild(formSwap); 
-          }
-          // КРИТИЧЕСКИ ВАЖНО: Удаляем скрытие при каждом рендере, так как closeForm() прячет её обратно
-          formSwap.classList.remove("hidden", "card", "form-dark");
-          formSwap.style.padding = "0";
-          formSwap.style.background = "transparent";
-          formSwap.style.border = "none";
-          formSwap.style.boxShadow = "none";
-          
-          // Скрываем внутреннюю кнопку закрытия модалки
-          let gridBtns = formSwap.querySelector(".grid-btns");
-          if (gridBtns) gridBtns.style.display = "none";
-      }
+      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+      
+      // 1. Переименовываем кнопку "План" в "Смена" и принудительно показываем её
+      let btnPlan = document.getElementById("btn-adm-plan"); 
+      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
+      
+      // 2. Встраиваем оригинальную форму и ВСЕГДА очищаем класс hidden (чтобы экран не пустел после отправки)
+      let adminPlanList = document.getElementById("admin-plan-list");
+      let formSwap = document.getElementById("form-swap");
+      if (adminPlanList && formSwap) {
+          if (!adminPlanList.contains(formSwap)) {
+              adminPlanList.innerHTML = ""; 
+              adminPlanList.appendChild(formSwap); 
+          }
+          formSwap.classList.remove("hidden", "card", "form-dark");
+          formSwap.style.padding = "0";
+          formSwap.style.background = "transparent";
+          formSwap.style.border = "none";
+          formSwap.style.boxShadow = "none";
+          
+          // Скрываем внутреннюю кнопку закрытия модалки
+          let gridBtns = formSwap.querySelector(".grid-btns");
+          if (gridBtns) gridBtns.style.display = "none";
+      }
 
-      // 3. УМНЫЙ ФИЛЬТР СМЕНЩИКОВ: Ищем всех сотрудников, у кого в должности есть слово "Заведующий"
-      let selectTarget = document.getElementById("fs-target");
-      if (selectTarget) {
-          let emps = data.employees || (data.info && data.info.employees) || data.users || [];
-          let zavs = emps.filter(e => e && e.role && String(e.role).toLowerCase().includes("заведующий"));
-          
-          if (zavs.length > 0) {
-              selectTarget.innerHTML = `<option value="" disabled selected>Выберите заведующего</option>` + 
-                  zavs.map(e => `<option value="${e.iin}">${e.name || e.fio || e.firstName || "Заведующий"}</option>`).join("");
-          } else {
-              selectTarget.innerHTML = `<option value="" disabled selected>Заведующие не найдены</option>`;
-          }
-      }
+      // 3. УМНЫЙ И ГИБКИЙ ПОИСК СМЕНЩИКОВ (Заведующих складом)
+      let selectTarget = document.getElementById("fs-target");
+      if (selectTarget) {
+          // Собираем данные из всех возможных источников, где могут лежать коллеги
+          let emps = [];
+          if (typeof globalSellers !== 'undefined' && globalSellers && globalSellers.length > 0) {
+              emps = globalSellers;
+          } else if (data.sellers) {
+              emps = data.sellers;
+          } else if (data.employees) {
+              emps = data.employees;
+          } else if (data.info && data.info.employees) {
+              emps = data.info.employees;
+          }
 
-      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
-      
-      // По умолчанию открываем именно вкладку "Смена" (plan)
-      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
-      
-      let match = roleStr.match(/заведующий складом\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
-      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
-  }
+          // Пробуем строго отфильтровать тех, у кого в роли есть слово "заведующий"
+          let zavs = emps.filter(e => e && e.role && String(e.role).toLowerCase().includes("заведующий"));
+          
+          // Если строго по роли ничего не нашлось (например, свойства role нет в объектах списка),
+          // но сам список сменщиков от бэкенда пришел не пустой — берем его целиком
+          if (zavs.length === 0 && emps.length > 0) {
+              zavs = emps;
+          }
+          
+          // Выводим результат в выпадающий список
+          if (zavs.length > 0) {
+              selectTarget.innerHTML = `<option value="" disabled selected>Выберите заведующего</option>` + 
+                  zavs.map(e => `<option value="${e.iin}">${e.name || e.fio || e.firstName || "Заведующий складом"}</option>`).join("");
+          } else {
+              selectTarget.innerHTML = `<option value="" disabled selected>Заведующие не найдены</option>`;
+          }
+      }
+
+      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
+      
+      // По умолчанию открываем именно вкладку "Смена" (plan)
+      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
+      
+      let match = roleStr.match(/заведующий складом\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
+  }
   else if (isDir) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
       let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "";
