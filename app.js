@@ -736,15 +736,26 @@ function setKpiColor(val, elCircle, elText) { let color = "#27ae60"; if (val >= 
 function switchTab(tab, direction = null) {
   // 1. Умное восстановление: проверяем хэш (из пуш-уведомления) или память (localStorage)
   if (!window.initialTabRestored && appState.iin) { 
-      window.initialTabRestored = true; 
-      let hashTab = window.location.hash.replace('#', '').split('?')[0];
-      let savedTab = localStorage.getItem("savedTab_" + appState.iin); 
-      if (hashTab && document.getElementById("content-" + hashTab)) {
-          tab = hashTab; window.location.hash = ''; 
-      } else if (savedTab && document.getElementById("content-" + savedTab)) {
-          tab = savedTab; 
+          window.initialTabRestored = true; 
+          let hashTab = window.location.hash.replace('#', '').split('?')[0];
+          let savedTab = localStorage.getItem("savedTab_" + appState.iin); 
+          
+          if (hashTab) {
+              // Умный редирект: если директор перешел по пушу, его Входящие лежат во вкладке админки
+              let rStr = String(appState.role || "").toLowerCase();
+              let iDir = rStr.includes("директор") || rStr.includes("управляющий") || rStr.includes("админ") || rStr.includes("супервайзер");
+              if (hashTab === 'inbox' && iDir) hashTab = 'adm-inbox';
+              
+              if (document.getElementById("content-" + hashTab)) {
+                  tab = hashTab; 
+                  window.location.hash = ''; 
+                  // ПРИОРИТЕТ УВЕДОМЛЕНИЙ: принудительно стираем память о разделах
+                  localStorage.removeItem("savedDetailsType_" + appState.iin);
+              }
+          } else if (savedTab && document.getElementById("content-" + savedTab)) {
+              tab = savedTab; 
+          }
       }
-  }
 
   let scroller = document.getElementById("scrollable-body"); if (scroller && lastActiveTab) savedScrollPos[lastActiveTab] = scroller.scrollTop;
   
@@ -1568,7 +1579,7 @@ function submitVacation() {
     let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
     let details = `С ${formatD(start)} по ${formatD(end)}`; 
     let meta = JSON.stringify({ startDate: start, endDate: end }); 
-    executeSubmit("Отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
+    executeSubmit("Трудовой отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
 }
 
 function renderAdminEmps(dept, btnElement) {
