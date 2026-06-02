@@ -923,6 +923,7 @@ function renderDashboardData(data, isSilent = false) {
   let isZavSklad = roleStr.includes("заведующий складом"); 
   let isCashier = roleStr.includes("кассир"); // НОВОЕ: Определение кассира
   let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier; // Продавец - это кто не промоутер, не дир, не завсклад и НЕ кассир
+  let isInfoConsultant = roleStr.includes("инфо-консультант");
   
   let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
   
