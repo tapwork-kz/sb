@@ -736,26 +736,15 @@ function setKpiColor(val, elCircle, elText) { let color = "#27ae60"; if (val >= 
 function switchTab(tab, direction = null) {
   // 1. Умное восстановление: проверяем хэш (из пуш-уведомления) или память (localStorage)
   if (!window.initialTabRestored && appState.iin) { 
-          window.initialTabRestored = true; 
-          let hashTab = window.location.hash.replace('#', '').split('?')[0];
-          let savedTab = localStorage.getItem("savedTab_" + appState.iin); 
-          
-          if (hashTab) {
-              // Умный редирект: если директор перешел по пушу, его Входящие лежат во вкладке админки
-              let rStr = String(appState.role || "").toLowerCase();
-              let iDir = rStr.includes("директор") || rStr.includes("управляющий") || rStr.includes("админ") || rStr.includes("супервайзер");
-              if (hashTab === 'inbox' && iDir) hashTab = 'adm-inbox';
-              
-              if (document.getElementById("content-" + hashTab)) {
-                  tab = hashTab; 
-                  window.location.hash = ''; 
-                  // ПРИОРИТЕТ УВЕДОМЛЕНИЙ: принудительно стираем память о разделах
-                  localStorage.removeItem("savedDetailsType_" + appState.iin);
-              }
-          } else if (savedTab && document.getElementById("content-" + savedTab)) {
-              tab = savedTab; 
-          }
+      window.initialTabRestored = true; 
+      let hashTab = window.location.hash.replace('#', '').split('?')[0];
+      let savedTab = localStorage.getItem("savedTab_" + appState.iin); 
+      if (hashTab && document.getElementById("content-" + hashTab)) {
+          tab = hashTab; window.location.hash = ''; 
+      } else if (savedTab && document.getElementById("content-" + savedTab)) {
+          tab = savedTab; 
       }
+  }
 
   let scroller = document.getElementById("scrollable-body"); if (scroller && lastActiveTab) savedScrollPos[lastActiveTab] = scroller.scrollTop;
   
@@ -792,23 +781,7 @@ function switchTab(tab, direction = null) {
   
   if(tab === 'adm-outs') renderAdminOuts(); if(tab === 'adm-main') { if (isZavSklad && window.currentAdminMainView === 'plan') window.currentAdminMainView = 'emps'; if (typeof window.currentAdminMainView === 'undefined') window.currentAdminMainView = isZavSklad ? 'emps' : 'plan'; toggleAdminMain(window.currentAdminMainView); } if(tab === 'adm-inbox') renderAdminHistory(currentHistFilter);
   
-  if (scroller) { 
-      // 1. Привязываем слушатель (один раз), чтобы сохранять скролл при каждом движении
-      if (!window.scrollListenerAdded) {
-          window.scrollListenerAdded = true;
-          scroller.addEventListener("scroll", () => {
-              if (lastActiveTab && appState.iin) {
-                  localStorage.setItem("scrollPos_" + appState.iin + "_" + lastActiveTab, scroller.scrollTop);
-              }
-          }, { passive: true }); // passive ускоряет работу скролла на телефонах
-      }
-      
-      // 2. Восстанавливаем скролл из памяти телефона
-      setTimeout(() => { 
-          let savedY = localStorage.getItem("scrollPos_" + appState.iin + "_" + tab);
-          scroller.scrollTop = savedY ? parseInt(savedY) : 0; 
-      }, 30); // Чуть увеличили задержку, чтобы контент успел отрисоваться
-  }
+  if (scroller) { setTimeout(() => { scroller.scrollTop = savedScrollPos[tab] || 0; }, 10); }
 }
 
 function applyLimits(state) { if (!appState.currentAction) { document.getElementById("btn-break").disabled = !state.canBreak; document.getElementById("btn-lunch").disabled = !state.canLunch; document.getElementById("btn-snack").disabled = !state.canSnack; document.getElementById("action-hint").innerText = (state.canBreak || state.canLunch || state.canSnack) ? "Выберите действие:" : "Очередь заполнена или лимит исчерпан"; } if (state.activeOuts) { globalActiveOuts = state.activeOuts; renderActiveOuts(); } }
@@ -895,12 +868,6 @@ async function loadDashboard(isSilent = false) {
                   if (isDir) { switchTab('adm-main'); toggleAdminMain('plan'); } 
                   else if (isZavSklad) { switchTab('adm-main'); toggleAdminMain('emps'); } 
                   else { switchTab('time'); } 
-              }
-              
-              // ВОССТАНАВЛИВАЕМ РАЗДЕЛ (проваливаемся внутрь, если были там)
-              let savedDetails = localStorage.getItem("savedDetailsType_" + appState.iin);
-              if (savedDetails) { 
-                  setTimeout(() => { openDetails(savedDetails); }, 100); 
               }
               
               hideLoader(); isSilent = true; 
@@ -1272,20 +1239,7 @@ function renderHistoryItem(i, isCompact = false) {
 function renderMoneyFineItem(i) { let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); let moneyVal = parseFloat(String(i.moneyFine).replace(',', '.')) || 0; let ptsVal = parseFloat(String(i.val).replace(',', '.')) || 0; let badgeHtml = ""; if (moneyVal !== 0) badgeHtml += `<span class="detail-fine" style="margin-left:10px; white-space:nowrap;">${formatNumberWithSpaces(String(moneyVal).replace('.',','))} ₸</span>`; if (ptsVal !== 0) badgeHtml += `<span class="detail-fine" style="margin-left:10px; white-space:nowrap;">${String(ptsVal).replace('.',',')} б.</span>`; if (badgeHtml === "") badgeHtml = `<span class="detail-fine" style="margin-left:10px;">0</span>`; let issuerHtml = (i.source && isDirOrZav) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${formatShortName(i.source)}</span>` : ''; return `<div class="req-item" style="border-left-color: #e74c3c; border-left-width: 2px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;"><div style="flex:1;"><b style="font-size:12px; color:#e74c3c; display:inline-block; margin-bottom:3px;">Штраф</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div><span style="color:gray;font-size:10px;">${i.date}</span></div>${issuerHtml}</div></div><div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">${badgeHtml}</div></div>`; }
 
 function openDetails(type) {
-  let prevTab = lastActiveTab; 
-  switchTab('details'); 
-  
-  // 1. Запоминаем, в какой именно раздел мы провалились
-  if (appState.iin) localStorage.setItem("savedDetailsType_" + appState.iin, type);
-  
-  document.getElementById("btn-details-back").onclick = () => { 
-      // 2. При нажатии "Назад" стираем память об этом разделе
-      if (appState.iin) localStorage.removeItem("savedDetailsType_" + appState.iin);
-      switchTab(prevTab); 
-  }; 
-  
-  document.getElementById("details-kpi-circle-container").innerHTML = ""; 
-  let listHtml = "";
+  let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-kpi-circle-container").innerHTML = ""; let listHtml = "";
   if (type === 'sc') { document.getElementById("details-title").innerText = "Детали СЦ | Фокус"; listHtml = generateDatePanelHTML('my-sc', 'window.triggerMyScReload'); listHtml += "<div id='my-sc-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; document.getElementById("details-list").innerHTML = listHtml; window.triggerMyScReload = function(t, val) { if(t && t !== 'search') setPanelDates(t, val, 'my-sc', () => window.triggerMyScReload('search')); else { let startParts = document.getElementById('my-sc-start').value.split('-'); let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime(); let endParts = document.getElementById('my-sc-end').value.split('-'); let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime(); let arr = myScHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; }); arr.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); let h = ""; if(arr.length > 0) { h += arr.map((i, idx) => buildStandardRow({title: `${idx + 1}. ${i.reason}`, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, hasBorder: false})).join(""); } else { h = "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; } document.getElementById('my-sc-list-container').innerHTML = h; } }; window.triggerMyScReload('search'); return; } 
   else if (type === 'points') { 
       document.getElementById("details-title").innerText = "История Баллов"; 
@@ -1579,7 +1533,7 @@ function submitVacation() {
     let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
     let details = `С ${formatD(start)} по ${formatD(end)}`; 
     let meta = JSON.stringify({ startDate: start, endDate: end }); 
-    executeSubmit("Трудовой отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
+    executeSubmit("Отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
 }
 
 function renderAdminEmps(dept, btnElement) {
