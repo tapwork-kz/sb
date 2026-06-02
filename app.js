@@ -946,86 +946,76 @@ function renderDashboardData(data, isSilent = false) {
   }
   
   if (isZavSklad) {
-      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
-      
-      // 1. Переименовываем кнопку "План" в "Смена" и принудительно показываем её
-      let btnPlan = document.getElementById("btn-adm-plan"); 
-      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
-      
-      // 2. Встраиваем оригинальную форму и очищаем классы скрытия
-      let adminPlanList = document.getElementById("admin-plan-list");
-      let formSwap = document.getElementById("form-swap");
-      if (adminPlanList && formSwap) {
-          if (!adminPlanList.contains(formSwap)) {
-              adminPlanList.innerHTML = ""; 
-              adminPlanList.appendChild(formSwap); 
-          }
-          formSwap.classList.remove("hidden", "card", "form-dark");
-          formSwap.style.padding = "0";
-          formSwap.style.background = "transparent";
-          formSwap.style.border = "none";
-          formSwap.style.boxShadow = "none";
-          
-          let gridBtns = formSwap.querySelector(".grid-btns");
-          if (gridBtns) gridBtns.style.display = "none";
-      }
+      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+      
+      // 1. Переименовываем кнопку "План" в "Смена" и принудительно показываем её
+      let btnPlan = document.getElementById("btn-adm-plan"); 
+      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
+      
+      // 2. Встраиваем оригинальную форму и ВСЕГДА очищаем класс hidden (чтобы экран не пустел после отправки)
+      let adminPlanList = document.getElementById("admin-plan-list");
+      let formSwap = document.getElementById("form-swap");
+      if (adminPlanList && formSwap) {
+          if (!adminPlanList.contains(formSwap)) {
+              adminPlanList.innerHTML = ""; 
+              adminPlanList.appendChild(formSwap); 
+          }
+          formSwap.classList.remove("hidden", "card", "form-dark");
+          formSwap.style.padding = "0";
+          formSwap.style.background = "transparent";
+          formSwap.style.border = "none";
+          formSwap.style.boxShadow = "none";
+          
+          // Скрываем внутреннюю кнопку закрытия модалки
+          let gridBtns = formSwap.querySelector(".grid-btns");
+          if (gridBtns) gridBtns.style.display = "none";
+      }
 
-      // 3. УМНЫЙ ЗАПРОС К Supabase БД ДЛЯ ПОЛУЧЕНИЯ ЗАВЕДУЮЩИХ
-      let selectTarget = document.getElementById("fs-target");
-      if (selectTarget) {
-          selectTarget.innerHTML = `<option value="" disabled selected>Загрузка заведующих из БД...</option>`;
-          
-          (async () => {
-              let filteredZavs = [];
-              
-              // Шаг А: Пробуем сделать прямой запрос в таблицу 'users' через глобальный клиент Supabase
-              if (typeof supabase !== 'undefined' && supabase && typeof supabase.from === 'function') {
-                  try {
-                      let { data: dbUsers, error } = await supabase.from('users').select('iin, name, role');
-                      if (dbUsers && dbUsers.length > 0) {
-                          filteredZavs = dbUsers.filter(e => e && e.role && String(e.role).toLowerCase().includes("заведующий"));
-                      }
-                  } catch (err) {
-                      console.error("Ошибка прямого обращения к Supabase:", err);
-                      filteredZavs = [];
-                  }
-              }
-              
-              // Шаг Б: Если прямой запрос не удался или вернул пустоту, проверяем локальный кэш приложения
-              if (filteredZavs.length === 0) {
-                  let localCache = data.employees || (data.info && data.info.employees) || data.users || window.globalEmployees || [];
-                  if (Array.isArray(localCache)) {
-                      filteredZavs = localCache.filter(e => e && e.role && String(e.role).toLowerCase().includes("заведующий"));
-                  }
-              }
-              
-              // Убираем возможные дубликаты пользователей по ИИН
-              let uniqueZavs = [];
-              let seenIins = new Set();
-              filteredZavs.forEach(z => {
-                  if (z && z.iin && !seenIins.has(String(z.iin))) {
-                      seenIins.add(String(z.iin));
-                      uniqueZavs.push(z);
-                  }
-              });
+      // 3. ИСПРАВЛЕННЫЙ ТОЧНЫЙ ЗАПРОС К Supabase ПО ВАШЕЙ СХЕМЕ ТАБЛИЦЫ
+      let selectTarget = document.getElementById("fs-target");
+      if (selectTarget) {
+          selectTarget.innerHTML = `<option value="" disabled selected>Загрузка заведующих...</option>`;
+          
+          (async () => {
+              try {
+                  if (typeof supabase !== 'undefined' && supabase) {
+                      // Делаем точечный запрос к таблице 'users' по колонкам iin, full_name, role
+                      // Используем ilike, чтобы найти "Заведующий складом" независимо от отдела (Цифра/МБТ/КБТ)
+                      let { data: dbUsers, error } = await supabase
+                          .from('users')
+                          .select('iin, full_name, role')
+                          .ilike('role', '%Заведующий складом%');
 
-              // Отрисовываем результат в выпадающий список
-              if (uniqueZavs.length > 0) {
-                  selectTarget.innerHTML = `<option value="" disabled selected>Выберите заведующего</option>` + 
-                      uniqueZavs.map(e => `<option value="${e.iin}">${e.name || e.fio || "Заведующий складом"}</option>`).join("");
-              } else {
-                  selectTarget.innerHTML = `<option value="" disabled selected>Заведующие не найдены в БД</option>`;
-              }
-          })();
-      }
+                      if (error) throw error;
 
-      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
-      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
-      
-      let match = roleStr.match(/заведующий складом\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
-      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
-  }
+                      if (dbUsers && dbUsers.length > 0) {
+                          // Сортируем список по алфавиту для красоты
+                          dbUsers.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
+                          
+                          selectTarget.innerHTML = `<option value="" disabled selected>Выберите заведующего</option>` + 
+                              dbUsers.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
+                      } else {
+                          selectTarget.innerHTML = `<option value="" disabled selected>Заведующие складом не найдены</option>`;
+                      }
+                  } else {
+                      selectTarget.innerHTML = `<option value="" disabled selected>Ошибка: Supabase не подключен</option>`;
+                  }
+              } catch (err) {
+                  console.error("Ошибка при получении заведующих из Supabase:", err);
+                  selectTarget.innerHTML = `<option value="" disabled selected>Ошибка загрузки из БД</option>`;
+              }
+          })();
+      }
+
+      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
+      
+      // По умолчанию открываем именно вкладку "Смена" (plan)
+      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
+      
+      let match = roleStr.match(/заведующий складом\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
+  }
   else if (isDir) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
       let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "";
