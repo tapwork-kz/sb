@@ -971,38 +971,42 @@ function renderDashboardData(data, isSilent = false) {
           if (gridBtns) gridBtns.style.display = "none";
       }
 
-      // 3. ИСПРАВЛЕННЫЙ ТОЧНЫЙ ЗАПРОС К Supabase ПО ВАШЕЙ СХЕМЕ ТАБЛИЦЫ
+      // 3. ИСПРАВЛЕННЫЙ ПРЯМОЙ ЗАПРОС К Supabase (Используем точный supabaseClient)
       let selectTarget = document.getElementById("fs-target");
       if (selectTarget) {
           selectTarget.innerHTML = `<option value="" disabled selected>Загрузка заведующих...</option>`;
           
           (async () => {
               try {
-                  if (typeof supabase !== 'undefined' && supabase) {
-                      // Делаем точечный запрос к таблице 'users' по колонкам iin, full_name, role
-                      // Используем ilike, чтобы найти "Заведующий складом" независимо от отдела (Цифра/МБТ/КБТ)
-                      let { data: dbUsers, error } = await supabase
+                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+                      // Запрашиваем из таблицы 'users' нужные нам поля
+                      // Фильтруем роль по фразе "Заведующий складом" и исключаем самого себя (appState.iin)
+                      let { data: dbUsers, error } = await supabaseClient
                           .from('users')
-                          .select('iin, full_name, role')
-                          .ilike('role', '%Заведующий складом%');
+                          .select('iin, full_name, role, login_status')
+                          .ilike('role', '%Заведующий складом%')
+                          .neq('iin', appState.iin);
 
                       if (error) throw error;
 
-                      if (dbUsers && dbUsers.length > 0) {
-                          // Сортируем список по алфавиту для красоты
-                          dbUsers.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
+                      // Дополнительно отсекаем заблокированных сотрудников
+                      let activeZavs = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
+
+                      if (activeZavs.length > 0) {
+                          // Сортируем список по алфавиту
+                          activeZavs.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
                           
                           selectTarget.innerHTML = `<option value="" disabled selected>Выберите заведующего</option>` + 
-                              dbUsers.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
+                              activeZavs.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
                       } else {
                           selectTarget.innerHTML = `<option value="" disabled selected>Заведующие складом не найдены</option>`;
                       }
                   } else {
-                      selectTarget.innerHTML = `<option value="" disabled selected>Ошибка: Supabase не подключен</option>`;
+                      selectTarget.innerHTML = `<option value="" disabled selected>Ошибка: Клиент БД не найден</option>`;
                   }
               } catch (err) {
                   console.error("Ошибка при получении заведующих из Supabase:", err);
-                  selectTarget.innerHTML = `<option value="" disabled selected>Ошибка загрузки из БД</option>`;
+                  selectTarget.innerHTML = `<option value="" disabled selected>Ошибка загрузки списка из БД</option>`;
               }
           })();
       }
