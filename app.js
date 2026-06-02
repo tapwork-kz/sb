@@ -734,17 +734,53 @@ async function manualLogin() {
 function setKpiColor(val, elCircle, elText) { let color = "#27ae60"; if (val >= 100) color = "#1e8449"; else if (val >= 80 && val < 90) color = "#f39c12"; else if (val < 80) color = "#e74c3c"; if(elCircle) { let trackColor = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)'; elCircle.style.background = `conic-gradient(${color} ${val > 100 ? 100 : val}%, ${trackColor} 0)`; } if(elText) elText.style.color = color; return color; }
 
 function switchTab(tab, direction = null) {
+  // 1. Умное восстановление: проверяем хэш (из пуш-уведомления) или память (localStorage)
+  if (!window.initialTabRestored && appState.iin) { 
+      window.initialTabRestored = true; 
+      let hashTab = window.location.hash.replace('#', '').split('?')[0];
+      let savedTab = localStorage.getItem("savedTab_" + appState.iin); 
+      if (hashTab && document.getElementById("content-" + hashTab)) {
+          tab = hashTab; window.location.hash = ''; 
+      } else if (savedTab && document.getElementById("content-" + savedTab)) {
+          tab = savedTab; 
+      }
+  }
+
   let scroller = document.getElementById("scrollable-body"); if (scroller && lastActiveTab) savedScrollPos[lastActiveTab] = scroller.scrollTop;
-  if (tab !== 'details') lastActiveTab = tab; if(appState.token) loadDashboard(true);
+  
+  // 2. Сохраняем в память каждую открытую вкладку (кроме деталей)
+  if (tab !== 'details') { 
+      lastActiveTab = tab; 
+      if(appState.iin) localStorage.setItem("savedTab_" + appState.iin, tab); 
+  } 
+  
+  if(appState.token) loadDashboard(true);
+  
   document.querySelectorAll('#main-tabs .icon-btn').forEach(btn => btn.classList.remove('active-tab')); 
   if(tab === 'time') document.getElementById('nav-time-icon').classList.add('active-tab'); if(tab === 'create') document.getElementById('nav-create-icon').classList.add('active-tab'); if(tab === 'inbox') document.getElementById('inbox-icon').classList.add('active-tab'); if(tab === 'adm-outs') document.getElementById('nav-adm-outs').classList.add('active-tab'); if(tab === 'adm-main') document.getElementById('nav-adm-main').classList.add('active-tab'); if(tab === 'adm-inbox') document.getElementById('nav-adm-inbox').classList.add('active-tab');
+  
   document.querySelectorAll('#scrollable-body > div').forEach(el => el.classList.add("hidden"));
   let sections = document.querySelectorAll('#scrollable-body > div'); let animClass = 'slide-up-fade'; if (direction === 'right') animClass = 'slide-in-right'; else if (direction === 'left') animClass = 'slide-in-left';
   sections.forEach(s => { s.classList.remove('fade-in', 'slide-up-fade', 'slide-in-right', 'slide-in-left'); s.style.animation = 'none'; s.offsetHeight; s.style.animation = null; });
-  let roleStr = String(appState.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); let isZavSklad = roleStr.includes("заведующий складом"); let isSeller = !isUserPromoter && !isDir && !isZavSklad; 
-  let isCreateTabActive = (tab === 'create'); let isAnyFormActive = isCreateTabActive && document.getElementById("menu-list").classList.contains("hidden"); let dash = document.getElementById("info-dashboard"); if (isSeller && tab !== 'details' && !tab.startsWith('adm') && !isAnyFormActive) { if (dash.classList.contains("hidden")) { dash.classList.remove("hidden"); dash.classList.remove("fade-in", "slide-up-fade"); dash.classList.add("slide-down-fade"); } } else { dash.classList.add("hidden"); }
+  
+  // 3. Распределение ролей и показ дашборда для кассиров
+  let roleStr = String(appState.role).toLowerCase(); 
+  let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
+  let isZavSklad = roleStr.includes("заведующий складом"); 
+  let isCashier = roleStr.includes("кассир");
+  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier; 
+  
+  let isCreateTabActive = (tab === 'create'); let isAnyFormActive = isCreateTabActive && document.getElementById("menu-list").classList.contains("hidden"); let dash = document.getElementById("info-dashboard"); 
+  if ((isSeller || isCashier) && tab !== 'details' && !tab.startsWith('adm') && !isAnyFormActive) { 
+      if (dash && dash.classList.contains("hidden")) { dash.classList.remove("hidden"); dash.classList.remove("fade-in", "slide-up-fade"); dash.classList.add("slide-down-fade"); } 
+  } else { 
+      if(dash) dash.classList.add("hidden"); 
+  }
+  
   let targetEl = document.getElementById("content-" + tab); if(targetEl) { targetEl.classList.remove("hidden"); targetEl.classList.add(animClass); }
+  
   if(tab === 'adm-outs') renderAdminOuts(); if(tab === 'adm-main') { if (isZavSklad && window.currentAdminMainView === 'plan') window.currentAdminMainView = 'emps'; if (typeof window.currentAdminMainView === 'undefined') window.currentAdminMainView = isZavSklad ? 'emps' : 'plan'; toggleAdminMain(window.currentAdminMainView); } if(tab === 'adm-inbox') renderAdminHistory(currentHistFilter);
+  
   if (scroller) { setTimeout(() => { scroller.scrollTop = savedScrollPos[tab] || 0; }, 10); }
 }
 
