@@ -952,7 +952,7 @@ function renderDashboardData(data, isSilent = false) {
       let btnPlan = document.getElementById("btn-adm-plan"); 
       if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
       
-      // 2. Встраиваем оригинальную форму и ВСЕГДА очищаем класс hidden
+      // 2. Встраиваем оригинальную форму и очищаем классы скрытия
       let adminPlanList = document.getElementById("admin-plan-list");
       let formSwap = document.getElementById("form-swap");
       if (adminPlanList && formSwap) {
@@ -970,48 +970,53 @@ function renderDashboardData(data, isSilent = false) {
           if (gridBtns) gridBtns.style.display = "none";
       }
 
-      // 3. ИСПРАВЛЕННЫЙ ПОИСК СМЕНЩИКОВ ИЗ БД (Исключаем продавцов Цифры)
+      // 3. УМНЫЙ ЗАПРОС К Supabase БД ДЛЯ ПОЛУЧЕНИЯ ЗАВЕДУЮЩИХ
       let selectTarget = document.getElementById("fs-target");
       if (selectTarget) {
-          // Ищем исключительно в массивах сотрудников из БД, игнорируя globalSellers
-          let emps = data.employees || (data.info && data.info.employees) || data.users || [];
-          let zavs = emps.filter(e => e && e.role && String(e.role).toLowerCase().includes("заведующий"));
+          selectTarget.innerHTML = `<option value="" disabled selected>Загрузка заведующих из БД...</option>`;
           
-          const fillSelect = (list) => {
-              if (list.length > 0) {
-                  selectTarget.innerHTML = `<option value="" disabled selected>Выберите заведующего</option>` + 
-                      list.map(e => `<option value="${e.iin}">${e.name || e.fio || e.firstName || "Заведующий складом"}</option>`).join("");
-              } else {
-                  selectTarget.innerHTML = `<option value="" disabled selected>Заведующие не найдены</option>`;
-              }
-          };
-
-          if (zavs.length > 0) {
-              fillSelect(zavs);
-          } else {
-              // Если в кэше пусто, делаем принудительный асинхронный запрос напрямую к БД через бэкенд
-              selectTarget.innerHTML = `<option value="" disabled selected>Загрузка заведующих из БД...</option>`;
-              (async () => {
+          (async () => {
+              let filteredZavs = [];
+              
+              // Шаг А: Пробуем сделать прямой запрос в таблицу 'users' через глобальный клиент Supabase
+              if (typeof supabase !== 'undefined' && supabase && typeof supabase.from === 'function') {
                   try {
-                      let res = await callBackend('getEmployees', { token: appState.token });
-                      let remoteEmps = [];
-                      if (res && res.employees) remoteEmps = res.employees;
-                      else if (res && Array.isArray(res)) remoteEmps = res;
-                      
-                      let remoteZavs = remoteEmps.filter(e => e && e.role && String(e.role).toLowerCase().includes("заведующий"));
-                      
-                      // Если бэкенд вернул уже отфильтрованный список (где может не быть свойства role)
-                      if (remoteZavs.length === 0 && remoteEmps.length > 0) {
-                          remoteZavs = remoteEmps;
+                      let { data: dbUsers, error } = await supabase.from('users').select('iin, name, role');
+                      if (dbUsers && dbUsers.length > 0) {
+                          filteredZavs = dbUsers.filter(e => e && e.role && String(e.role).toLowerCase().includes("заведующий"));
                       }
-                      
-                      fillSelect(remoteZavs);
                   } catch (err) {
-                      console.error("Ошибка получения заведующих:", err);
-                      fillSelect([]);
+                      console.error("Ошибка прямого обращения к Supabase:", err);
+                      filteredZavs = [];
                   }
-              })();
-          }
+              }
+              
+              // Шаг Б: Если прямой запрос не удался или вернул пустоту, проверяем локальный кэш приложения
+              if (filteredZavs.length === 0) {
+                  let localCache = data.employees || (data.info && data.info.employees) || data.users || window.globalEmployees || [];
+                  if (Array.isArray(localCache)) {
+                      filteredZavs = localCache.filter(e => e && e.role && String(e.role).toLowerCase().includes("заведующий"));
+                  }
+              }
+              
+              // Убираем возможные дубликаты пользователей по ИИН
+              let uniqueZavs = [];
+              let seenIins = new Set();
+              filteredZavs.forEach(z => {
+                  if (z && z.iin && !seenIins.has(String(z.iin))) {
+                      seenIins.add(String(z.iin));
+                      uniqueZavs.push(z);
+                  }
+              });
+
+              // Отрисовываем результат в выпадающий список
+              if (uniqueZavs.length > 0) {
+                  selectTarget.innerHTML = `<option value="" disabled selected>Выберите заведующего</option>` + 
+                      uniqueZavs.map(e => `<option value="${e.iin}">${e.name || e.fio || "Заведующий складом"}</option>`).join("");
+              } else {
+                  selectTarget.innerHTML = `<option value="" disabled selected>Заведующие не найдены в БД</option>`;
+              }
+          })();
       }
 
       let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
