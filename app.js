@@ -976,15 +976,16 @@ function renderDashboardData(data, isSilent = false) {
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
   let isZavSklad = roleStr.includes("заведующий складом"); 
-  let isCashier = roleStr.includes("кассир"); 
   let isInfoConsultant = roleStr.includes("инфо-консультант");
+  let isSeniorCashier = roleStr.includes("старший кассир"); // НОВОЕ: Определение Старшего кассира
+  let isCashier = roleStr.includes("кассир") && !isSeniorCashier; // ИСПРАВЛЕНО: Обычный кассир (не старший)
   
-  // ИСПРАВЛЕНО: Инфо-консультант теперь полностью исключен из продавцов
-  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant; 
+  // ИСПРАВЛЕНО: Все менеджерские роли надежно исключены из обычных продавцов
+  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier; 
   
   let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
   
-  // Скрываем ненужные элементы интерфейса для кассира
+  // Скрываем ненужные элементы интерфейса для обычного кассира
   if (isCashier) {
       let scBlock = document.querySelector(".info-box[onclick=\"openDetails('sc')\"]");
       if (scBlock) scBlock.style.display = "none"; 
@@ -1003,7 +1004,7 @@ function renderDashboardData(data, isSilent = false) {
       if (btnFormTradeIn) btnFormTradeIn.style.display = ""; 
   }
   
-  // ИСПРАВЛЕНО: Жесткая цепь условий через else if предотвращает смешивание интерфейсов
+  // ЦЕПОЧКА ИНТЕРФЕЙСОВ ДЛЯ КАЖДОЙ ДОЛЖНОСТИ
   if (isZavSklad) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
@@ -1028,7 +1029,6 @@ function renderDashboardData(data, isSilent = false) {
           formSwap.querySelectorAll(".inner-block.card").forEach(b => b.style.display = "");
       }
 
-      // ИСПРАВЛЕНО: Защита от дёрганья. Запрос в БД пойдёт только если список ещё пуст
       let selectTarget = document.getElementById("fs-target");
       if (selectTarget && selectTarget.children.length <= 1) {
           selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
@@ -1068,7 +1068,7 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
-  else if (isInfoConsultant) { // ИСПРАВЛЕНО: Теперь этот блок не конфликтует с заведующими
+  else if (isInfoConsultant) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
       let btnPlan = document.getElementById("btn-adm-plan"); 
@@ -1104,7 +1104,6 @@ function renderDashboardData(data, isSilent = false) {
           });
       }
 
-      // ИСПРАВЛЕНО: Защита от дёрганья списка для инфо-консультантов
       let selectTarget = document.getElementById("fs-target");
       if (selectTarget && selectTarget.children.length <= 1) {
           selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
@@ -1141,6 +1140,83 @@ function renderDashboardData(data, isSilent = false) {
       if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
       
       let match = roleStr.match(/инфо-консультант\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
+  }
+  else if (isSeniorCashier) { // НОВОЕ: Точная копия кода Инфо-консультанта для Старшего кассира
+      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+      
+      let btnPlan = document.getElementById("btn-adm-plan"); 
+      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
+      
+      let adminPlanList = document.getElementById("admin-plan-list");
+      let formSwap = document.getElementById("form-swap");
+      if (adminPlanList && formSwap) {
+          if (!adminPlanList.contains(formSwap)) {
+              adminPlanList.innerHTML = ""; 
+              adminPlanList.appendChild(formSwap); 
+          }
+          formSwap.classList.remove("hidden", "card", "form-dark");
+          formSwap.style.padding = "0";
+          formSwap.style.background = "transparent";
+          formSwap.style.border = "none";
+          formSwap.style.boxShadow = "none";
+          
+          let gridBtns = formSwap.querySelector(".grid-btns");
+          if (gridBtns) gridBtns.style.display = "none";
+
+          // Оставляем ТОЛЬКО заявку в отпуск, скрывая исправление и обмен сменами
+          let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
+          innerBlocks.forEach(block => {
+              let h3 = block.querySelector("h3");
+              if (h3) {
+                  let txt = h3.innerText.toLowerCase();
+                  if (txt.includes("исправ") || txt.includes("обмен")) {
+                      block.style.display = "none"; 
+                  } else {
+                      block.style.display = ""; 
+                  }
+              }
+          });
+      }
+
+      let selectTarget = document.getElementById("fs-target");
+      if (selectTarget && selectTarget.children.length <= 1) {
+          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
+          
+          (async () => {
+              try {
+                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+                      // Ищем в БД сотрудников с должностью "Старший кассир"
+                      let { data: dbUsers, error } = await supabaseClient
+                          .from('users')
+                          .select('iin, full_name, role, login_status')
+                          .ilike('role', '%Старший кассир%')
+                          .neq('iin', appState.iin);
+
+                      if (error) throw error;
+
+                      let activeConsultants = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
+
+                      if (activeConsultants.length > 0) {
+                          activeConsultants.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
+                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>` + 
+                              activeConsultants.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
+                      } else {
+                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Старшие кассиры не найдены</option>`;
+                      }
+                  }
+              } catch (err) {
+                  console.error(err);
+                  selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Ошибка загрузки</option>`;
+              }
+          })();
+      }
+
+      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
+      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
+      
+      let match = roleStr.match(/старший кассир\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
@@ -1749,7 +1825,7 @@ function submitVacation() {
     let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
     let details = `С ${formatD(start)} по ${formatD(end)}`; 
     let meta = JSON.stringify({ startDate: start, endDate: end }); 
-    executeSubmit("Отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
+    executeSubmit("Трудовой отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
 }
 
 function renderAdminEmps(dept, btnElement) {
