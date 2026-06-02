@@ -818,10 +818,13 @@ function switchTab(tab, direction = null) {
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
   let isZavSklad = roleStr.includes("заведующий складом"); 
   let isCashier = roleStr.includes("кассир");
-  let isInfoConsultant = roleStr.includes("инфо-консультант"); // ДОБАВЛЕНО
+  let isInfoConsultant = roleStr.includes("инфо-консультант");
+  let isSeniorCashier = roleStr.includes("старший кассир"); // ДОБАВЛЕНО
+
+  // ИСПРАВЛЕНО: Старший кассир теперь тоже надежно исключен из продавцов и обычных кассиров
+  if (isSeniorCashier) isCashier = false; 
   
-  // ИСПРАВЛЕНО: Инфо-консультант и Заведующий складом теперь корректно исключены из обычных продавцов
-  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant; 
+  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier; 
   
   let isCreateTabActive = (tab === 'create'); let isAnyFormActive = isCreateTabActive && document.getElementById("menu-list").classList.contains("hidden"); let dash = document.getElementById("info-dashboard"); 
   if ((isSeller || isCashier) && tab !== 'details' && !tab.startsWith('adm') && !isAnyFormActive) { 
@@ -835,13 +838,12 @@ function switchTab(tab, direction = null) {
   if(tab === 'adm-outs') renderAdminOuts(); 
   
   if(tab === 'adm-main') { 
-      // ИСПРАВЛЕНО: Полностью удален баг принудительного сброса на 'emps'.
-      // Система плавно сохраняет текущий открытый вид подразделов (Смена/Сотрудники/Товары)
+      // ИСПРАВЛЕНО: Для Старшего кассира, Инфо-консультанта и Завсклада сохраняем подвкладку "Смена"
       if (typeof window.currentAdminMainView === 'undefined' || !window.currentAdminMainView) { 
           window.currentAdminMainView = 'plan'; 
       } 
       toggleAdminMain(window.currentAdminMainView); 
-  } 
+  }
   
   if(tab === 'adm-inbox') renderAdminHistory(currentHistFilter);
   
@@ -1437,8 +1439,17 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
               let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
               let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12"; 
               let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
-              let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
-              let roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
+              
+              // Проверяем и выводим полную должность строчными для нужных ролей
+              let lowRole = String(v.authorRole || "").toLowerCase().trim();
+              let roleDeptStr = "";
+              if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант")) {
+                  roleDeptStr = ` — ${lowRole}`;
+              } else {
+                  let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
+                  roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
+              }
+              
               let detailsStr = String(v.details).toLowerCase();
               return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div>`; 
           }).join("");
@@ -1769,8 +1780,16 @@ function renderAdminOuts() {
       if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
       if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
       let actionTitle = out.action; 
-      let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
-      let roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`;
+      
+      // ИСПРАВЛЕНО: Выводим полную должность строчными, если это Старший кассир или Инфо-консультант
+      let roleLabel = "";
+      if (rRole.includes("старший кассир") || rRole.includes("инфо-консультант")) {
+          roleLabel = rRole;
+      } else {
+          let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
+          roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`;
+      }
+      
       return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
   }).join("");
   
@@ -1806,8 +1825,17 @@ function renderAdminOuts() {
           let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
           let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
           let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
-          let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
-          let roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
+          
+          // ИСПРАВЛЕНО: Выводим полную должность строчными для отпусков в панели руководителя
+          let lowRole = String(v.authorRole || "").toLowerCase().trim();
+          let roleDeptStr = "";
+          if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант")) {
+              roleDeptStr = ` — ${lowRole}`;
+          } else {
+              let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
+              roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
+          }
+          
           let detailsStr = String(v.details).toLowerCase();
           return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div>`; 
       }).join("") + `</div>`;
