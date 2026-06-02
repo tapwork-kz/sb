@@ -924,7 +924,7 @@ function renderDashboardData(data, isSilent = false) {
   let isCashier = roleStr.includes("кассир"); 
   let isInfoConsultant = roleStr.includes("инфо-консультант");
   
-  // ИСПРАВЛЕНО: Теперь инфо-консультант четко отделен и больше не считается продавцом
+  // ИСПРАВЛЕНО: Инфо-консультант теперь полностью отделен от простых продавцов
   let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant; 
   
   let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
@@ -948,7 +948,9 @@ function renderDashboardData(data, isSilent = false) {
       if (btnFormTradeIn) btnFormTradeIn.style.display = ""; 
   }
   
-  // ИСПРАВЛЕНО: Все роли теперь связаны через цельную конструкцию if / else if
+  // =========================================================================
+  // НАЧАЛО ЕДИНОЙ ЦЕПОЧКИ РОЛЕЙ (Каждый блок изолирован через else if)
+  // =========================================================================
   if (isZavSklad) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
@@ -971,7 +973,7 @@ function renderDashboardData(data, isSilent = false) {
           let gridBtns = formSwap.querySelector(".grid-btns");
           if (gridBtns) gridBtns.style.display = "none";
           
-          // Восстанавливаем отображение всех блоков (на случай если заходили под инфо-консультантом)
+          // Показываем все скрытые блоки (на случай, если до этого заходили под Инфо-консультантом)
           formSwap.querySelectorAll(".inner-block.card").forEach(b => b.style.display = "");
       }
 
@@ -1015,7 +1017,7 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
-  else if (isInfoConsultant) { // СВЯЗАНО: теперь это часть единой цепочки условий
+  else if (isInfoConsultant) { // КРИТИЧЕСКИ ВАЖНО: теперь это жесткая ветка else if
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
       let btnPlan = document.getElementById("btn-adm-plan"); 
@@ -1044,9 +1046,9 @@ function renderDashboardData(data, isSilent = false) {
               if (h3) {
                   let txt = h3.innerText.toLowerCase();
                   if (txt.includes("исправ") || txt.includes("обмен")) {
-                      block.style.display = "none"; 
+                      block.style.style.display = "none"; 
                   } else {
-                      block.style.display = ""; 
+                      block.style.style.display = ""; 
                   }
               }
           });
@@ -1127,7 +1129,11 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "Непрочитанные сообщения"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) switchTab('time');
   }
+  // =========================================================================
+  // КОНЕЦ ЕДИНОЙ ЦЕПОЧКИ РОЛЕЙ
+  // =========================================================================
 
+  // ИСПРАВЛЕНО: Всё, что ниже — СНАРУЖИ, выполняется для КАЖДОГО пользователя!
   let pAcc = document.getElementById("pt-acc"); if(pAcc) pAcc.innerText = data.info?.ptsAccrued ?? '-'; let pUse = document.getElementById("pt-use"); if(pUse) pUse.innerText = data.info?.ptsUsed ?? '-'; const remVal = parseFloat(String(data.info?.ptsLeft).replace(',','.')) || 0; const ptRemEl = document.getElementById("pt-rem"); if(ptRemEl) { ptRemEl.innerText = data.info?.ptsLeft ?? '-'; ptRemEl.style.color = remVal >= 0 ? "#27ae60" : "#e67e22"; } let pFin = document.getElementById("pt-fin"); if(pFin) pFin.innerText = data.info?.ptsFine ?? '-'; 
   let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0; let kValEl = document.getElementById("kpi-val"); if(kValEl) kValEl.innerText = kpiValue + '%'; setKpiColor(kpiValue, document.getElementById("kpi-circle"), document.getElementById("kpi-val")); myKpiDetails = data.info?.kpiDetails || [];
   let infoTabel = document.getElementById("info-tabel"); if(infoTabel) { infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div>`; }
@@ -1141,8 +1147,7 @@ function renderDashboardData(data, isSilent = false) {
   let hcCard = document.getElementById("hot-check-card");
   if (hcCard) {
       hcCard.innerHTML = ""; let hasContent = false;
-      
-      // ИСПРАВЛЕНО: Элементы продавца (горячие чеки и промо-листы) выводятся строго для продавцов (isSeller)
+      let isCashierLocal = String(appState.role).toLowerCase().includes("кассир");
       if (isSeller && data.hotChecks && data.hotChecks.length > 0) {
           hasContent = true; let hcHtml = `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
           for(let sub in groups) {
@@ -1157,7 +1162,7 @@ function renderDashboardData(data, isSilent = false) {
       }
       
       let promoLists = data.promoLists || [];
-      if (isSeller && promoLists.length > 0) { // ИСПРАВЛЕНО: Промо-листы скрыты для менеджеров
+      if (isSeller && promoLists.length > 0) { 
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               let headerColor = list.listColor || "var(--text-color)";
@@ -1219,6 +1224,11 @@ function renderDashboardData(data, isSilent = false) {
       }
       if (hasContent && isSeller) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
   }
+
+  // Наполнение глобальных системных массивов
+  window.adminHistoryGlobal = data.adminHistory || []; if(isDir && typeof renderAdminHistory === "function") renderAdminHistory();
+  adminScItemsGlobal = data.adminScItems || []; globalSellers = data.sellers || []; globalScItems = data.scItems || []; allEmployeesData = data.adminEmployees || []; tradeInModelsGlobal = data.tradeInModels || []; window.adminVacationsGlobal = data.vacations || [];
+  if ((isDir || isZavSklad) && typeof renderAdminEmps === "function") renderAdminEmps(currentEmpDept, null);
 }
     
   let savedReplies = {}; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { savedReplies[ta.id] = ta.value; });
