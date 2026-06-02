@@ -948,44 +948,22 @@ function renderDashboardData(data, isSilent = false) {
   if (isZavSklad) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
-      // 1. Переименовываем кнопку "План" в "Смена" и показываем её
+      // 1. Переименовываем кнопку "План" в "Смена"
       let btnPlan = document.getElementById("btn-adm-plan"); 
       if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
       
-      // 2. Заменяем содержимое раздела на точные кнопки как у продавцов
+      // 2. Вставляем ту самую оригинальную оранжевую кнопку как у продавцов
       let adminPlanList = document.getElementById("admin-plan-list");
       if (adminPlanList) {
           adminPlanList.innerHTML = `
-          <div style="padding: 16px 12px; display: flex; flex-direction: column; gap: 12px;">
-              <div class="inner-block card" style="background:var(--card-bg); border:1px solid var(--border-color); padding:16px; border-radius:12px; cursor:pointer; display:flex; align-items:center; gap:12px;" onclick="openForm('Исправление смены')">
-                  <div style="background:rgba(52, 152, 219, 0.1); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
-                      <span class="material-symbols-rounded" style="color:#3498db;">edit_calendar</span>
-                  </div>
-                  <div style="flex:1; font-size:14px; font-weight:bold; color:var(--text-color);">Исправление смены</div>
-                  <span class="material-symbols-rounded" style="color:gray; font-size:18px;">chevron_right</span>
-              </div>
-              
-              <div class="inner-block card" style="background:var(--card-bg); border:1px solid var(--border-color); padding:16px; border-radius:12px; cursor:pointer; display:flex; align-items:center; gap:12px;" onclick="openForm('Обмен сменами')">
-                  <div style="background:rgba(155, 89, 182, 0.1); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
-                      <span class="material-symbols-rounded" style="color:#9b59b6;">sync_alt</span>
-                  </div>
-                  <div style="flex:1; font-size:14px; font-weight:bold; color:var(--text-color);">Обмен сменами</div>
-                  <span class="material-symbols-rounded" style="color:gray; font-size:18px;">chevron_right</span>
-              </div>
-              
-              <div class="inner-block card" style="background:var(--card-bg); border:1px solid var(--border-color); padding:16px; border-radius:12px; cursor:pointer; display:flex; align-items:center; gap:12px;" onclick="openForm('Отпуск')">
-                  <div style="background:rgba(243, 156, 18, 0.1); width:40px; height:40px; border-radius:10px; display:flex; align-items:center; justify-content:center;">
-                      <span class="material-symbols-rounded" style="color:#f39c12;">flight_takeoff</span>
-                  </div>
-                  <div style="flex:1; font-size:14px; font-weight:bold; color:var(--text-color);">Заявка в отпуск</div>
-                  <span class="material-symbols-rounded" style="color:gray; font-size:18px;">chevron_right</span>
-              </div>
+          <div style="padding: 20px 12px; display: flex; flex-direction: column; align-items: center;">
+              <p style="color: gray; font-size: 13px; margin-bottom: 15px; text-align: center;">Управление сменой и заявки на отпуск</p>
+              <button onclick="openForm('swap')" class="btn-orange" style="width: 100%; padding: 14px; font-size: 15px; border-radius: 12px; margin: 0;">Рабочая смена</button>
           </div>`;
       }
 
       let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
       
-      // Устанавливаем вкладку "Смена" (plan) по умолчанию
       if (!window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
       
       let match = roleStr.match(/заведующий складом\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
