@@ -2294,8 +2294,8 @@ window.addEventListener('hashchange', checkNotificationRoute);
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         if (appState && appState.iin) {
-            console.log("Приложение открыто: принудительно обновляем данные...");
-            loadDashboard(false);
+            console.log("Приложение открыто: тихо обновляем данные без сброса экрана...");
+            loadDashboard(true); // ИСПРАВЛЕНО: Изменили false на true, чтобы вкладка и скролл оставались на месте
             checkNotificationRoute();
         }
     }
