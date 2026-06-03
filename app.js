@@ -933,18 +933,19 @@ async function loadDashboard(isSilent = false) {
               let roleStr = String(appState.role).toLowerCase(); 
               let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
               let isZavSklad = roleStr.includes("заведующий складом"); 
+              let isInfoConsultant = roleStr.includes("инфо-консультант");
+              let isSeniorCashier = roleStr.includes("старший кассир");
+              let isGruzchik = roleStr.includes("грузчик");
               
               // Умная проверка памяти прямо при загрузке кэша
               let hashT = window.location.hash.replace('#', '').split('?')[0];
               let savedT = localStorage.getItem("savedTab_" + appState.iin);
               let targetT = (hashT && document.getElementById("content-" + hashT)) ? hashT : ((savedT && document.getElementById("content-" + savedT)) ? savedT : null);
               
-              let isInfoConsultant = roleStr.includes("инфо-консультант"); // Добавлено определение роли
-              
               if (targetT) {
                   if (targetT === 'adm-main') {
                       let savedV = localStorage.getItem("savedAdminView_" + appState.iin);
-                      switchTab(targetT); toggleAdminMain(savedV || ((isZavSklad || isInfoConsultant) ? 'plan' : 'plan'));
+                      switchTab(targetT); toggleAdminMain(savedV || ((isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik) ? 'plan' : 'plan'));
                   } else {
                       switchTab(targetT);
                   }
@@ -966,9 +967,27 @@ async function loadDashboard(isSilent = false) {
   let activeEl = document.activeElement; let isTyping = activeEl && (activeEl.tagName === 'TEXTAREA' || activeEl.tagName === 'INPUT' || activeEl.tagName === 'SELECT'); let hasUnsavedText = false; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { if (ta.value.length > 0) hasUnsavedText = true; });
   localStorage.setItem("dashData_" + appState.iin, JSON.stringify(data)); 
   if (!isTyping && !hasUnsavedText) { renderDashboardData(data, isSilent); } if (!isSilent) hideLoader(); 
-  let roleStr = String(appState.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); let isZavSklad = roleStr.includes("заведующий складом");
+  
+  let roleStr = String(appState.role).toLowerCase(); 
+  let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
+  let isZavSklad = roleStr.includes("заведующий складом");
+  let isInfoConsultant = roleStr.includes("инфо-консультант");
+  let isSeniorCashier = roleStr.includes("старший кассир");
+  let isGruzchik = roleStr.includes("грузчик");
+  
   let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin, tgUserId: null }); 
-  if(state && state.authorized !== false) { globalActiveOuts = state.activeOuts || []; if (!isDir && !isZavSklad) { appState.currentAction = state.myActiveAction || ""; saveMemory("currentAction", appState.currentAction); renderTimeUI(); applyLimits(state); } else { if (!document.getElementById("content-adm-outs").classList.contains("hidden")) renderAdminOuts(); } }
+  if(state && state.authorized !== false) { 
+      globalActiveOuts = state.activeOuts || []; 
+      // ИСПРАВЛЕНО: Лимиты времени и кнопки перерывов применяются только к продавцам/кассирам
+      if (!isDir && !isZavSklad && !isInfoConsultant && !isSeniorCashier && !isGruzchik) { 
+          appState.currentAction = state.myActiveAction || ""; 
+          saveMemory("currentAction", appState.currentAction); 
+          renderTimeUI(); 
+          applyLimits(state); 
+      } else { 
+          if (!document.getElementById("content-adm-outs").classList.contains("hidden")) renderAdminOuts(); 
+      } 
+  }
 }
 
 function renderTradeInList() { let container = document.getElementById("tradein-list"); if (!container) return; container.innerHTML = tradeInModelsGlobal.map(m => { let isSel = (selectedTradeInModel === m); return `<div class="sc-item ${isSel ? 'selected' : ''}" onclick="selectTradeIn('${m}')"><div style="font-size:13px;">${m}</div></div>`; }).join(""); }
@@ -2068,7 +2087,41 @@ function openForm(type) {
   let scroller = document.getElementById("scrollable-body"); if (scroller) scroller.scrollTop = 0;
 }
 
-function closeForm() { let roleStr = String(appState.role).toLowerCase(); let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); let isZavSklad = roleStr.includes("заведующий складом"); let dash = document.getElementById("info-dashboard"); if (!isUserPromoter && !isDir && !isZavSklad) { dash.classList.remove("hidden"); dash.classList.remove("fade-in", "slide-up-fade", "slide-down-fade"); dash.classList.add("slide-down-fade"); } ["form-sc", "form-tradein", "form-points", "form-swap"].forEach(id => { let el = document.getElementById(id); el.classList.add("hidden"); el.classList.remove("slide-up-fade"); }); let menu = document.getElementById("menu-list"); menu.classList.remove("hidden"); menu.style.animation = 'none'; menu.offsetHeight; menu.style.animation = null; menu.classList.add("fade-in"); let scroller = document.getElementById("scrollable-body"); if (scroller) scroller.scrollTop = 0; }
+function closeForm() { 
+  let roleStr = String(appState.role).toLowerCase(); 
+  let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
+  let isZavSklad = roleStr.includes("заведующий складом"); 
+  let isInfoConsultant = roleStr.includes("инфо-консультант");
+  let isSeniorCashier = roleStr.includes("старший кассир");
+  let isGruzchik = roleStr.includes("грузчик");
+  
+  let dash = document.getElementById("info-dashboard"); 
+  
+  // ИСПРАВЛЕНО: Не показываем дашборд продавца для всех менеджерских и технических ролей
+  if (!isUserPromoter && !isDir && !isZavSklad && !isInfoConsultant && !isSeniorCashier && !isGruzchik) { 
+      dash.classList.remove("hidden"); 
+      dash.classList.remove("fade-in", "slide-up-fade", "slide-down-fade"); 
+      dash.classList.add("slide-down-fade"); 
+  } 
+  
+  ["form-sc", "form-tradein", "form-points", "form-swap"].forEach(id => { 
+      let el = document.getElementById(id); 
+      if (el) { el.classList.add("hidden"); el.classList.remove("slide-up-fade"); }
+  }); 
+  
+  // ИСПРАВЛЕНО: Не открываем меню кнопок продавца для новых административных должностей
+  let menu = document.getElementById("menu-list"); 
+  if (menu && !isDir && !isZavSklad && !isInfoConsultant && !isSeniorCashier && !isGruzchik) {
+      menu.classList.remove("hidden"); 
+      menu.style.animation = 'none'; 
+      menu.offsetHeight; 
+      menu.style.animation = null; 
+      menu.classList.add("fade-in"); 
+  }
+  
+  let scroller = document.getElementById("scrollable-body"); 
+  if (scroller) scroller.scrollTop = 0; 
+}
 function checkSwapFields() { const target = document.getElementById("fs-target").value; if (target) document.getElementById("fs-extra").classList.remove("hidden"); }
 
 function renderScItems() {
