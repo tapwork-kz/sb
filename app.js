@@ -717,12 +717,12 @@ function initSwipe() {
             let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
             let isZavSklad = roleStr.includes("заведующий складом"); 
             let isInfoConsultant = roleStr.includes("инфо-консультант");
-            let isSeniorCashier = roleStr.includes("старший кассир"); // ДОБАВЛЕНО
+            let isSeniorCashier = roleStr.includes("старший кассир"); 
+            let isGruzchik = roleStr.includes("грузчик"); // ДОБАВЛЕНО
             
-            // ИСПРАВЛЕНО: Старший кассир добавлен в группу админских вкладок ['adm-outs', 'adm-main', 'inbox']
             let tabs = isDir ? 
                 ['adm-outs', 'adm-main', 'adm-inbox'] : 
-                (isZavSklad || isInfoConsultant || isSeniorCashier) ? ['adm-outs', 'adm-main', 'inbox'] : 
+                (isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik) ? ['adm-outs', 'adm-main', 'inbox'] : 
                 ['time', 'create', 'inbox']; 
             
             let currentIdx = tabs.indexOf(lastActiveTab); 
@@ -821,14 +821,13 @@ function switchTab(tab, direction = null) {
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
   let isZavSklad = roleStr.includes("заведующий складом"); 
-  let isCashier = roleStr.includes("кассир");
   let isInfoConsultant = roleStr.includes("инфо-консультант");
-  let isSeniorCashier = roleStr.includes("старший кассир"); // ДОБАВЛЕНО
-
-  // ИСПРАВЛЕНО: Старший кассир теперь тоже надежно исключен из продавцов и обычных кассиров
-  if (isSeniorCashier) isCashier = false; 
+  let isSeniorCashier = roleStr.includes("старший кассир"); 
+  let isGruzchik = roleStr.includes("грузчик"); // ДОБАВЛЕНО
+  let isCashier = roleStr.includes("кассир") && !isSeniorCashier; 
   
-  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier; 
+  // ИСПРАВЛЕНО: Все менеджерские роли и грузчик надежно исключены из обычных продавцов
+  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier && !isGruzchik;
   
   let isCreateTabActive = (tab === 'create'); let isAnyFormActive = isCreateTabActive && document.getElementById("menu-list").classList.contains("hidden"); let dash = document.getElementById("info-dashboard"); 
   if ((isSeller || isCashier) && tab !== 'details' && !tab.startsWith('adm') && !isAnyFormActive) { 
@@ -952,7 +951,7 @@ async function loadDashboard(isSilent = false) {
               } else {
                   // Только если памяти нет, грузим дефолтные вкладки
                   if (isDir) { switchTab('adm-main'); toggleAdminMain('plan'); } 
-                  else if (isZavSklad || isInfoConsultant) { switchTab('adm-main'); toggleAdminMain('plan'); } // ИСПРАВЛЕНО: Инфо и Завсклад по умолчанию открывают «Смена»
+                  else if (isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik) { switchTab('adm-main'); toggleAdminMain('plan'); } 
                   else { switchTab('time'); } 
               }
               
@@ -982,12 +981,14 @@ function renderDashboardData(data, isSilent = false) {
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
   let isZavSklad = roleStr.includes("заведующий складом"); 
-  let isInfoConsultant = roleStr.includes("инфо-консультант");
-  let isSeniorCashier = roleStr.includes("старший кассир"); // НОВОЕ: Определение Старшего кассира
-  let isCashier = roleStr.includes("кассир") && !isSeniorCashier; // ИСПРАВЛЕНО: Обычный кассир (не старший)
+  let isCashier = roleStr.includes("кассир");
+  let isInfoConsultant = roleStr.includes("инфо-консультант"); 
+  let isSeniorCashier = roleStr.includes("старший кассир"); 
+  let isGruzchik = roleStr.includes("грузчик"); // ДОБАВЛЕНО
+
+  if (isSeniorCashier) isCashier = false; 
   
-  // ИСПРАВЛЕНО: Все менеджерские роли надежно исключены из обычных продавцов
-  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier; 
+  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier && !isGruzchik; 
   
   let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
   
@@ -1226,6 +1227,84 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
+  if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
+  }
+  else if (isGruzchik) { // ДОБАВЛЕНО: Полная копия кода для должности Грузчик
+      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+      
+      let btnPlan = document.getElementById("btn-adm-plan"); 
+      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
+      
+      let adminPlanList = document.getElementById("admin-plan-list");
+      let formSwap = document.getElementById("form-swap");
+      if (adminPlanList && formSwap) {
+          if (!adminPlanList.contains(formSwap)) {
+              adminPlanList.innerHTML = ""; 
+              adminPlanList.appendChild(formSwap); 
+          }
+          formSwap.classList.remove("hidden", "card", "form-dark");
+          formSwap.style.padding = "0";
+          formSwap.style.background = "transparent";
+          formSwap.style.border = "none";
+          formSwap.style.boxShadow = "none";
+          
+          let gridBtns = formSwap.querySelector(".grid-btns");
+          if (gridBtns) gridBtns.style.display = "none";
+
+          // Оставляем ТОЛЬКО заявку в отпуск, скрывая исправление и обмен сменами
+          let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
+          innerBlocks.forEach(block => {
+              let h3 = block.querySelector("h3");
+              if (h3) {
+                  let txt = h3.innerText.toLowerCase();
+                  if (txt.includes("исправ") || txt.includes("обмен")) {
+                      block.style.display = "none"; 
+                  } else {
+                      block.style.display = ""; 
+                  }
+              }
+          });
+      }
+
+      let selectTarget = document.getElementById("fs-target");
+      if (selectTarget && selectTarget.children.length <= 1) {
+          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
+          
+          (async () => {
+              try {
+                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+                      let { data: dbUsers, error } = await supabaseClient
+                          .from('users')
+                          .select('iin, full_name, role, login_status')
+                          .ilike('role', '%Грузчик%')
+                          .neq('iin', appState.iin);
+
+                      if (error) throw error;
+
+                      let activeLoaders = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
+
+                      if (activeLoaders.length > 0) {
+                          activeLoaders.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
+                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>` + 
+                              activeLoaders.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
+                      } else {
+                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Грузчики не найдены</option>`;
+                      }
+                  }
+              } catch (err) {
+                  console.error(err);
+                  selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Ошибка загрузки</option>`;
+              }
+          })();
+      }
+
+      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
+      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
+      
+      let match = roleStr.match(/грузчик\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
+  }
   else if (isDir) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
       let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "";
@@ -1447,7 +1526,7 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
               // Проверяем и выводим полную должность строчными для нужных ролей
               let lowRole = String(v.authorRole || "").toLowerCase().trim();
               let roleDeptStr = "";
-              if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант")) {
+              if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант") || lowRole.includes("грузчик")) {
                   roleDeptStr = ` — ${lowRole}`;
               } else {
                   let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
@@ -1785,9 +1864,9 @@ function renderAdminOuts() {
       if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
       let actionTitle = out.action; 
       
-      // ИСПРАВЛЕНО: Выводим полную должность строчными, если это Старший кассир или Инфо-консультант
+      // ИСПРАВЛЕНО: Выводим полную должность строчными, если это Старший кассир, Инфо-консультант или Грузчик
       let roleLabel = "";
-      if (rRole.includes("старший кассир") || rRole.includes("инфо-консультант")) {
+      if (rRole.includes("старший кассир") || rRole.includes("инфо-консультант") || rRole.includes("грузчик")) {
           roleLabel = rRole;
       } else {
           let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
@@ -1833,7 +1912,7 @@ function renderAdminOuts() {
           // ИСПРАВЛЕНО: Выводим полную должность строчными для отпусков в панели руководителя
           let lowRole = String(v.authorRole || "").toLowerCase().trim();
           let roleDeptStr = "";
-          if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант")) {
+          if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант") || lowRole.includes("грузчик")) {
               roleDeptStr = ` — ${lowRole}`;
           } else {
               let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
