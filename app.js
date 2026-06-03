@@ -981,13 +981,14 @@ function renderDashboardData(data, isSilent = false) {
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
   let isZavSklad = roleStr.includes("заведующий складом"); 
-  let isCashier = roleStr.includes("кассир");
   let isInfoConsultant = roleStr.includes("инфо-консультант"); 
   let isSeniorCashier = roleStr.includes("старший кассир"); 
-  let isGruzchik = roleStr.includes("грузчик"); // ДОБАВЛЕНО
+  let isGruzchik = roleStr.includes("грузчик"); 
+  let isCashier = roleStr.includes("кассир") && !isSeniorCashier; 
 
   if (isSeniorCashier) isCashier = false; 
   
+  // НАДЕЖНОЕ ИСКЛЮЧЕНИЕ: Менеджеры и технический персонал больше не пересекаются с интерфейсом продавцов
   let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier && !isGruzchik; 
   
   let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
@@ -1011,7 +1012,7 @@ function renderDashboardData(data, isSilent = false) {
       if (btnFormTradeIn) btnFormTradeIn.style.display = ""; 
   }
   
-  // ЦЕПОЧКА ИНТЕРФЕЙСОВ ДЛЯ КАЖДОЙ ДОЛЖНОСТИ
+  // ЦЕПОЧКА ИНТЕРФЕЙСОВ ДЛЯ КАЖДОЙ ДОЛЖНОСТИ (ОБЪЕДИНЕНА В ЕДИНУЮ СТРУКТУРУ)
   if (isZavSklad) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
@@ -1150,7 +1151,7 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
-  else if (isSeniorCashier) { // НОВОЕ: Точная копия кода Инфо-консультанта для Старшего кассира
+  else if (isSeniorCashier) {
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
       let btnPlan = document.getElementById("btn-adm-plan"); 
@@ -1172,7 +1173,6 @@ function renderDashboardData(data, isSilent = false) {
           let gridBtns = formSwap.querySelector(".grid-btns");
           if (gridBtns) gridBtns.style.display = "none";
 
-          // Оставляем ТОЛЬКО заявку в отпуск, скрывая исправление и обмен сменами
           let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
           innerBlocks.forEach(block => {
               let h3 = block.querySelector("h3");
@@ -1194,7 +1194,6 @@ function renderDashboardData(data, isSilent = false) {
           (async () => {
               try {
                   if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-                      // Ищем в БД сотрудников с должностью "Старший кассир"
                       let { data: dbUsers, error } = await supabaseClient
                           .from('users')
                           .select('iin, full_name, role, login_status')
@@ -1227,9 +1226,7 @@ function renderDashboardData(data, isSilent = false) {
       let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
   }
-  if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
-  }
-  else if (isGruzchik) { // ДОБАВЛЕНО: Полная копия кода для должности Грузчик
+  else if (isGruzchik) { 
       document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
       
       let btnPlan = document.getElementById("btn-adm-plan"); 
@@ -1251,7 +1248,6 @@ function renderDashboardData(data, isSilent = false) {
           let gridBtns = formSwap.querySelector(".grid-btns");
           if (gridBtns) gridBtns.style.display = "none";
 
-          // Оставляем ТОЛЬКО заявку в отпуск, скрывая исправление и обмен сменами
           let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
           innerBlocks.forEach(block => {
               let h3 = block.querySelector("h3");
@@ -1312,14 +1308,13 @@ function renderDashboardData(data, isSilent = false) {
       let adminPlanList = document.getElementById("admin-plan-list"); if (adminPlanList) { let planFiltersExist = document.getElementById("plan-filter-start"); if (!planFiltersExist) { let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0)); adminPlanList.innerHTML = `<style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style><div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button><div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;"><input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button></div><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button></div><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="plan-filter-start" value="${defStart}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="plan-filter-end" value="${defEnd}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:44px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div></div></div><div id="plan-render-area"></div>`; setTimeout(() => loadPlanHistory(true), 100); } else { if (!isSensitiveState()) { loadPlanHistory(true); } } }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
-      if (isUserPromoter) { 
+      if (isUserPromoter) { 
           document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); 
           let db = document.getElementById("desc-break"); if(db) db.innerText = "15 мин"; 
           let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "1 час"; 
           let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; 
           if(dash) dash.classList.add("hidden"); 
       } else { 
-          // НОВОЕ: Логика для Продавцов и Кассиров (и те, и другие видят нижние кнопки и дашборд)
           document.getElementById("nav-time-icon")?.classList.remove("hidden"); 
           document.getElementById("nav-create-icon")?.classList.remove("hidden"); 
           document.getElementById("inbox-icon")?.classList.remove("hidden"); 
@@ -1356,7 +1351,7 @@ function renderDashboardData(data, isSilent = false) {
   if (hcCard) {
       hcCard.innerHTML = ""; let hasContent = false;
       let isCashierLocal = String(appState.role).toLowerCase().includes("кассир");
-      if (!isCashierLocal && data.hotChecks && data.hotChecks.length > 0) {
+      if (isSeller && data.hotChecks && data.hotChecks.length > 0) {
           hasContent = true; let hcHtml = `<h3 style="margin-bottom: 10px; font-size: 14px; color: #e84393;">Горячий чек</h3>`; let groups = {}; data.hotChecks.forEach(hc => { if(!groups[hc.sub]) groups[hc.sub] = []; groups[hc.sub].push(hc); });
           for(let sub in groups) {
               if (sub) hcHtml += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${sub}</div>`;
@@ -1369,13 +1364,12 @@ function renderDashboardData(data, isSilent = false) {
           } hcCard.innerHTML += hcHtml;
       }
       let promoLists = data.promoLists || [];
-      if (!isCashierLocal && promoLists.length > 0) {
+      if (isSeller && promoLists.length > 0) {
           let promoHtml = "";
           promoLists.forEach((list, lIdx) => {
               let headerColor = list.listColor || "var(--text-color)";
               
               promoHtml += `<div class="inner-block card" style="margin-top: 12px; margin-bottom: 12px; padding: 14px 12px; border: 1px solid var(--border-color); background: var(--card-bg); position: relative;">`;
-              // Применяем спарсенный цвет к заголовку списка
               promoHtml += `<div style="font-size:14px; font-weight:bold; color:${headerColor}; margin-bottom: 14px;">${list.title}</div>`;
               promoHtml += `<div style="display: flex; flex-direction: column; gap: 10px;">`;
               
@@ -1404,13 +1398,9 @@ function renderDashboardData(data, isSilent = false) {
                       badgeHtml += `</div>`; 
                   }
                   
-                  // Добавляем символы, чтобы сбить перехват ссылки нативными приложениями
                   let bypassLink = link ? (link + (link.includes('?') ? '&' : '?') + 'force_browser_bypass=1#web') : '';
-                  
-                  // Безопасный клик через div и stopPropagation, чтобы Telegram не дублировал открытие
                   let linkBtn = link ? `<div onclick="event.stopPropagation(); event.preventDefault(); if(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.openLink) { window.Telegram.WebApp.openLink('${bypassLink}'); } else { window.open('${bypassLink}', '_blank'); }" style="display:flex; align-items:center; justify-content:center; background:#f39c12; color:white; width:22px; height:22px; border-radius:5px; margin-right:8px; flex-shrink:0; box-sizing:border-box; border:1px solid rgba(0,0,0,0.05); cursor:pointer;"><span class="material-symbols-rounded" style="font-size:16px;">open_in_new</span></div>` : '';
                   
-                  // Текст товара: используем адаптивный var(--text-color) для совместимости с темной темой
                   promoHtml += `
                   <div id="promo-item-${lIdx}-${iIdx}" style="position:relative; display:flex; align-items:center; width:100%; margin-bottom:4px;">
                       ${linkBtn}
@@ -1434,7 +1424,7 @@ function renderDashboardData(data, isSilent = false) {
           let promoContainer = document.getElementById("promo-lists-container");
           if (promoContainer) promoContainer.innerHTML = "";
       }
-      if (hasContent && !isCashierLocal) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
+      if (hasContent && isSeller) hcCard.classList.remove("hidden"); else hcCard.classList.add("hidden");
   }
     
   let savedReplies = {}; document.querySelectorAll("textarea[id^='remark-reply-']").forEach(ta => { savedReplies[ta.id] = ta.value; });
@@ -1447,7 +1437,6 @@ function renderDashboardData(data, isSilent = false) {
           if (r.status === "approved_notify_zav") return `<div class="req-item" id="req-${r.id}" style="border-left-color: #27ae60;"><div class="req-title" style="display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="font-size:16px;">check_circle</span> Штраф одобрен</div><div class="req-desc">Ваш запрос на штраф сотрудника <b>${r.targetName}</b> одобрен: <b>${approverName || 'Руководителем'}</b>.<br>Причина штрафа: ${desc}${selDateHtml}</div><div class="grid-btns" style="grid-template-columns: 1fr;"><button class="btn-gray" onclick="processReq('${r.id}', 'dismiss_notification')">Ознакомлен</button></div></div>`;
           if (r.type === "Замечание" && (r.status === "approved" || r.status === "pending_user_reply" || r.status === "pending_admin_view_remark")) {
     if (r.targetIin === appState.iin) {
-        // Шаблон для получателя замечания (с полем для ответа)
         return `<div class="req-item" id="req-${r.id}" style="border-left-color: #f39c12;">
             <div class="req-title" style="color:#f39c12; display:flex; align-items:center; gap:4px;">
                 <span class="material-symbols-rounded" style="font-size:16px;">warning</span> Замечание 
@@ -1460,7 +1449,6 @@ function renderDashboardData(data, isSilent = false) {
             <button class="btn-orange" onclick="processReq('${r.id}', 'reply_remark', document.getElementById('remark-reply-${r.id}').value)">Ответить</button>
         </div>`;
     } else {
-        // Шаблон для отправителя или руководителя (только просмотр)
         return `<div class="req-item" id="req-${r.id}" style="border-left-color: #f39c12;">
             <div class="req-title" style="color:#f39c12; display:flex; align-items:center; gap:4px;">
                 <span class="material-symbols-rounded" style="font-size:16px;">warning</span> Замечание 
@@ -1523,7 +1511,6 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
               let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12"; 
               let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
               
-              // Проверяем и выводим полную должность строчными для нужных ролей
               let lowRole = String(v.authorRole || "").toLowerCase().trim();
               let roleDeptStr = "";
               if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант") || lowRole.includes("грузчик")) {
