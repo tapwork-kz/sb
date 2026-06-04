@@ -2312,11 +2312,21 @@ window.addEventListener('load', () => {
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', event => {
         if (event.data && event.data.action === 'navigate') {
-            // ИСПРАВЛЕНО: Безопасно очищаем строку от слешей и знаков хэша перед установкой
-            let cleanHash = event.data.url.replace('/', '').replace('#', '');
-            window.location.hash = cleanHash; 
+            console.log("Получен URL пуша из Service Worker:", event.data.url);
             
-            // Запускаем проверку роута
+            // УМНОЕ ИЗВЛЕЧЕНИЕ: если пришел полный абсолютный URL из Supabase,
+            // мы аккуратно забираем только хэш (всё, что идёт после знака #)
+            let targetHash = '#inbox';
+            if (event.data.url && event.data.url.includes('#')) {
+                targetHash = '#' + event.data.url.split('#')[1];
+            } else if (event.data.url) {
+                targetHash = event.data.url;
+            }
+            
+            // Выставляем чистый, ровный хэш (строго '#inbox')
+            window.location.hash = targetHash; 
+            
+            // Мгновенно вызываем функцию перехода по вкладкам
             checkNotificationRoute(); 
         }
     });
