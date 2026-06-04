@@ -1958,10 +1958,10 @@ function renderAdminEmps(dept, btnElement) {
    let container = document.getElementById("admin-emp-list"); 
    let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
    
-   // Основной переключатель подразделов на самом верху контейнера
+   // Основной переключатель подразделов на самом верху контейнера (отступ уменьшен до 8px)
    let tabsHtml = `
-   <div class="no-swipe" style="display:flex; gap:6px; margin-bottom:12px; padding:0 4px;">
-       <button class="admin-flt ${window.currentEmpSubTab === 'sellers' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='sellers'; renderAdminEmps(currentEmpDept, document.getElementById('flt-emp-' + currentEmpDept.toLowerCase()));" style="flex:1;">Продавцы</button>
+   <div class="no-swipe" style="display:flex; gap:6px; margin-bottom:8px; padding:0 4px;">
+       <button class="admin-flt ${window.currentEmpSubTab === 'sellers' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='sellers'; renderAdminEmps(currentEmpDept, null);" style="flex:1;">Продавцы</button>
        <button class="admin-flt ${window.currentEmpSubTab === 'aup' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='aup'; renderAdminEmps(currentEmpDept, null);" style="flex:1;">АУП / Персонал</button>
    </div>
    <div id="emp-sub-list-content"></div>
@@ -1971,23 +1971,54 @@ function renderAdminEmps(dept, btnElement) {
    let listContent = document.getElementById("emp-sub-list-content");
    
    if (window.currentEmpSubTab === 'sellers') {
-       // ПОДРАЗДЕЛ 1: Только продавцы с фильтрацией по отделам
-       let filtered = allEmployeesData.filter(e => {
+       // ПОДРАЗДЕЛ 1: Только продавцы, сгруппированные по отделам (Цифра, МБТ, КБТ) списком
+       let filteredSellers = allEmployeesData.filter(e => {
            if (String(e.login_status).toUpperCase() === 'FALSE') return false;
            let rLow = String(e.role || "").toLowerCase();
-           let isNotSeller = rLow.includes("директор") || rLow.includes("управляющий") || rLow.includes("админ") || rLow.includes("супервайзер") || rLow.includes("заведующий") || rLow.includes("инфо-консультант") || rLow.includes("старший кассир") || rLow.includes("грузчик") || (rLow.includes("кассир") && !rLow.includes("старший"));
-           return !isNotSeller && e.dept.toLowerCase().includes(dept.toLowerCase());
+           let isNotSeller = rLow.includes("директор") || rLow.includes("управляющий") || rLow.includes("админ") || rLow.includes("супервайзер") || rLow.includes("заведующий") || rLow.includes("инфо-консультант") || rLow.includes("старший кассир") || rLow.includes("грузчик") || rLow.includes("кассир");
+           return !isNotSeller;
        });
-       
-       listContent.innerHTML = filtered.map(e => { 
-           let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
-           let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
-           let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
-           let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
-           return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
-       }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Продавцов нет</p>";
+
+       // Распределяем продавцов по группам отделов
+       let deptGroups = { "Цифра": [], "МБТ": [], "КБТ": [] };
+       filteredSellers.forEach(e => {
+           let dLow = String(e.dept || "Цифра").toLowerCase().trim();
+           if (dLow.includes("цифра") || dLow.includes("чт")) {
+               deptGroups["Цифра"].push(e);
+           } else if (dLow.includes("мбт")) {
+               deptGroups["МБТ"].push(e);
+           } else if (dLow.includes("кбт")) {
+               deptGroups["КБТ"].push(e);
+           } else {
+               let normalDept = String(e.dept).charAt(0).toUpperCase() + String(e.dept).slice(1);
+               if (!deptGroups[normalDept]) deptGroups[normalDept] = [];
+               deptGroups[normalDept].push(e);
+           }
+       });
+
+       let sellersHtml = "";
+       Object.keys(deptGroups).forEach(deptName => {
+           let groupEmps = deptGroups[deptName] || [];
+           if (groupEmps.length === 0) return; // Не выводим пустые отделы
+
+           // ИСПРАВЛЕНО: Убрана белая полоса (border-bottom) и уменьшены отступы (margin)
+           sellersHtml += `<div class="grid-details-title" style="color:gray; font-size:13px; font-weight:bold; margin-top:8px; margin-bottom:4px; text-transform:none; text-align:left;">${deptName}:</div>`;
+           
+           groupEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+           
+           // Пронумерованный и отсортированный список продавцов
+           sellersHtml += groupEmps.map((e, idx) => {
+               let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
+               let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
+               let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
+               let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
+               return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${idx + 1}.</b> ${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
+           }).join("");
+       });
+
+       listContent.innerHTML = sellersHtml || "<p style='color:gray; font-size:12px; text-align:center;'>Продавцов нет</p>";
    } else {
-       // ПОДРАЗДЕЛ 2: АУП / Персонал (Все остальные должности с группировкой по должностям)
+       // ПОДРАЗДЕЛ 2: АУП / Персонал (Все остальные должности с группировкой по ролям)
        let groups = {};
        allEmployeesData.forEach(e => {
            if (String(e.login_status).toUpperCase() === 'FALSE') return;
@@ -2002,13 +2033,13 @@ function renderAdminEmps(dept, btnElement) {
        
        let aupHtml = "";
        Object.keys(groups).sort().forEach(roleName => {
-           // Отрисовываем название должности как заголовок группы
-           aupHtml += `<div class="grid-details-title" style="color:gray; font-size:13px; font-weight:bold; margin-top:14px; margin-bottom:8px; text-transform:none; border-bottom:1px solid var(--border-color); padding-bottom:4px; text-align:left;">${roleName}:</div>`;
+           // ИСПРАВЛЕНО: Убрана белая полоса (border-bottom) и уменьшены отступы (margin)
+           aupHtml += `<div class="grid-details-title" style="color:gray; font-size:13px; font-weight:bold; margin-top:8px; margin-bottom:4px; text-transform:none; text-align:left;">${roleName}:</div>`;
            
            let groupEmps = groups[roleName];
            groupEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
            
-           // Отрисовываем пронумерованный интерактивный список сотрудников внутри этой должности
+           // Пронумерованный список АУП
            aupHtml += groupEmps.map((e, idx) => {
                let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
                let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
