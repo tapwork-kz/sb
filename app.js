@@ -316,7 +316,16 @@ async function callBackend(actionName, payloadData = {}) {
       if (userErr || !userData) return { authorized: false };
 
       let localData = {}; 
-      const [ { data: allUsers }, { data: allReqs }, { data: allUserDetails }, { data: kpiDataRaw }, { data: allSheetInfo }, { data: scItemsRaw }, { data: tradeInRaw } ] = await Promise.all([ 
+      
+      // ИСПРАВЛЕНО: Автоматически вычисляем границы текущего календарного месяца для SQL-запроса табеля
+      let dObj = new Date();
+      let curYear = dObj.getFullYear();
+      let curMonth = dObj.getMonth() + 1;
+      let startDateStr = `${curYear}-${("0" + curMonth).slice(-2)}-01`;
+      let lastDay = new Date(curYear, curMonth, 0).getDate();
+      let endDateStr = `${curYear}-${("0" + curMonth).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+
+      const [ { data: allUsers }, { data: allReqs }, { data: allUserDetails }, { data: kpiDataRaw }, { data: allSheetInfo }, { data: scItemsRaw }, { data: tradeInRaw }, { data: allAttendanceRaw } ] = await Promise.all([ 
           // --- НОВОЕ: Добавили login_status сюда ---
           supabaseClient.from('users').select('iin, full_name, role, dept, login_status'), 
           // -----------------------------------------
@@ -325,8 +334,28 @@ async function callBackend(actionName, payloadData = {}) {
           supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1), 
           supabaseClient.from('user_sheet_info').select('*'), 
           supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1), 
-          supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }) 
+          supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }),
+          // ИСПРАВЛЕНО: Подтягиваем подневные записи табеля за текущий месяц из новой таблицы emp_attendance_days
+          supabaseClient.from('emp_attendance_days').select('iin, status').gte('date', startDateStr).lte('date', endDateStr)
       ]);
+
+      // ИСПРАВЛЕНО: Сводная агрегация подневных статусов для каждого ИИН из базы данных
+      let dbTabelMap = {};
+      if (allAttendanceRaw) {
+          allAttendanceRaw.forEach(row => {
+              let empIin = String(row.iin).trim();
+              let status = String(row.status).toUpperCase().trim();
+              if (!dbTabelMap[empIin]) {
+                  dbTabelMap[empIin] = { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+              }
+              if (status === 'БС') dbTabelMap[empIin].bs++;
+              else if (status === 'БЛ') dbTabelMap[empIin].bl++;
+              else if (status === 'ПР') dbTabelMap[empIin].pr++;
+              else if (status === 'ОТ') dbTabelMap[empIin].ot++;
+              else if (status === 'РД') dbTabelMap[empIin].rd++;
+              else if (status === 'УС') dbTabelMap[empIin].us++;
+          });
+      }
 
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : []; let tradeInList = (tradeInRaw && tradeInRaw.length > 0) ? tradeInRaw.map(item => item.model_name) : [];
       
@@ -426,7 +455,6 @@ async function callBackend(actionName, payloadData = {}) {
                       activeAdminPromoList = null; 
                       let btnVal = rawVal.replace('%', '').replace(',', '.').trim();
                       let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
-                      // Убрали приставку отдела из названия, но сохранили dept для скрытого фильтра
                       allHotChecks.push({ sub: currentSub, name: btnName.replace(/\*/g, '').trim(), val: btnVal, pts: btnPts, dept: cols.dept }); 
                   } else if (activeAdminPromoList) {
                       let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); 
@@ -463,15 +491,99 @@ async function callBackend(actionName, payloadData = {}) {
           
           window.adminPromoListsGlobal = adminAllPromoLists.filter(l => l.items.length > 0);
           
-          // Определяем отдел текущего пользователя
           let dStr = String(userData.dept).toLowerCase(); 
           let myDept = 'Цифра';
           if (dStr.includes("мбт")) myDept = 'МБТ';
           else if (dStr.includes("кбт")) myDept = 'КБТ';
 
-          // Фильтруем данные: продавцу только его отдел, админ потом берет из window.adminPromoListsGlobal
           localData.promoLists = window.adminPromoListsGlobal.filter(l => l.dept === myDept);
           localData.hotChecks = allHotChecks.filter(hc => hc.dept === myDept || hc.sub.includes(myDept));
+      }
+
+      let userMap = {}; let adminEmployees = []; let empMap = {};
+      if (allUsers) {
+          allUsers.forEach(u => {
+              userMap[u.iin] = u; 
+              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { reports_data: [] };
+              
+              // ИСПРАВЛЕНО: Извлекаем агрегированные данные по дням из новой БД для каждого сотрудника
+              let tData = dbTMap = dbTabelMap[u.iin] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+              
+              let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
+              
+              // ИСПРАВЛЕНО: Процентные вычеты за больничные и прогулы теперь тоже рассчитываются по новой базе данных emp_attendance_days
+              let bBl = parseFloat(String(tData.bl || "0").replace(',', '.')) || 0; 
+              let bPr = parseFloat(String(tData.pr || "0").replace(',', '.')) || 0; 
+              let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
+              kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
+              
+              let uRoleLow = String(u.role || "").toLowerCase();
+              let actualRole = u.role || 'Продавец';
+              
+              let emp = { 
+                  iin: u.iin, 
+                  name: u.full_name, 
+                  dept: u.dept || '', 
+                  role: actualRole, 
+                  login_status: u.login_status, 
+                  kpi: kpiVal, 
+                  kpiDetails: kDetails, 
+                  pts: { acc: 0, use: 0, rem: 0, fin: 0 }, 
+                  sales: { sc: 0, trade: 0 }, 
+                  reportErrors: 0, 
+                  reports: sInfo.reports_data || [], 
+                  ptsHistory: [], 
+                  remarks: [], 
+                  // ИСПРАВЛЕНО: Полоса табеля в админке берет данные строго из tData (база emp_attendance_days)
+                  tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${tData.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${tData.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${tData.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${tData.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${tData.rd}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${tData.us}</div>`, 
+                  rawTabel: tData, 
+                  directPenaltyPoints: 0 
+              };
+              
+              if (sInfo.reports_data) {
+                  sInfo.reports_data.forEach(rep => {
+                      emp.reportErrors += rep.errors; 
+                      let ptPenPerErr = 0; let kpiPenPerErr = 0;
+                      
+                      if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenPerErr = ptsCfg.price; kpiPenPerErr = kpiCfg.price; } 
+                      else if (rep.title.includes("Ревизия")) { ptPenPerErr = ptsCfg.revsn; kpiPenPerErr = kpiCfg.revsn; } 
+                      else if (rep.title.includes("уборка")) { ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; } 
+                      else if (rep.title.includes("Отзыв")) { ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; }
+                      
+                      let totalKpiPenalty = rep.errors * kpiPenPerErr;
+                      if (totalKpiPenalty !== 0) { 
+                          emp.kpi += totalKpiPenalty; 
+                          emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: totalKpiPenalty, date: "" }); 
+                      }
+                      
+                      if (ptPenPerErr !== 0 && rep.values && rep.headers) {
+                          let currentYear = new Date().getFullYear();
+                          rep.values.forEach((v, idx) => {
+                              if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
+                                  let rawDate = rep.headers[idx] || "";
+                                  let rDate = rawDate.length === 5 ? `${rawDate}.${currentYear}` : rawDate;
+                                  let histItem = { date: rDate || formatDateLocal(new Date()), type: "Списание", source: rep.title, reason: "Отсутствие отчета", val: -Math.abs(ptPenPerErr), approver: "", moneyFine: 0, kpiChange: kpiPenPerErr };
+                                  emp.ptsHistory.push(histItem);
+                                  emp.pts.fin += Math.abs(ptPenPerErr);
+                              }
+                          });
+                      }
+                  });
+              }
+
+              adminEmployees.push(emp); empMap[u.iin] = emp;
+          });
+      }
+      window.adminEmployeesGlobal = adminEmployees;
+
+      let myEmp = empMap[appState.iin];
+      // ИСПРАВЛЕНО: Личный табель текущего вошедшего пользователя на главном экране тоже синхронизируем с emp_attendance_days
+      let myTData = dbTabelMap[appState.iin] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+      if (!myEmp) { 
+          let mySheet = (allSheetInfo || []).find(s => String(s.iin).trim() === String(appState.iin).trim()) || { reports_data: [] }; 
+          localData.info = { tabel: myTData, reports: mySheet.reports_data || [], kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] }; 
+      } else { 
+          localData.info = { tabel: myTData, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] }; 
       }
 
       let userMap = {}; let adminEmployees = []; let empMap = {};
