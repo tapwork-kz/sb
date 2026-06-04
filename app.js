@@ -1735,15 +1735,36 @@ function openEmpDetails(iin) {
   let kpiFontSizeDet = String(emp.kpi).includes('.') ? (String(emp.kpi).length > 4 ? '6.5px' : '7.5px') : '9px';
   document.getElementById("details-title").innerHTML = `<div style="display:flex; justify-content:space-between; align-items:center; width:100%;"><span style="flex:1; text-align:center; padding-left:28px;">${emp.name}</span><div class="circle-box" style="width:28px; min-width:28px; height:28px; margin:0; cursor:pointer; box-shadow:none;" onclick="openEmpKpiDetails('${emp.iin}', true)"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(emp.kpi, null, null)} ${emp.kpi > 100 ? 100 : emp.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:24px; height:24px;"><span style="font-size:${kpiFontSizeDet}; font-weight:bold; color:${setKpiColor(emp.kpi, null, null)}; letter-spacing:-0.3px;">${emp.kpi}%</span></div></div></div></div>`;
   document.getElementById("details-kpi-circle-container").innerHTML = "";
-  let tabsHtml = `<div style="display:flex; gap:6px; margin-bottom:12px; padding:0 4px;"><button id="emp-tab-rep" class="admin-flt active-flt" onclick="renderEmpDetailTab('rep', '${iin}')">Отчет</button><button id="emp-tab-pts" class="admin-flt" onclick="renderEmpDetailTab('pts', '${iin}')">Баллы</button><button id="emp-tab-viol" class="admin-flt" onclick="renderEmpDetailTab('viol', '${iin}')">Нарушения</button></div><div id="emp-detail-content" class="slide-up-fade"></div>`;
-  document.getElementById("details-list").innerHTML = tabsHtml; renderEmpDetailTab(window.currentEmpDetailTab || 'rep', iin); 
+  
+  // ИСПРАВЛЕНО: Добавлен таб "Табель" на первое место, настроена адаптивная прокрутка кнопок без конфликтов со свайпами страницы
+  let tabsHtml = `<div style="display:flex; gap:4px; margin-bottom:12px; padding:0 4px; overflow-x:auto;" class="no-swipe"><button id="emp-tab-tabel" class="admin-flt" onclick="renderEmpDetailTab('tabel', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Табель</button><button id="emp-tab-rep" class="admin-flt" onclick="renderEmpDetailTab('rep', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Отчет</button><button id="emp-tab-pts" class="admin-flt" onclick="renderEmpDetailTab('pts', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Баллы</button><button id="emp-tab-viol" class="admin-flt" onclick="renderEmpDetailTab('viol', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Нарушения</button></div><div id="emp-detail-content" class="slide-up-fade"></div>`;
+  
+  document.getElementById("details-list").innerHTML = tabsHtml; 
+  renderEmpDetailTab(window.currentEmpDetailTab || 'tabel', iin); 
 }
 
 function renderEmpDetailTab(tab, iin) {
   window.currentEmpDetailTab = tab; const emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return;
-  document.getElementById('emp-tab-rep').classList.remove('active-flt'); document.getElementById('emp-tab-pts').classList.remove('active-flt'); document.getElementById('emp-tab-viol').classList.remove('active-flt'); document.getElementById('emp-tab-'+tab).classList.add('active-flt');
+  
+  // Переключаем активный класс на кнопках табов динамически
+  ['tabel', 'rep', 'pts', 'viol'].forEach(t => document.getElementById('emp-tab-' + t)?.classList.remove('active-flt'));
+  document.getElementById('emp-tab-' + tab)?.classList.add('active-flt');
+  
   let content = document.getElementById('emp-detail-content'); content.classList.remove("slide-up-fade"); void content.offsetWidth; content.classList.add("slide-up-fade"); let html = "";
-  if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
+  
+  if (tab === 'tabel') {
+      // Инициализируем календарный месяц текущей датой, если он не сохранен в памяти
+      if (!window.currentCalMonth || !window.currentCalYear) {
+          let d = new Date();
+          window.currentCalMonth = d.getMonth();
+          window.currentCalYear = d.getFullYear();
+      }
+      html = `<div id="tabel-calendar-container" style="background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px;"></div>`;
+      content.innerHTML = html;
+      renderTabelCalendarData(iin); // Запуск асинхронной отрисовки календаря
+      return;
+  }
+  else if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
   else if (tab === 'pts') { 
     let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:12px; background:var(--card-bg); border:1px solid rgba(150,150,150,0.2); border-radius:12px; margin-bottom:8px;">
         <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; width:70px; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:36px; box-sizing:border-box; gap:4px; white-space:nowrap; overflow:hidden; padding:0 2px;">
@@ -1819,6 +1840,125 @@ function renderEmpDetailTab(tab, iin) {
   }
   content.innerHTML = html;
 }
+
+// АСИНХРОННАЯ ОТРИСОВКА СЕТКИ КАЛЕНДАРЯ ТАБЕЛЯ
+async function renderTabelCalendarData(iin) {
+    let container = document.getElementById("tabel-calendar-container");
+    if (!container) return;
+    
+    let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    let year = window.currentCalYear;
+    let month = window.currentCalMonth;
+    
+    // Блок переключения месяцев стрелками
+    let navHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:0 2px;" class="no-swipe">
+        <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="adjustCalMonth('${iin}', -1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_left</span></button>
+        <b style="font-size:13px; color:var(--text-color);">${monthNames[month]} ${year}</b>
+        <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="adjustCalMonth('${iin}', 1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_right</span></button>
+    </div>
+    `;
+    
+    // Заголовки дней недели (Пн-Вс)
+    let daysOfWeek = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    let weekHeadersHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); text-align:center; font-size:11px; color:gray; font-weight:bold; margin-bottom:6px;">` + 
+        daysOfWeek.map(d => `<div>${d}</div>`).join("") + `</div>`;
+        
+    container.innerHTML = navHtml + weekHeadersHtml + `<div id="tabel-days-grid" style="text-align:center; font-size:12px; padding:15px 0; color:gray;">Загрузка табеля...</div>`;
+    
+    // Диапазон дат для отправки запроса в Supabase
+    let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
+    let lastDay = new Date(year, month + 1, 0).getDate();
+    let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+    
+    let attendanceMap = {};
+    try {
+        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+            let { data: dbData, error } = await supabaseClient
+                .from('emp_attendance_days')
+                .select('date, status, hours')
+                .eq('iin', iin)
+                .gte('date', startDateStr)
+                .lte('date', endDateStr);
+                
+            if (!error && dbData) {
+                dbData.forEach(row => {
+                    let dayNum = parseInt(row.date.split('-')[2], 10);
+                    attendanceMap[dayNum] = { status: row.status, hours: row.hours };
+                });
+            }
+        }
+    } catch(e) { console.error("Ошибка загрузки дней табеля:", e); }
+    
+    // Вычисляем смещение первого дня месяца
+    let firstDayIndex = new Date(year, month, 1).getDay(); 
+    let startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; 
+    
+    let gridHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:5px;">`;
+    
+    // Заполняем пустые клетки начала месяца
+    for (let i = 0; i < startOffset; i++) {
+        gridHtml += `<div></div>`;
+    }
+    
+    // Статусные стили и цвета
+    let statusColors = {
+        'РД': { color: '#27ae60', bg: 'rgba(39, 174, 96, 0.08)' }, 
+        'БС': { color: '#f39c12', bg: 'rgba(243, 156, 18, 0.08)' }, 
+        'БЛ': { color: '#e67e22', bg: 'rgba(230, 126, 34, 0.08)' }, 
+        'ПР': { color: '#e74c3c', bg: 'rgba(231, 76, 60, 0.08)' }, 
+        'ОТ': { color: '#f1c40f', bg: 'rgba(241, 196, 15, 0.08)' }, 
+        'В':  { color: '#7f8c8d', bg: 'rgba(127, 140, 141, 0.06)' }  
+    };
+    
+    // Генерируем сетку дней
+    for (let day = 1; day <= lastDay; day++) {
+        let dayData = attendanceMap[day];
+        let statusText = dayData ? dayData.status : "";
+        let hoursText = (dayData && dayData.hours && dayData.hours > 0) ? `${dayData.hours}ч` : "";
+        
+        let cellStyle = "background:var(--inner-bg, rgba(150,150,150,0.03)); color:var(--text-color); border:1px solid var(--border-color);";
+        if (statusText && statusColors[statusText]) {
+            cellStyle = `background:${statusColors[statusText].bg}; color:${statusColors[statusText].color}; border: 1px solid ${statusColors[statusText].color}25;`;
+        }
+        
+        gridHtml += `
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:42px; border-radius:8px; padding:2px 0; box-sizing:border-box; ${cellStyle}">
+            <span style="font-size:10px; font-weight:bold; opacity:0.5; margin-bottom:1px;">${day}</span>
+            <b style="font-size:11px; text-transform:uppercase; letter-spacing:-0.3px;">${statusText || '-'}</b>
+            ${hoursText ? `<span style="font-size:8px; opacity:0.6; margin-top:1px; font-weight:bold;">${hoursText}</span>` : ''}
+        </div>`;
+    }
+    
+    gridHtml += `</div>`;
+    
+    // Маленькая легенда под календарем
+    let legendHtml = `
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-top:10px; font-size:9px; font-weight:bold; text-align:center;">
+        <div style="color:#27ae60; background:rgba(39,174,96,0.05); padding:3px; border-radius:6px;">РД - Рабочий</div>
+        <div style="color:#f39c12; background:rgba(243,156,18,0.05); padding:3px; border-radius:6px;">БС - Личный</div>
+        <div style="color:#e67e22; background:rgba(230,126,34,0.05); padding:3px; border-radius:6px;">БЛ - Больнич.</div>
+        <div style="color:#e74c3c; background:rgba(231,76,60,0.05); padding:3px; border-radius:6px;">ПР - Прогул</div>
+        <div style="color:#f1c40f; background:rgba(241,196,15,0.05); padding:3px; border-radius:6px;">ОТ - Отпуск</div>
+        <div style="color:#7f8c8d; background:rgba(127,140,141,0.05); padding:3px; border-radius:6px;">В - Выходной</div>
+    </div>`;
+    
+    let daysGridEl = document.getElementById("tabel-days-grid");
+    if (daysGridEl) daysGridEl.outerHTML = gridHtml + legendHtml;
+}
+
+// ОБРАБОТЧИК НАВИГАЦИИ СТРЕЛКАМИ С ПЕРЕХОДОМ ГОДА
+window.adjustCalMonth = function(iin, delta) {
+    window.currentCalMonth += delta;
+    if (window.currentCalMonth > 11) {
+        window.currentCalMonth = 0;
+        window.currentCalYear += 1;
+    } else if (window.currentCalMonth < 0) {
+        window.currentCalMonth = 11;
+        window.currentCalYear -= 1;
+    }
+    renderTabelCalendarData(iin);
+};
 
 async function executeRemark(iin, name) { let text = document.getElementById(`remark-text-${iin}`).value; if (!text) return showToast("Укажите текст замечания!", true); vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitRemark', { token: appState.token, targetIin: iin, targetName: name, text: text }); if (res.success) { showToast("Замечание отправлено!"); loadDashboard(true); closeDetails(); } else showToast(res.error, true); }
 async function executeFine(iin, name) { let reason = document.getElementById(`fine-reason-${iin}`).value; let amount = document.getElementById(`fine-amount-${iin}`).value || "0"; let moneyAmount = document.getElementById(`fine-money-${iin}`).value || "0"; if (!reason) return showToast("Укажите причину штрафа!", true); if (parseFloat(amount) >= 0 && parseFloat(moneyAmount) >= 0) return showToast("Укажите штраф (баллы или сумма) меньше 0!", true); vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitFine', { token: appState.token, iin: iin, name: name, reason: reason, amount: amount, moneyAmount: moneyAmount }); if (res.success) { showToast("Штраф выписан/запрошен!"); loadDashboard(true); closeDetails(); } else showToast(res.error, true); }
