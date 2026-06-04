@@ -2270,19 +2270,21 @@ window.submitPromoCheck = function(typeText, valText, ptsText, lIdx, iIdx, prefi
 
 // Функция, которая проверяет URL и открывает нужную вкладку
 function checkNotificationRoute() {
-    if (window.location.hash === '#inbox') {
+    let currentHash = window.location.hash.split('?')[0];
+    if (currentHash === '#inbox' || currentHash === '#/inbox') {
+        console.log("Маршрутизация уведомления: принудительный бронебойный переход во Входящие...");
         
-        let userInboxBtn = document.getElementById('inbox-icon');
-        let adminInboxBtn = document.getElementById('nav-adm-inbox');
+        let roleStr = String(appState.role || "Продавец").toLowerCase();
+        let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
         
-        // Проверяем, какая из кнопок сейчас активна (не скрыта классом hidden)
-        if (adminInboxBtn && !adminInboxBtn.classList.contains('hidden')) {
-            adminInboxBtn.click(); // Открываем админскую вкладку
-        } else if (userInboxBtn && !userInboxBtn.classList.contains('hidden')) {
-            userInboxBtn.click(); // Открываем вкладку сотрудника
+        // ИСПРАВЛЕНО: Переключаем вкладки напрямую через функцию switchTab, минуя капризный DOM-интерфейс кнопок
+        if (isDir) {
+            switchTab('adm-inbox'); // Директора идут в админские входящие
+        } else {
+            switchTab('inbox'); // Все остальные (Завсклада, Инфо, Старшие кассиры, Грузчики, Продавцы) идут в обычные входящие
         }
         
-        // Стираем хэш, чтобы при обычном обновлении страницы вкладка не открывалась снова
+        // Стираем хэш сразу, чтобы избежать зацикливаний и повторных ложных срабатываний
         history.replaceState(null, null, window.location.pathname); 
     }
 }
@@ -2294,8 +2296,8 @@ window.addEventListener('hashchange', checkNotificationRoute);
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         if (appState && appState.iin) {
-            console.log("Приложение открыто: тихо обновляем данные без сброса экрана...");
-            loadDashboard(true); // ИСПРАВЛЕНО: Изменили false на true, чтобы вкладка и скролл оставались на месте
+            console.log("Приложение открыто: принудительно обновляем данные...");
+            loadDashboard(false);
             checkNotificationRoute();
         }
     }
@@ -2310,9 +2312,11 @@ window.addEventListener('load', () => {
 if ('serviceWorker' in navigator) {
     navigator.serviceWorker.addEventListener('message', event => {
         if (event.data && event.data.action === 'navigate') {
-            // Тихо меняем URL
-            window.location.hash = event.data.url.replace('/', ''); 
-            // Мгновенно переключаем вкладку (функция, которую мы добавили ранее)
+            // ИСПРАВЛЕНО: Безопасно очищаем строку от слешей и знаков хэша перед установкой
+            let cleanHash = event.data.url.replace('/', '').replace('#', '');
+            window.location.hash = cleanHash; 
+            
+            // Запускаем проверку роута
             checkNotificationRoute(); 
         }
     });
