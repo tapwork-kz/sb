@@ -483,9 +483,9 @@ async function callBackend(actionName, payloadData = {}) {
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
               
               let uRoleLow = String(u.role || "").toLowerCase();
-              // ИСПРАВЛЕНО: Убрано ограничение, теперь в список попадают абсолютно все сотрудники для АУП/Персонала
+              // ИСПРАВЛЕНО: Убрано ограничение ролей, теперь в массив попадает весь персонал для подраздела АУП
               let actualRole = u.role || 'Продавец';
-              let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: actualRole, login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
+              let emp = { iin: u.iin, name: u.full_name, dept: u.dept || '', role: actualRole, login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
               
               sInfo.reports_data.forEach(rep => {
                   emp.reportErrors += rep.errors; 
@@ -508,17 +508,7 @@ async function callBackend(actionName, payloadData = {}) {
                           if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
                               let rawDate = rep.headers[idx] || "";
                               let rDate = rawDate.length === 5 ? `${rawDate}.${currentYear}` : rawDate;
-                              
-                              let histItem = { 
-                                  date: rDate || formatDateLocal(new Date()), 
-                                  type: "Списание", 
-                                  source: rep.title, 
-                                  reason: "Отсутствие отчета", 
-                                  val: -Math.abs(ptPenPerErr), 
-                                  approver: "", 
-                                  moneyFine: 0, 
-                                  kpiChange: kpiPenPerErr 
-                              };
+                              let histItem = { date: rDate || formatDateLocal(new Date()), type: "Списание", source: rep.title, reason: "Отсутствие отчета", val: -Math.abs(ptPenPerErr), approver: "", moneyFine: 0, kpiChange: kpiPenPerErr };
                               emp.ptsHistory.push(histItem);
                               emp.pts.fin += Math.abs(ptPenPerErr);
                           }
@@ -1946,19 +1936,16 @@ function renderAdminEmps(dept, btnElement) {
    currentEmpDept = dept; 
    window.currentEmpSubTab = window.currentEmpSubTab || 'sellers';
    
-   // Находим старые кнопки фильтров отделов и навсегда скрываем их,
-   // чтобы наш переключатель подразделов поднялся на самый верх экрана
+   // ИСПРАВЛЕНО: Скрываем весь родительский контейнер старых кнопок Цифра/МБТ/КБТ, убирая пустую полосу
    let btnCifra = document.getElementById('flt-emp-cifra');
-   let btnMbt = document.getElementById('flt-emp-mbt');
-   let btnKbt = document.getElementById('flt-emp-kbt');
-   if(btnCifra) btnCifra.style.display = 'none';
-   if(btnMbt) btnMbt.style.display = 'none';
-   if(btnKbt) btnKbt.style.display = 'none';
+   if (btnCifra && btnCifra.parentElement) {
+       btnCifra.parentElement.style.display = 'none';
+   }
    
    let container = document.getElementById("admin-emp-list"); 
    let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
    
-   // Основной переключатель подразделов на самом верху контейнера (отступ уменьшен до 8px)
+   // Переключатель подразделов на самом верху (отступы минимизированы)
    let tabsHtml = `
    <div class="no-swipe" style="display:flex; gap:6px; margin-bottom:8px; padding:0 4px;">
        <button class="admin-flt ${window.currentEmpSubTab === 'sellers' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='sellers'; renderAdminEmps(currentEmpDept, null);" style="flex:1;">Продавцы</button>
@@ -1971,7 +1958,7 @@ function renderAdminEmps(dept, btnElement) {
    let listContent = document.getElementById("emp-sub-list-content");
    
    if (window.currentEmpSubTab === 'sellers') {
-       // ПОДРАЗДЕЛ 1: Только продавцы, сгруппированные по отделам (Цифра, МБТ, КБТ) списком
+       // ПОДРАЗДЕЛ 1: Только продавцы с автоматической группировкой по отделам списком
        let filteredSellers = allEmployeesData.filter(e => {
            if (String(e.login_status).toUpperCase() === 'FALSE') return false;
            let rLow = String(e.role || "").toLowerCase();
@@ -1979,17 +1966,13 @@ function renderAdminEmps(dept, btnElement) {
            return !isNotSeller;
        });
 
-       // Распределяем продавцов по группам отделов
        let deptGroups = { "Цифра": [], "МБТ": [], "КБТ": [] };
        filteredSellers.forEach(e => {
            let dLow = String(e.dept || "Цифра").toLowerCase().trim();
-           if (dLow.includes("цифра") || dLow.includes("чт")) {
-               deptGroups["Цифра"].push(e);
-           } else if (dLow.includes("мбт")) {
-               deptGroups["МБТ"].push(e);
-           } else if (dLow.includes("кбт")) {
-               deptGroups["КБТ"].push(e);
-           } else {
+           if (dLow.includes("цифра") || dLow.includes("чт")) deptGroups["Цифра"].push(e);
+           else if (dLow.includes("мбт")) deptGroups["МБТ"].push(e);
+           else if (dLow.includes("кбт")) deptGroups["КБТ"].push(e);
+           else {
                let normalDept = String(e.dept).charAt(0).toUpperCase() + String(e.dept).slice(1);
                if (!deptGroups[normalDept]) deptGroups[normalDept] = [];
                deptGroups[normalDept].push(e);
@@ -1999,53 +1982,59 @@ function renderAdminEmps(dept, btnElement) {
        let sellersHtml = "";
        Object.keys(deptGroups).forEach(deptName => {
            let groupEmps = deptGroups[deptName] || [];
-           if (groupEmps.length === 0) return; // Не выводим пустые отделы
+           if (groupEmps.length === 0) return;
 
-           // ИСПРАВЛЕНО: Убрана белая полоса (border-bottom) и уменьшены отступы (margin)
            sellersHtml += `<div class="grid-details-title" style="color:gray; font-size:13px; font-weight:bold; margin-top:8px; margin-bottom:4px; text-transform:none; text-align:left;">${deptName}:</div>`;
-           
            groupEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
            
-           // Пронумерованный и отсортированный список продавцов
            sellersHtml += groupEmps.map((e, idx) => {
                let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
                let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
                let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
                let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
-               return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${idx + 1}.</b> ${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
+               return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);"><b>${idx + 1}.</b> ${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
            }).join("");
        });
-
        listContent.innerHTML = sellersHtml || "<p style='color:gray; font-size:12px; text-align:center;'>Продавцов нет</p>";
    } else {
-       // ПОДРАЗДЕЛ 2: АУП / Персонал (Все остальные должности с группировкой по ролям)
+       // ПОДРАЗДЕЛ 2: АУП / Персонал со строгой ручной сортировкой должностей
+       const aupRolesOrder = ["Директор", "Супервайзер", "Старший кассир", "Кассир", "Заведующий складом", "Инфо-консультант", "Грузчик"];
        let groups = {};
+       aupRolesOrder.forEach(r => groups[r] = []);
+       groups["Другой персонал"] = [];
+
        allEmployeesData.forEach(e => {
            if (String(e.login_status).toUpperCase() === 'FALSE') return;
            let rLow = String(e.role || "").toLowerCase();
-           let isNotSeller = rLow.includes("директор") || rLow.includes("управляющий") || rLow.includes("админ") || rLow.includes("супервайзер") || rLow.includes("заведующий") || rLow.includes("инфо-консультант") || rLow.includes("старший кассир") || rLow.includes("грузчик") || rLow.includes("кассир");
-           if (isNotSeller) {
-               let roleName = e.role || "Персонал";
-               if (!groups[roleName]) groups[roleName] = [];
-               groups[roleName].push(e);
+           let isAup = rLow.includes("директор") || rLow.includes("управляющий") || rLow.includes("админ") || rLow.includes("супервайзер") || rLow.includes("заведующий") || rLow.includes("инфо-консультант") || rLow.includes("старший кассир") || rLow.includes("грузчик") || rLow.includes("кассир");
+           
+           if (isAup) {
+               let matched = false;
+               for (let roleName of aupRolesOrder) {
+                   if (rLow.includes(roleName.toLowerCase())) {
+                       groups[roleName].push(e);
+                       matched = true;
+                       break;
+                   }
+               }
+               if (!matched) groups["Другой персонал"].push(e);
            }
        });
        
        let aupHtml = "";
-       Object.keys(groups).sort().forEach(roleName => {
-           // ИСПРАВЛЕНО: Убрана белая полоса (border-bottom) и уменьшены отступы (margin)
+       // Выводим списки должностей в строго заданном вами порядке
+       [...aupRolesOrder, "Другой персонал"].forEach(roleName => {
+           let groupEmps = groups[roleName] || [];
+           if (groupEmps.length === 0) return;
+
            aupHtml += `<div class="grid-details-title" style="color:gray; font-size:13px; font-weight:bold; margin-top:8px; margin-bottom:4px; text-transform:none; text-align:left;">${roleName}:</div>`;
-           
-           let groupEmps = groups[roleName];
            groupEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
            
-           // Пронумерованный список АУП
-           aupHtml += groupEmps.map((e, idx) => {
-               let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
-               let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
-               let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
-               let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
-               return `<div class="req-item" style="border-left-color: #7f8c8d; border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);"><b>${idx + 1}.</b> ${e.name} <span style="font-size:11px; font-weight:normal; color:gray;">(${e.dept})</span></div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`;
+           aupHtml += groupEmps.map(e => {
+               // ИСПРАВЛЕНО: Умный вывод тега отдела (выводится только если он реально заполнен в базе)
+               let deptLabel = (e.dept && e.dept.trim() !== "" && e.dept.toLowerCase() !== "null" && e.dept.toLowerCase() !== "undefined") ? ` <span style="font-size:11px; font-weight:normal; color:gray;">(${e.dept})</span>` : "";
+               // ИСПРАВЛЕНО: Полностью удалена нумерация, круги эффективности, строки СЦ/Фокус и Ошибки отчетов
+               return `<div class="req-item" style="border-left-color: #7f8c8d; border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}${deptLabel}</div><div style="display:flex; justify-content:space-between; align-items:center; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div></div></div>`;
            }).join("");
        });
        
