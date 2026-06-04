@@ -315,51 +315,29 @@ async function callBackend(actionName, payloadData = {}) {
       const { data: userData, error: userErr } = await supabaseClient.from('users').select('*').eq('iin', appState.iin).maybeSingle();
       if (userErr || !userData) return { authorized: false };
 
-      let localData = {}; 
-      
-      // ИСПРАВЛЕНО: Автоматически вычисляем границы текущего календарного месяца для SQL-запроса табеля
-      let dObj = new Date();
-      let curYear = dObj.getFullYear();
-      let curMonth = dObj.getMonth() + 1;
-      let startDateStr = `${curYear}-${("0" + curMonth).slice(-2)}-01`;
-      let lastDay = new Date(curYear, curMonth, 0).getDate();
-      let endDateStr = `${curYear}-${("0" + curMonth).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+      // ИСПРАВЛЕНО: Автоматически вычисляем границы текущего месяца для живого подсчета дней табеля
+      let dNow = new Date();
+      let yNow = dNow.getFullYear();
+      let mNow = dNow.getMonth() + 1;
+      let startMStr = `${yNow}-${("0" + mNow).slice(-2)}-01`;
+      let lastDayM = new Date(yNow, mNow, 0).getDate();
+      let endMStr = `${yNow}-${("0" + mNow).slice(-2)}-${("0" + lastDayM).slice(-2)}`;
 
-      const [ { data: allUsers }, { data: allReqs }, { data: allUserDetails }, { data: kpiDataRaw }, { data: allSheetInfo }, { data: scItemsRaw }, { data: tradeInRaw }, { data: allAttendanceRaw } ] = await Promise.all([ 
-          // --- НОВОЕ: Добавили login_status сюда ---
+      let localData = {}; 
+      // ИСПРАВЛЕНО: Добавлен деструктурируемый запрос к базе emp_attendance_days в конец списка Promise.all
+      const [ { data: allUsers }, { data: allReqs }, { data: allUserDetails }, { data: kpiDataRaw }, { data: allSheetInfo }, { data: scItemsRaw }, { data: tradeInRaw }, { data: allAttendanceDays } ] = await Promise.all([ 
           supabaseClient.from('users').select('iin, full_name, role, dept, login_status'), 
-          // -----------------------------------------
           supabaseClient.from('requests').select('*').order('created_at', { ascending: false }), 
           supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }), 
           supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1), 
           supabaseClient.from('user_sheet_info').select('*'), 
           supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1), 
           supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }),
-          // ИСПРАВЛЕНО: Подтягиваем подневные записи табеля за текущий месяц из новой таблицы emp_attendance_days
-          supabaseClient.from('emp_attendance_days').select('iin, status').gte('date', startDateStr).lte('date', endDateStr)
+          supabaseClient.from('emp_attendance_days').select('*').gte('date', startMStr).lte('date', endMStr)
       ]);
-
-      // ИСПРАВЛЕНО: Сводная агрегация подневных статусов для каждого ИИН из базы данных
-      let dbTabelMap = {};
-      if (allAttendanceRaw) {
-          allAttendanceRaw.forEach(row => {
-              let empIin = String(row.iin).trim();
-              let status = String(row.status).toUpperCase().trim();
-              if (!dbTabelMap[empIin]) {
-                  dbTabelMap[empIin] = { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
-              }
-              if (status === 'БС') dbTabelMap[empIin].bs++;
-              else if (status === 'БЛ') dbTabelMap[empIin].bl++;
-              else if (status === 'ПР') dbTabelMap[empIin].pr++;
-              else if (status === 'ОТ') dbTabelMap[empIin].ot++;
-              else if (status === 'РД') dbTabelMap[empIin].rd++;
-              else if (status === 'УС') dbTabelMap[empIin].us++;
-          });
-      }
 
       let finalScItems = (scItemsRaw && scItemsRaw.length > 0 && scItemsRaw[0].items_data) ? scItemsRaw[0].items_data : []; let tradeInList = (tradeInRaw && tradeInRaw.length > 0) ? tradeInRaw.map(item => item.model_name) : [];
       
-      // Инициализируем нулями (теперь всё берется СТРОГО из базы)
       let kpiCfg = { base: 0, rev: 0, revsn: 0, price: 0, ub: 0, bl: 0, pr: 0 }; 
       window.ptsCfg = { rev: 0, revsn: 0, price: 0, ub: 0 }; let ptsCfg = window.ptsCfg;
       let freshHotChecks = [];
@@ -368,19 +346,15 @@ async function callBackend(actionName, payloadData = {}) {
 
       if (kpiDataRaw && kpiDataRaw.length > 0) {
           let rows = kpiDataRaw[0].data || [];
-          let userDeptStr = String(userData.dept).toLowerCase(); // Отдел продавца
+          let userDeptStr = String(userData.dept).toLowerCase();
 
           rows.forEach(r => {
-              // Парсим проценты вычетов
               let pValStr = String(r.col_d_penalty_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
               let pVal = parseFloat(pValStr) || 0;
-
               let kpiNameRaw = String(r.col_a_kpi_name || "");
               let penNameRaw = String(r.col_c_penalty_name || "");
               let kpiName = kpiNameRaw.toLowerCase();
               let penName = penNameRaw.toLowerCase();
-
-              // Функция для извлечения баллов из квадратных скобок [x]
               const extractPts = (str) => { let m = str.match(/\[(.*?)]/); return m ? (parseFloat(m[1].replace(',', '.')) || 0) : null; };
               let penPts = extractPts(penNameRaw);
               let kpiPts = extractPts(kpiNameRaw);
@@ -389,8 +363,6 @@ async function callBackend(actionName, payloadData = {}) {
                   let baseValStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
                   kpiCfg.base = parseFloat(baseValStr) || 0;
               }
-
-              // Присваиваем проценты и БАЛЛЫ штрафов
               if (penName.includes('отзыв')) { kpiCfg.rev = pVal; if (penPts !== null) ptsCfg.rev = penPts; }
               if (penName.includes('ревизи')) { kpiCfg.revsn = pVal; if (penPts !== null) ptsCfg.revsn = penPts; }
               if (penName.includes('ценник')) { kpiCfg.price = pVal; if (penPts !== null) ptsCfg.price = penPts; }
@@ -398,19 +370,16 @@ async function callBackend(actionName, payloadData = {}) {
               if (penName.includes('бл') || penName.includes('больничн')) kpiCfg.bl = pVal;
               if (penName.includes('пр') || penName.includes('прогул')) kpiCfg.pr = pVal;
 
-              // Проверяем принадлежность к отделу
               let deptMatched = false;
               if (userDeptStr.includes("мбт") && kpiName.includes("мбт")) deptMatched = true;
               else if (userDeptStr.includes("кбт") && kpiName.includes("кбт")) deptMatched = true;
               else if (userDeptStr.includes("цифра") && kpiName.includes("цифра")) deptMatched = true;
 
-              // Парсим проценты и БАЛЛЫ для Trade-In ИМЕННО ДЛЯ ОТДЕЛА сотрудника
               if (kpiName.includes('trade-in') && (deptMatched || window.tradeInKpiBonus === 0)) {
                   let valStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
                   window.tradeInKpiBonus = parseFloat(valStr) || 0;
                   if (kpiPts !== null) window.tradeInPtsBonus = kpiPts;
               }
-              // То же самое для СЦ/Дефект
               if (kpiName.includes('сц/дефект') && (deptMatched || window.scKpiBonus === 0)) {
                   let valStr = String(r.col_b_kpi_val || "").replace(/%/g, '').replace(/\s/g, '').replace(',', '.');
                   window.scKpiBonus = parseFloat(valStr) || 0;
@@ -421,7 +390,6 @@ async function callBackend(actionName, payloadData = {}) {
           window.dynamicPrefixColors = window.dynamicPrefixColors || {};
           let adminAllPromoLists = [];
           let allHotChecks = [];
-          
           const allDeptsCols = [
               {n: 'col_e_cifra_name', k: 'col_f_cifra_kpi', p: 'col_g_cifra_pts', dept: 'Цифра'},
               {n: 'col_h_mbt_name', k: 'col_i_mbt_kpi', p: 'col_j_mbt_pts', dept: 'МБТ'},
@@ -436,19 +404,16 @@ async function callBackend(actionName, payloadData = {}) {
                   let rawVal = String(r[cols.k] || "").trim();
                   let rawPts = String(r[cols.p] || "").trim();
                   if (!btnName) return; 
-                  
                   if (btnName.startsWith("_") && rawVal.startsWith("_") && rawPts.startsWith("_#")) {
                       let prefix = rawVal.indexOf(" ") !== -1 ? rawVal.substring(1, rawVal.indexOf(" ")).trim() : rawVal.substring(1).trim();
                       let listColor = rawPts.indexOf(" ") !== -1 ? rawPts.substring(1, rawPts.indexOf(" ")).trim() : rawPts.substring(1).trim();
                       if (prefix) window.dynamicPrefixColors[prefix] = listColor;
-                      
                       let defKpi = "0";
                       if (rawVal.indexOf(" ") !== -1) {
                           defKpi = rawVal.substring(rawVal.indexOf(" ")).replace('%', '').replace(',', '.').trim();
                       } else {
                           defKpi = rawVal.replace('%', '').replace(',', '.').trim();
                       }
-                      
                       activeAdminPromoList = { title: btnName.substring(1).trim(), prefix: prefix, defKpi: defKpi, listColor: listColor, items: [], dept: cols.dept };
                       adminAllPromoLists.push(activeAdminPromoList);
                   } else if (btnName.includes("*")) {
@@ -460,7 +425,6 @@ async function callBackend(actionName, payloadData = {}) {
                       let btnVal = rawVal.replace('%', '').replace(',', '.').trim(); 
                       if (!btnVal || btnVal === "0") btnVal = activeAdminPromoList.defKpi; 
                       let btnPts = rawPts.replace('%', '').replace(',', '.').trim() || "0";
-                      
                       let cleanName = btnName; let count = null; let link = "";
                       let bracketIdx = btnName.indexOf('[');
                       if (bracketIdx !== -1) {
@@ -471,7 +435,6 @@ async function callBackend(actionName, payloadData = {}) {
                           let urlMatch = metaStr.match(/https?:\/\/[^\s\]]+/);
                           if (urlMatch) link = urlMatch[0];
                       }
-                      
                       if (count !== null && allReqs) {
                           let approvedCount = allReqs.filter(req => 
                               (req.status === 'approved' || req.status === 'approved_notify_zav') && 
@@ -480,7 +443,6 @@ async function callBackend(actionName, payloadData = {}) {
                           ).length;
                           count = Math.max(0, count - approvedCount);
                       }
-                      
                       if (count !== null && count <= 0) return; 
                       activeAdminPromoList.items.push({ name: btnName, cleanName: cleanName, currentCount: count, val: btnVal, pts: btnPts, link: link }); 
                   } else {
@@ -488,16 +450,29 @@ async function callBackend(actionName, payloadData = {}) {
                   }
               });
           });
-          
           window.adminPromoListsGlobal = adminAllPromoLists.filter(l => l.items.length > 0);
-          
           let dStr = String(userData.dept).toLowerCase(); 
           let myDept = 'Цифра';
           if (dStr.includes("мбт")) myDept = 'МБТ';
           else if (dStr.includes("кбт")) myDept = 'КБТ';
-
           localData.promoLists = window.adminPromoListsGlobal.filter(l => l.dept === myDept);
           localData.hotChecks = allHotChecks.filter(hc => hc.dept === myDept || hc.sub.includes(myDept));
+      }
+
+      // ИСПРАВЛЕНО: Группируем и агрегируем сырые строки дней табеля по ИИН сотрудников
+      let attMap = {};
+      if (allAttendanceDays) {
+          allAttendanceDays.forEach(row => {
+              let uIin = safeIin(row.iin);
+              if (!attMap[uIin]) attMap[uIin] = { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+              let st = String(row.status || "").toLowerCase().trim();
+              if (st === 'рд') attMap[uIin].rd++;
+              else if (st === 'ус') attMap[uIin].us++;
+              else if (st === 'бс') attMap[uIin].bs++;
+              else if (st === 'бл') attMap[uIin].bl++;
+              else if (st === 'пр') attMap[uIin].pr++;
+              else if (st === 'от') attMap[uIin].ot++;
+          });
       }
 
       let userMap = {}; let adminEmployees = []; let empMap = {};
@@ -506,101 +481,15 @@ async function callBackend(actionName, payloadData = {}) {
               userMap[u.iin] = u; 
               let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { reports_data: [] };
               
-              // ИСПРАВЛЕНО: Извлекаем агрегированные данные по дням из новой БД для каждого сотрудника
-              let tData = dbTMap = dbTabelMap[u.iin] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
-              
-              let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
-              
-              // ИСПРАВЛЕНО: Процентные вычеты за больничные и прогулы теперь тоже рассчитываются по новой базе данных emp_attendance_days
-              let bBl = parseFloat(String(tData.bl || "0").replace(',', '.')) || 0; 
-              let bPr = parseFloat(String(tData.pr || "0").replace(',', '.')) || 0; 
-              let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
-              kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
-              
-              let uRoleLow = String(u.role || "").toLowerCase();
-              let actualRole = u.role || 'Продавец';
-              
-              let emp = { 
-                  iin: u.iin, 
-                  name: u.full_name, 
-                  dept: u.dept || '', 
-                  role: actualRole, 
-                  login_status: u.login_status, 
-                  kpi: kpiVal, 
-                  kpiDetails: kDetails, 
-                  pts: { acc: 0, use: 0, rem: 0, fin: 0 }, 
-                  sales: { sc: 0, trade: 0 }, 
-                  reportErrors: 0, 
-                  reports: sInfo.reports_data || [], 
-                  ptsHistory: [], 
-                  remarks: [], 
-                  // ИСПРАВЛЕНО: Полоса табеля в админке берет данные строго из tData (база emp_attendance_days)
-                  tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${tData.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${tData.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${tData.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${tData.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${tData.rd}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${tData.us}</div>`, 
-                  rawTabel: tData, 
-                  directPenaltyPoints: 0 
-              };
-              
-              if (sInfo.reports_data) {
-                  sInfo.reports_data.forEach(rep => {
-                      emp.reportErrors += rep.errors; 
-                      let ptPenPerErr = 0; let kpiPenPerErr = 0;
-                      
-                      if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenPerErr = ptsCfg.price; kpiPenPerErr = kpiCfg.price; } 
-                      else if (rep.title.includes("Ревизия")) { ptPenPerErr = ptsCfg.revsn; kpiPenPerErr = kpiCfg.revsn; } 
-                      else if (rep.title.includes("уборка")) { ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; } 
-                      else if (rep.title.includes("Отзыв")) { ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; }
-                      
-                      let totalKpiPenalty = rep.errors * kpiPenPerErr;
-                      if (totalKpiPenalty !== 0) { 
-                          emp.kpi += totalKpiPenalty; 
-                          emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: totalKpiPenalty, date: "" }); 
-                      }
-                      
-                      if (ptPenPerErr !== 0 && rep.values && rep.headers) {
-                          let currentYear = new Date().getFullYear();
-                          rep.values.forEach((v, idx) => {
-                              if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
-                                  let rawDate = rep.headers[idx] || "";
-                                  let rDate = rawDate.length === 5 ? `${rawDate}.${currentYear}` : rawDate;
-                                  let histItem = { date: rDate || formatDateLocal(new Date()), type: "Списание", source: rep.title, reason: "Отсутствие отчета", val: -Math.abs(ptPenPerErr), approver: "", moneyFine: 0, kpiChange: kpiPenPerErr };
-                                  emp.ptsHistory.push(histItem);
-                                  emp.pts.fin += Math.abs(ptPenPerErr);
-                              }
-                          });
-                      }
-                  });
-              }
+              // ИСПРАВЛЕНО: Подменяем sInfo.tabel_data на агрегированные живые данные из emp_attendance_days
+              let uIinClean = safeIin(u.iin);
+              sInfo.tabel_data = attMap[uIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
 
-              adminEmployees.push(emp); empMap[u.iin] = emp;
-          });
-      }
-      window.adminEmployeesGlobal = adminEmployees;
-
-      let myEmp = empMap[appState.iin];
-      // ИСПРАВЛЕНО: Личный табель текущего вошедшего пользователя на главном экране тоже синхронизируем с emp_attendance_days
-      let myTData = dbTabelMap[appState.iin] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
-      if (!myEmp) { 
-          let mySheet = (allSheetInfo || []).find(s => String(s.iin).trim() === String(appState.iin).trim()) || { reports_data: [] }; 
-          localData.info = { tabel: myTData, reports: mySheet.reports_data || [], kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] }; 
-      } else { 
-          localData.info = { tabel: myTData, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] }; 
-      }
-
-      let userMap = {}; let adminEmployees = []; let empMap = {};
-      if (allUsers) {
-          allUsers.forEach(u => {
-              // ИСПРАВЛЕНО: userMap НА МЕСТЕ, имена руководителей и авторов не пропадут!
-              userMap[u.iin] = u; 
-              
-              // ИСПРАВЛЕНО: Добавлен дефолтный ноль для нового статуса переработки us:0
-              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0, us:0}, reports_data: [] };
               let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
               let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0; let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0; let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
               
               let uRoleLow = String(u.role || "").toLowerCase();
-              
-              // ИСПРАВЛЕНО: Убрано ограничение ролей, теперь АУП и технический персонал успешно собираются в массив
               let actualRole = u.role || 'Продавец';
               let emp = { 
                   iin: u.iin, 
@@ -616,7 +505,6 @@ async function callBackend(actionName, payloadData = {}) {
                   reports: sInfo.reports_data, 
                   ptsHistory: [], 
                   remarks: [], 
-                  // ИСПРАВЛЕНО: В горизонтальную полосу табеля добавлен фиолетовый статус УС с защитой от пустых значений ?? 0
                   tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${sInfo.tabel_data.us ?? 0}</div>`, 
                   rawTabel: sInfo.tabel_data, 
                   directPenaltyPoints: 0 
@@ -625,18 +513,15 @@ async function callBackend(actionName, payloadData = {}) {
               sInfo.reports_data.forEach(rep => {
                   emp.reportErrors += rep.errors; 
                   let ptPenPerErr = 0; let kpiPenPerErr = 0;
-                  
                   if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenPerErr = ptsCfg.price; kpiPenPerErr = kpiCfg.price; } 
                   else if (rep.title.includes("Ревизия")) { ptPenPerErr = ptsCfg.revsn; kpiPenPerErr = kpiCfg.revsn; } 
                   else if (rep.title.includes("уборка")) { ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; } 
                   else if (rep.title.includes("Отзыв")) { ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; }
-                  
                   let totalKpiPenalty = rep.errors * kpiPenPerErr;
                   if (totalKpiPenalty !== 0) { 
                       emp.kpi += totalKpiPenalty; 
                       emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: totalKpiPenalty, date: "" }); 
                   }
-                  
                   if (ptPenPerErr !== 0 && rep.values && rep.headers) {
                       let currentYear = new Date().getFullYear();
                       rep.values.forEach((v, idx) => {
@@ -650,14 +535,19 @@ async function callBackend(actionName, payloadData = {}) {
                       });
                   }
               });
-
               adminEmployees.push(emp); empMap[u.iin] = emp;
           });
       }
       window.adminEmployeesGlobal = adminEmployees;
 
       let myEmp = empMap[appState.iin];
-      if (!myEmp) { let mySheet = (allSheetInfo || []).find(s => String(s.iin).trim() === String(appState.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] }; localData.info = { tabel: mySheet.tabel_data, reports: mySheet.reports_data, kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] }; } 
+      if (!myEmp) { 
+          let mySheet = (allSheetInfo || []).find(s => String(s.iin).trim() === String(appState.iin).trim()) || { reports_data: [] }; 
+          // ИСПРАВЛЕНО: Переопределяем данные табеля из живой БД и для резервного случая (когда карточка строится для текущего аккаунта напрямую)
+          let myIinClean = safeIin(appState.iin);
+          mySheet.tabel_data = attMap[myIinClean] || { bs:0, bl:0, pr:0, ot:0, rd:0, us:0 };
+          localData.info = { tabel: mySheet.tabel_data, reports: mySheet.reports_data, kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] }; 
+      } 
       else { localData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] }; }
 
       let myPtsHistory = []; let myKpiChanges = 0;
