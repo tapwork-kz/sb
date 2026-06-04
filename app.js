@@ -477,15 +477,38 @@ async function callBackend(actionName, payloadData = {}) {
       let userMap = {}; let adminEmployees = []; let empMap = {};
       if (allUsers) {
           allUsers.forEach(u => {
-              userMap[u.iin] = u; let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0}, reports_data: [] };
+              // ИСПРАВЛЕНО: userMap НА МЕСТЕ, имена руководителей и авторов не пропадут!
+              userMap[u.iin] = u; 
+              
+              // ИСПРАВЛЕНО: Добавлен дефолтный ноль для нового статуса переработки us:0
+              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0, us:0}, reports_data: [] };
               let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
               let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0; let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0; let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
               
               let uRoleLow = String(u.role || "").toLowerCase();
-              // ИСПРАВЛЕНО: Убрано ограничение ролей, теперь в массив попадает весь персонал для подраздела АУП
+              
+              // ИСПРАВЛЕНО: Убрано ограничение ролей, теперь АУП и технический персонал успешно собираются в массив
               let actualRole = u.role || 'Продавец';
-              let emp = { iin: u.iin, name: u.full_name, dept: u.dept || '', role: actualRole, login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
+              let emp = { 
+                  iin: u.iin, 
+                  name: u.full_name, 
+                  dept: u.dept || '', 
+                  role: actualRole, 
+                  login_status: u.login_status, 
+                  kpi: kpiVal, 
+                  kpiDetails: kDetails, 
+                  pts: { acc: 0, use: 0, rem: 0, fin: 0 }, 
+                  sales: { sc: 0, trade: 0 }, 
+                  reportErrors: 0, 
+                  reports: sInfo.reports_data, 
+                  ptsHistory: [], 
+                  remarks: [], 
+                  // ИСПРАВЛЕНО: В горизонтальную полосу табеля добавлен фиолетовый статус УС с защитой от пустых значений ?? 0
+                  tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${sInfo.tabel_data.us ?? 0}</div>`, 
+                  rawTabel: sInfo.tabel_data, 
+                  directPenaltyPoints: 0 
+              };
               
               sInfo.reports_data.forEach(rep => {
                   emp.reportErrors += rep.errors; 
@@ -1345,7 +1368,7 @@ function renderDashboardData(data, isSilent = false) {
 
   let pAcc = document.getElementById("pt-acc"); if(pAcc) pAcc.innerText = data.info?.ptsAccrued ?? '-'; let pUse = document.getElementById("pt-use"); if(pUse) pUse.innerText = data.info?.ptsUsed ?? '-'; const remVal = parseFloat(String(data.info?.ptsLeft).replace(',','.')) || 0; const ptRemEl = document.getElementById("pt-rem"); if(ptRemEl) { ptRemEl.innerText = data.info?.ptsLeft ?? '-'; ptRemEl.style.color = remVal >= 0 ? "#27ae60" : "#e67e22"; } let pFin = document.getElementById("pt-fin"); if(pFin) pFin.innerText = data.info?.ptsFine ?? '-'; 
   let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0; let kValEl = document.getElementById("kpi-val"); if(kValEl) kValEl.innerText = kpiValue + '%'; setKpiColor(kpiValue, document.getElementById("kpi-circle"), document.getElementById("kpi-val")); myKpiDetails = data.info?.kpiDetails || [];
-  let infoTabel = document.getElementById("info-tabel"); if(infoTabel) { infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div>`; }
+  let infoTabel = document.getElementById("info-tabel"); if(infoTabel) { infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${data.info?.tabel?.us ?? 0}</div>`; }
 
   myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.type === "Штраф"); myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек"); window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
   let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear; let monthSc = myScHistory.filter(p => p && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
@@ -1916,7 +1939,13 @@ async function renderTabelCalendarData(iin) {
     for (let day = 1; day <= lastDay; day++) {
         let dayData = attendanceMap[day];
         let statusText = dayData ? dayData.status : "";
-        let hoursText = (dayData && dayData.hours && dayData.hours > 0) ? `${dayData.hours}ч` : "";
+        
+        // ИСПРАВЛЕНО: Все смены 9, 12 и 13 принудительно отображаем как 10ч
+        let displayHours = dayData ? dayData.hours : 0;
+        if (displayHours === 9 || displayHours === 12 || displayHours === 13) {
+            displayHours = 10;
+        }
+        let hoursText = (dayData && displayHours && displayHours > 0) ? `${displayHours}ч` : "";
         
         let cellStyle = "background:var(--inner-bg, rgba(150,150,150,0.03)); color:var(--text-color); border:1px solid var(--border-color);";
         if (statusText && statusColors[statusText]) {
