@@ -483,53 +483,51 @@ async function callBackend(actionName, payloadData = {}) {
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
               
               let uRoleLow = String(u.role || "").toLowerCase();
-              if (uRoleLow.includes("продавец") || uRoleLow.includes("кассир")) {
-    let actualRole = uRoleLow.includes("кассир") ? "Кассир" : (u.role || 'Продавец');
-    let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: actualRole, login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
+              // ИСПРАВЛЕНО: Убрано ограничение, теперь в список попадают абсолютно все сотрудники для АУП/Персонала
+              let actualRole = u.role || 'Продавец';
+              let emp = { iin: u.iin, name: u.full_name, dept: u.dept || 'Цифра', role: actualRole, login_status: u.login_status, kpi: kpiVal, kpiDetails: kDetails, pts: { acc: 0, use: 0, rem: 0, fin: 0 }, sales: { sc: 0, trade: 0 }, reportErrors: 0, reports: sInfo.reports_data, ptsHistory: [], remarks: [], tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div>`, rawTabel: sInfo.tabel_data, directPenaltyPoints: 0 };
+              
+              sInfo.reports_data.forEach(rep => {
+                  emp.reportErrors += rep.errors; 
+                  let ptPenPerErr = 0; let kpiPenPerErr = 0;
                   
-                  sInfo.reports_data.forEach(rep => {
-                      emp.reportErrors += rep.errors; 
-                      let ptPenPerErr = 0; let kpiPenPerErr = 0;
-                      
-                      if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenPerErr = ptsCfg.price; kpiPenPerErr = kpiCfg.price; } 
-                      else if (rep.title.includes("Ревизия")) { ptPenPerErr = ptsCfg.revsn; kpiPenPerErr = kpiCfg.revsn; } 
-                      else if (rep.title.includes("уборка")) { ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; } 
-                      else if (rep.title.includes("Отзыв")) { ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; }
-                      
-                      let totalKpiPenalty = rep.errors * kpiPenPerErr;
-                      if (totalKpiPenalty !== 0) { 
-                          emp.kpi += totalKpiPenalty; 
-                          emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: totalKpiPenalty, date: "" }); 
-                      }
-                      
-                      if (ptPenPerErr !== 0 && rep.values && rep.headers) {
-                          let currentYear = new Date().getFullYear();
-                          rep.values.forEach((v, idx) => {
-                              // Ищем крестики в массиве отчета
-                              if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
-                                  let rawDate = rep.headers[idx] || "";
-                                  // Если дата короткая (напр. 29.05), добавляем год (29.05.2026)
-                                  let rDate = rawDate.length === 5 ? `${rawDate}.${currentYear}` : rawDate;
-                                  
-                                  let histItem = { 
-                                      date: rDate || formatDateLocal(new Date()), 
-                                      type: "Списание", // Указываем Списание, чтобы оно красиво рендерилось с названием источника
-                                      source: rep.title, 
-                                      reason: "Отсутствие отчета", 
-                                      val: -Math.abs(ptPenPerErr), 
-                                      approver: "", 
-                                      moneyFine: 0, 
-                                      kpiChange: kpiPenPerErr 
-                                  };
-                                  emp.ptsHistory.push(histItem);
-                                  emp.pts.fin += Math.abs(ptPenPerErr);
-                              }
-                          });
-                      }
-                  });
+                  if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenPerErr = ptsCfg.price; kpiPenPerErr = kpiCfg.price; } 
+                  else if (rep.title.includes("Ревизия")) { ptPenPerErr = ptsCfg.revsn; kpiPenPerErr = kpiCfg.revsn; } 
+                  else if (rep.title.includes("уборка")) { ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; } 
+                  else if (rep.title.includes("Отзыв")) { ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; }
+                  
+                  let totalKpiPenalty = rep.errors * kpiPenPerErr;
+                  if (totalKpiPenalty !== 0) { 
+                      emp.kpi += totalKpiPenalty; 
+                      emp.kpiDetails.push({ name: "Ошибки", source: rep.title, val: totalKpiPenalty, date: "" }); 
+                  }
+                  
+                  if (ptPenPerErr !== 0 && rep.values && rep.headers) {
+                      let currentYear = new Date().getFullYear();
+                      rep.values.forEach((v, idx) => {
+                          if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
+                              let rawDate = rep.headers[idx] || "";
+                              let rDate = rawDate.length === 5 ? `${rawDate}.${currentYear}` : rawDate;
+                              
+                              let histItem = { 
+                                  date: rDate || formatDateLocal(new Date()), 
+                                  type: "Списание", 
+                                  source: rep.title, 
+                                  reason: "Отсутствие отчета", 
+                                  val: -Math.abs(ptPenPerErr), 
+                                  approver: "", 
+                                  moneyFine: 0, 
+                                  kpiChange: kpiPenPerErr 
+                              };
+                              emp.ptsHistory.push(histItem);
+                              emp.pts.fin += Math.abs(ptPenPerErr);
+                          }
+                      });
+                  }
+              });
 
-                  adminEmployees.push(emp); empMap[u.iin] = emp;
-              }
+              adminEmployees.push(emp); empMap[u.iin] = emp;
+              if (true) { // Безопасное сохранение баланса фигурных скобок архитектуры
           });
       }
       window.adminEmployeesGlobal = adminEmployees;
@@ -1946,24 +1944,95 @@ function submitVacation() {
 }
 
 function renderAdminEmps(dept, btnElement) {
-   currentEmpDept = dept; if (btnElement) { document.getElementById('flt-emp-cifra').classList.remove('active-flt'); document.getElementById('flt-emp-mbt').classList.remove('active-flt'); document.getElementById('flt-emp-kbt').classList.remove('active-flt'); btnElement.classList.add('active-flt'); }
-   let container = document.getElementById("admin-emp-list"); 
+   currentEmpDept = dept; 
+   window.currentEmpSubTab = window.currentEmpSubTab || 'sellers';
    
-   // --- НОВОЕ: Скрываем заблокированных сотрудников (у которых login_status === FALSE) ---
-   let filtered = allEmployeesData.filter(e => 
-       String(e.login_status).toUpperCase() !== 'FALSE' && 
-       e.dept.toLowerCase().includes(dept.toLowerCase())
-   ); 
-   // --------------------------------------------------------------------------------------
+   let btnCifra = document.getElementById('flt-emp-cifra');
+   let btnMbt = document.getElementById('flt-emp-mbt');
+   let btnKbt = document.getElementById('flt-emp-kbt');
    
+   // Управляем видимостью кнопок отделов в зависимости от открытого подраздела
+   if (window.currentEmpSubTab === 'aup') {
+       if(btnCifra) btnCifra.style.display = 'none';
+       if(btnMbt) btnMbt.style.display = 'none';
+       if(btnKbt) btnKbt.style.display = 'none';
+   } else {
+       if(btnCifra) btnCifra.style.display = '';
+       if(btnMbt) btnMbt.style.display = '';
+       if(btnKbt) btnKbt.style.display = '';
+       if (btnElement) { 
+           document.getElementById('flt-emp-cifra').classList.remove('active-flt'); 
+           document.getElementById('flt-emp-mbt').classList.remove('active-flt'); 
+           document.getElementById('flt-emp-kbt').classList.remove('active-flt'); 
+           btnElement.classList.add('active-flt'); 
+       }
+   }
+   
+   let container = document.getElementById("admin-emp-list"); 
    let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
-   container.innerHTML = filtered.map(e => { 
+   
+   // Переключатель подразделов
+   let tabsHtml = `
+   <div class="no-swipe" style="display:flex; gap:6px; margin-bottom:12px; padding:0 4px;">
+       <button class="admin-flt ${window.currentEmpSubTab === 'sellers' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='sellers'; renderAdminEmps(currentEmpDept, document.getElementById('flt-emp-' + currentEmpDept.toLowerCase()));" style="flex:1;">Продавцы</button>
+       <button class="admin-flt ${window.currentEmpSubTab === 'aup' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='aup'; renderAdminEmps(currentEmpDept, null);" style="flex:1;">АУП / Персонал</button>
+   </div>
+   <div id="emp-sub-list-content"></div>
+   `;
+   
+   container.innerHTML = tabsHtml;
+   let listContent = document.getElementById("emp-sub-list-content");
+   
+   if (window.currentEmpSubTab === 'sellers') {
+       // ПОДРАЗДЕЛ 1: Только продавцы с фильтрацией по отделам
+       let filtered = allEmployeesData.filter(e => {
+           if (String(e.login_status).toUpperCase() === 'FALSE') return false;
+           let rLow = String(e.role || "").toLowerCase();
+           let isNotSeller = rLow.includes("директор") || rLow.includes("управляющий") || rLow.includes("админ") || rLow.includes("супервайзер") || rLow.includes("заведующий") || rLow.includes("инфо-консультант") || rLow.includes("старший кассир") || rLow.includes("грузчик") || (rLow.includes("кассир") && !rLow.includes("старший"));
+           return !isNotSeller && e.dept.toLowerCase().includes(dept.toLowerCase());
+       });
+       
+       listContent.innerHTML = filtered.map(e => { 
            let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
            let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
            let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
            let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
            return `<div class="req-item" style="border-left-color: var(--btn-color); border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);">${e.name}</div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`; 
-       }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Сотрудников нет</p>";
+       }).join("") || "<p style='color:gray; font-size:12px; text-align:center;'>Продавцов нет</p>";
+   } else {
+       // ПОДРАЗДЕЛ 2: АУП / Персонал (Все остальные должности с группировкой по должностям)
+       let groups = {};
+       allEmployeesData.forEach(e => {
+           if (String(e.login_status).toUpperCase() === 'FALSE') return;
+           let rLow = String(e.role || "").toLowerCase();
+           let isNotSeller = rLow.includes("директор") || rLow.includes("управляющий") || rLow.includes("админ") || rLow.includes("супервайзер") || rLow.includes("заведующий") || rLow.includes("инфо-консультант") || rLow.includes("старший кассир") || rLow.includes("грузчик") || rLow.includes("кассир");
+           if (isNotSeller) {
+               let roleName = e.role || "Персонал";
+               if (!groups[roleName]) groups[roleName] = [];
+               groups[roleName].push(e);
+           }
+       });
+       
+       let aupHtml = "";
+       Object.keys(groups).sort().forEach(roleName => {
+           // Отрисовываем название должности как заголовок группы
+           aupHtml += `<div class="grid-details-title" style="color:gray; font-size:13px; font-weight:bold; margin-top:14px; margin-bottom:8px; text-transform:none; border-bottom:1px solid var(--border-color); padding-bottom:4px; text-align:left;">${roleName}:</div>`;
+           
+           let groupEmps = groups[roleName];
+           groupEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+           
+           // Отрисовываем пронумерованный интерактивный список сотрудников внутри этой должности
+           aupHtml += groupEmps.map((e, idx) => {
+               let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
+               let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
+               let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
+               let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
+               return `<div class="req-item" style="border-left-color: #7f8c8d; border-left-width: 2px; padding: 10px 8px; margin-bottom: 8px; cursor:pointer;" onclick="openEmpDetails('${e.iin}')"><div style="font-size:13px; font-weight:bold; margin-bottom:6px; color:var(--text-color);"><b>${idx + 1}.</b> ${e.name} <span style="font-size:11px; font-weight:normal; color:gray;">(${e.dept})</span></div><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; gap:8px;"><div class="inner-block" style="flex:1; margin:0; padding:2px 4px; height:34px; display:flex; align-items:center; justify-content:space-evenly;">${e.tabelStr}</div><div class="circle-box" style="width:34px; min-width:34px; height:34px; margin:0; cursor:pointer; box-shadow:none; flex-shrink:0;" onclick="event.stopPropagation(); openEmpKpiDetails('${e.iin}')"><div class="kpi-container" style="background: conic-gradient(${setKpiColor(e.kpi, null, null)} ${e.kpi > 100 ? 100 : e.kpi}%, var(--inner-bg) 0);"><div class="kpi-inner" style="width:28px; height:28px;"><span style="font-size:${kpiFontSize}; font-weight:bold; color:${setKpiColor(e.kpi, null, null)}">${e.kpi}%</span></div></div></div></div><div style="display:flex; justify-content:space-between; font-size:11px; align-items:center; color:var(--desc-color);"><span onclick="event.stopPropagation(); openEmpScDetails('${e.iin}')" style="padding: 4px 8px; background: rgba(39, 174, 96, 0.1); border-radius: 8px; cursor: pointer;">СЦ: <b style="color:var(--btn-color);">${curMonthSc}</b> | Фокус: <b style="color:var(--btn-color);">${curMonthFocus}</b></span><span>Ошибки: <b style="color:var(--text-color);">${e.reportErrors}</b></span></div></div>`;
+           }).join("");
+       });
+       
+       listContent.innerHTML = aupHtml || "<p style='color:gray; font-size:12px; text-align:center;'>Персонал не найден</p>";
+   }
 }
 
 let currentAdminScTabType = 'active'; function switchScAdminTab(tabType) { currentAdminScTabType = tabType; document.getElementById('tab-sc-active').classList.remove('active-flt'); document.getElementById('tab-sc-sold').classList.remove('active-flt'); document.getElementById('tab-sc-' + tabType).classList.add('active-flt'); renderAdminScItems(currentAdminScDept, null); }
