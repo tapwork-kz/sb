@@ -2292,42 +2292,51 @@ function checkNotificationRoute() {
 // Слушаем изменения адреса (когда приложение УЖЕ открыто и пришел PUSH)
 window.addEventListener('hashchange', checkNotificationRoute);
 
-// Принудительное обновление данных и проверка роутинга при разворачивании приложения
+// ПРИНУДИТЕЛЬНЫЙ И БРОНЕБОЙНЫЙ ПЕРЕХОД ПО УВЕДОМЛЕНИЮ (ДЛЯ СВЕРНУТОГО ПРИЛОЖЕНИЯ)
+if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.addEventListener('message', event => {
+        if (event.data && event.data.action === 'navigate') {
+            console.log("SW принудительно переключает вкладку на Входящие. Целевой URL:", event.data.url);
+            
+            let roleStr = String(appState.role || "Продавец").toLowerCase();
+            let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
+            
+            // АБСОЛЮТНЫЙ ПРИОРИТЕТ: Переключаем вкладку напрямую, минуя любые проверки DOM-кнопок и классов hidden
+            if (isDir) {
+                switchTab('adm-inbox'); // Директора принудительно отправляются в админ-входящие
+            } else {
+                switchTab('inbox'); // Завсклада, Инфо, Старшие кассиры, Грузчики и Продавцы отправляются в обычные входящие
+            }
+            
+            // Полностью очищаем хэш адресной строки браузера, чтобы избежать зацикливаний
+            if (window.location.hash) {
+                history.replaceState(null, null, window.location.pathname);
+            }
+        }
+    });
+}
+
+// Тихое фоновое обновление данных при разворачивании приложения (БЕЗ сброса текущего экрана)
 document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
         if (appState && appState.iin) {
-            console.log("Приложение открыто: принудительно обновляем данные...");
-            loadDashboard(false);
-            checkNotificationRoute();
+            console.log("Приложение развернуто: тихо обновляем данные в фоне...");
+            loadDashboard(true); // Параметр true гарантирует, что вкладка и позиция скролла НЕ сбросятся
         }
     }
 });
 
-// Если приложение запускается с нуля (после закрытия)
+// Если приложение запускается с нуля (после полного закрытия по клику на уведомление)
 window.addEventListener('load', () => {
-    setTimeout(checkNotificationRoute, 1000); // Даем время интерфейсу загрузиться
+    let currentHash = window.location.hash.split('?')[0];
+    if (currentHash === '#inbox' || currentHash === '#/inbox') {
+        let roleStr = String(appState.role || "Продавец").toLowerCase();
+        let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
+        
+        setTimeout(() => {
+            if (isDir) switchTab('adm-inbox');
+            else switchTab('inbox');
+            history.replaceState(null, null, window.location.pathname);
+        }, 1000); // Даем 1 секунду на полную отрисовку интерфейса и переключаем экран
+    }
 });
-
-// Прием мгновенных команд от Service Worker (для PUSH уведомлений)
-if ('serviceWorker' in navigator) {
-    navigator.serviceWorker.addEventListener('message', event => {
-        if (event.data && event.data.action === 'navigate') {
-            console.log("Получен URL пуша из Service Worker:", event.data.url);
-            
-            // УМНОЕ ИЗВЛЕЧЕНИЕ: если пришел полный абсолютный URL из Supabase,
-            // мы аккуратно забираем только хэш (всё, что идёт после знака #)
-            let targetHash = '#inbox';
-            if (event.data.url && event.data.url.includes('#')) {
-                targetHash = '#' + event.data.url.split('#')[1];
-            } else if (event.data.url) {
-                targetHash = event.data.url;
-            }
-            
-            // Выставляем чистый, ровный хэш (строго '#inbox')
-            window.location.hash = targetHash; 
-            
-            // Мгновенно вызываем функцию перехода по вкладкам
-            checkNotificationRoute(); 
-        }
-    });
-}
