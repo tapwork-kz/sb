@@ -1933,25 +1933,11 @@ async function renderTabelCalendarData(iin) {
     
     gridHtml += `</div>`;
     
-    // Маленькая легенда под календарем (ДОБАВЛЕНО УСИЛЕНИЕ)
+    // Маленькая легенда под календарем с Усилением (без дубликатов и лишних скобок)
     let legendHtml = `
     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-top:10px; font-size:9px; font-weight:bold; text-align:center;">
         <div style="color:#27ae60; background:rgba(39,174,96,0.05); padding:3px; border-radius:6px;">РД - Рабочий</div>
         <div style="color:#9b59b6; background:rgba(155,89,182,0.05); padding:3px; border-radius:6px;">УС - Усиление</div>
-        <div style="color:#f39c12; background:rgba(243,156,18,0.05); padding:3px; border-radius:6px;">БС - Личный</div>
-        <div style="color:#e67e22; background:rgba(230,126,34,0.05); padding:3px; border-radius:6px;">БЛ - Больнич.</div>
-        <div style="color:#e74c3c; background:rgba(231,76,60,0.05); padding:3px; border-radius:6px;">ПР - Прогул</div>
-        <div style="color:#f1c40f; background:rgba(241,196,15,0.05); padding:3px; border-radius:6px;">ОТ - Отпуск</div>
-        <div style="color:#7f8c8d; background:rgba(127,140,141,0.05); padding:3px; border-radius:6px;">В - Выходной</div>
-    </div>`;
-    }
-    
-    gridHtml += `</div>`;
-    
-    // Маленькая легенда под календарем
-    let legendHtml = `
-    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-top:10px; font-size:9px; font-weight:bold; text-align:center;">
-        <div style="color:#27ae60; background:rgba(39,174,96,0.05); padding:3px; border-radius:6px;">УС - Переработка</div>
         <div style="color:#f39c12; background:rgba(243,156,18,0.05); padding:3px; border-radius:6px;">БС - Личный</div>
         <div style="color:#e67e22; background:rgba(230,126,34,0.05); padding:3px; border-radius:6px;">БЛ - Больнич.</div>
         <div style="color:#e74c3c; background:rgba(231,76,60,0.05); padding:3px; border-radius:6px;">ПР - Прогул</div>
