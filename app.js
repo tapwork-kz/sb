@@ -527,7 +527,6 @@ async function callBackend(actionName, payloadData = {}) {
               });
 
               adminEmployees.push(emp); empMap[u.iin] = emp;
-              if (true) { // Безопасное сохранение баланса фигурных скобок архитектуры
           });
       }
       window.adminEmployeesGlobal = adminEmployees;
