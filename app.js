@@ -459,12 +459,12 @@ async function callBackend(actionName, payloadData = {}) {
           localData.hotChecks = allHotChecks.filter(hc => hc.dept === myDept || hc.sub.includes(myDept));
       }
 
-      // ИСПРАВЛЕНО: Группируем и агрегируем сырые строки дней табеля по ИИН сотрудников
+      // ИСПРАВЛЕНО: Группируем и агрегируем сырые строки дней табеля по ИИН сотрудников, включая подсчет выходных (v)
       let attMap = {};
       if (allAttendanceDays) {
           allAttendanceDays.forEach(row => {
               let uIin = safeIin(row.iin);
-              if (!attMap[uIin]) attMap[uIin] = { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+              if (!attMap[uIin]) attMap[uIin] = { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0, v: 0 };
               let st = String(row.status || "").toLowerCase().trim();
               if (st === 'рд') attMap[uIin].rd++;
               else if (st === 'ус') attMap[uIin].us++;
@@ -472,6 +472,7 @@ async function callBackend(actionName, payloadData = {}) {
               else if (st === 'бл') attMap[uIin].bl++;
               else if (st === 'пр') attMap[uIin].pr++;
               else if (st === 'от') attMap[uIin].ot++;
+              else if (st === 'в' || st === 'v') attMap[uIin].v++; // Считаем выходные дни
           });
       }
 
@@ -481,16 +482,19 @@ async function callBackend(actionName, payloadData = {}) {
               userMap[u.iin] = u; 
               let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { reports_data: [] };
               
-              // ИСПРАВЛЕНО: tabel_data формируется СТРОГО и ИСКЛЮЧИТЕЛЬНО на основе живых дней из emp_attendance_days (без планов)
               let uIinClean = safeIin(u.iin);
-              let liveTabel = attMap[uIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+              let liveTabel = attMap[uIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0, v: 0 };
               
+              // ИСПРАВЛЕНО: Вычисляем план РД динамически (Всего дней в месяце минус выходные дни из базы)
+              let planRd = lastDayM - liveTabel.v;
+              if (planRd < 0) planRd = 0;
+
               sInfo.tabel_data = {
                   bs: liveTabel.bs,
                   bl: liveTabel.bl,
                   pr: liveTabel.pr,
                   ot: liveTabel.ot,
-                  rd: liveTabel.rd, // Чистое число фактически отработанных дней (например: 17)
+                  rd: `${liveTabel.rd} / ${planRd}`, // Формат Факт / План (например: 17 / 22)
                   us: liveTabel.us
               };
 
@@ -554,14 +558,17 @@ async function callBackend(actionName, payloadData = {}) {
           let mySheet = (allSheetInfo || []).find(s => String(s.iin).trim() === String(appState.iin).trim()) || { reports_data: [] }; 
           let myIinClean = safeIin(appState.iin);
           
-          // ИСПРАВЛЕНО: Резервный случай для текущего аккаунта теперь тоже строится строго на базе emp_attendance_days
-          let liveTabel = attMap[myIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+          // ИСПРАВЛЕНО: Рассчитываем план РД по этой же формуле для резервного случая текущего аккаунта
+          let liveTabel = attMap[myIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0, v: 0 };
+          let planRd = lastDayM - liveTabel.v;
+          if (planRd < 0) planRd = 0;
+
           mySheet.tabel_data = {
               bs: liveTabel.bs,
               bl: liveTabel.bl,
               pr: liveTabel.pr,
               ot: liveTabel.ot,
-              rd: liveTabel.rd,
+              rd: `${liveTabel.rd} / ${planRd}`,
               us: liveTabel.us
           };
           localData.info = { tabel: mySheet.tabel_data, reports: mySheet.reports_data, kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] }; 
