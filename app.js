@@ -479,11 +479,24 @@ async function callBackend(actionName, payloadData = {}) {
       if (allUsers) {
           allUsers.forEach(u => {
               userMap[u.iin] = u; 
-              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { reports_data: [] };
               
-              // ИСПРАВЛЕНО: Подменяем sInfo.tabel_data на агрегированные живые данные из emp_attendance_days
+              // ИСПРАВЛЕНО: Безопасно инициализируем структуру sInfo, сохраняя старый табель
+              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0, us:0}, reports_data: [] };
+              
+              // ИСПРАВЛЕНО: Запоминаем изначальный план РД из Гугл Таблицы перед перезаписью живым фактом
+              let planRd = sInfo.tabel_data?.rd ?? 0;
               let uIinClean = safeIin(u.iin);
-              sInfo.tabel_data = attMap[uIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+              let liveAtt = attMap[uIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
+
+              // ИСПРАВЛЕНО: Пересобираем объект табеля, подставляя для РД строчку "Факт / План"
+              sInfo.tabel_data = {
+                  bs: liveAtt.bs,
+                  bl: liveAtt.bl,
+                  pr: liveAtt.pr,
+                  ot: liveAtt.ot,
+                  rd: `${liveAtt.rd} / ${planRd}`, // Результат: 17 / 22
+                  us: liveAtt.us
+              };
 
               let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
               let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0; let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0; let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
@@ -501,11 +514,12 @@ async function callBackend(actionName, payloadData = {}) {
                   kpiDetails: kDetails, 
                   pts: { acc: 0, use: 0, rem: 0, fin: 0 }, 
                   sales: { sc: 0, trade: 0 }, 
+                  roleGroup: actualRole,
                   reportErrors: 0, 
                   reports: sInfo.reports_data, 
                   ptsHistory: [], 
                   remarks: [], 
-                  tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${sInfo.tabel_data.us ?? 0}</div>`, 
+                  tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${sInfo.tabel_data.us ?? 0}</div>`, 
                   rawTabel: sInfo.tabel_data, 
                   directPenaltyPoints: 0 
               };
@@ -542,13 +556,23 @@ async function callBackend(actionName, payloadData = {}) {
 
       let myEmp = empMap[appState.iin];
       if (!myEmp) { 
-          let mySheet = (allSheetInfo || []).find(s => String(s.iin).trim() === String(appState.iin).trim()) || { reports_data: [] }; 
-          // ИСПРАВЛЕНО: Переопределяем данные табеля из живой БД и для резервного случая (когда карточка строится для текущего аккаунта напрямую)
+          let mySheet = (allSheetInfo || []).find(s => String(s.iin).trim() === String(appState.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0, us:0}, reports_data: [] }; 
+          
+          // ИСПРАВЛЕНО: Аналогично подтягиваем "Факт / План" для личного дашборда аккаунта руководителя
+          let planRd = mySheet.tabel_data?.rd ?? 0;
           let myIinClean = safeIin(appState.iin);
-          mySheet.tabel_data = attMap[myIinClean] || { bs:0, bl:0, pr:0, ot:0, rd:0, us:0 };
+          let liveAtt = attMap[myIinClean] || { bs:0, bl:0, pr:0, ot:0, rd:0, us:0 };
+          
+          mySheet.tabel_data = {
+              bs: liveAtt.bs,
+              bl: liveAtt.bl,
+              pr: liveAtt.pr,
+              ot: liveAtt.ot,
+              rd: `${liveAtt.rd} / ${planRd}`,
+              us: liveAtt.us
+          };
           localData.info = { tabel: mySheet.tabel_data, reports: mySheet.reports_data, kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] }; 
-      } 
-      else { localData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] }; }
+      }
 
       let myPtsHistory = []; let myKpiChanges = 0;
       if (myEmp) { myPtsHistory = myPtsHistory.concat(myEmp.ptsHistory); }
