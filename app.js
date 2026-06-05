@@ -478,29 +478,27 @@ async function callBackend(actionName, payloadData = {}) {
       let userMap = {}; let adminEmployees = []; let empMap = {};
       if (allUsers) {
           allUsers.forEach(u => {
+              // Сохраняем ИИН в общую карту для предотвращения пропадания имён руководителей
               userMap[u.iin] = u; 
-              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { tabel_data: {bs:0, bl:0, pr:0, ot:0, rd:0, us:0}, reports_data: [] };
               
-              // ИСПРАВЛЕНО: Вытаскиваем изначальный план РД из синхронизированной Гугл Таблицы
-              let rawPlanRd = (sInfo.tabel_data && sInfo.tabel_data.rd) ? String(sInfo.tabel_data.rd) : "0";
-              let planRd = rawPlanRd.includes('/') ? rawPlanRd.split('/')[1].trim() : rawPlanRd.trim();
-              if (!planRd || planRd === "0") planRd = "0";
-
-              // Получаем живой факт из новой подневной базы emp_attendance_days
+              let sInfo = (allSheetInfo || []).find(s => String(s.iin).trim() === String(u.iin).trim()) || { reports_data: [] };
+              
+              // Извлекаем живой факт дней по статусам из новой подневной базы данных emp_attendance_days
               let uIinClean = safeIin(u.iin);
               let liveAtt = attMap[uIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
 
-              // ИСПРАВЛЕНО: Объединяем живой Факт и План из таблицы в строку формата "17 / 22"
+              // ИСПРАВЛЕНО: Теперь данные табеля формируются СТРОГО на основе живых записей emp_attendance_days
               sInfo.tabel_data = {
                   bs: liveAtt.bs,
                   bl: liveAtt.bl,
                   pr: liveAtt.pr,
                   ot: liveAtt.ot,
-                  rd: `${liveAtt.rd} / ${planRd}`, 
+                  rd: liveAtt.rd, // Отображаем чистый факт отработанных дней из подневной БД
                   us: liveAtt.us
               };
 
               let kpiVal = kpiCfg.base; let kDetails = [{ name: "Базовый KPI", source: "База", val: kpiCfg.base, date: "" }]; let repErrors = 0; let directPenaltyPoints = 0;
+              // Живой автоматический подсчет вычетов KPI за больничные и прогулы на основе данных из emp_attendance_days
               let bBl = parseFloat(String(sInfo.tabel_data.bl || "0").replace(',', '.')) || 0; let bPr = parseFloat(String(sInfo.tabel_data.pr || "0").replace(',', '.')) || 0; let blPen = bBl * kpiCfg.bl; let prPen = bPr * kpiCfg.pr;
               kpiVal += blPen + prPen; if (blPen !== 0) kDetails.push({ name: "Больничный", source: "Табель", val: blPen, date: "" }); if (prPen !== 0) kDetails.push({ name: "Прогул", source: "Табель", val: prPen, date: "" });
               
@@ -520,6 +518,7 @@ async function callBackend(actionName, payloadData = {}) {
                   reports: sInfo.reports_data, 
                   ptsHistory: [], 
                   remarks: [], 
+                  // Живая обновляемая полоса табеля для карточек руководителей
                   tabelStr: `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${sInfo.tabel_data.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${sInfo.tabel_data.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${sInfo.tabel_data.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${sInfo.tabel_data.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${sInfo.tabel_data.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${sInfo.tabel_data.us ?? 0}</div>`, 
                   rawTabel: sInfo.tabel_data, 
                   directPenaltyPoints: 0 
@@ -559,19 +558,15 @@ async function callBackend(actionName, payloadData = {}) {
       if (!myEmp) { 
           let mySheet = (allSheetInfo || []).find(s => String(s.iin).trim() === String(appState.iin).trim()) || { reports_data: [] }; 
           let myIinClean = safeIin(appState.iin);
+          let liveAtt = attMap[myIinClean] || { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0 };
           
-          // ИСПРАВЛЕНО: Точно так же обрабатываем резервный случай для текущего аккаунта
-          let rawPlanRd = (mySheet.tabel_data && mySheet.tabel_data.rd) ? String(mySheet.tabel_data.rd) : "0";
-          let planRd = rawPlanRd.includes('/') ? rawPlanRd.split('/')[1].trim() : rawPlanRd.trim();
-          if (!planRd || planRd === "0") planRd = "0";
-
-          let liveAtt = attMap[myIinClean] || { bs:0, bl:0, pr:0, ot:0, rd:0, us:0 };
+          // ИСПРАВЛЕНО: Резервный случай для текущего аккаунта переведен на строгое подтягвание из emp_attendance_days
           mySheet.tabel_data = {
               bs: liveAtt.bs,
               bl: liveAtt.bl,
               pr: liveAtt.pr,
               ot: liveAtt.ot,
-              rd: `${liveAtt.rd} / ${planRd}`,
+              rd: liveAtt.rd,
               us: liveAtt.us
           };
           localData.info = { tabel: mySheet.tabel_data, reports: mySheet.reports_data, kpiValue: kpiCfg.base, kpiDetails: [], baseKpi: kpiCfg.base, reportErrors: 0, directPenaltyPoints: 0, remarks: [], myPtsHistory: [] }; 
