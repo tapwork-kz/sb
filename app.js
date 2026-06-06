@@ -1900,17 +1900,20 @@ async function renderTabelCalendarData(iin) {
     let year = window.currentCalYear;
     let month = window.currentCalMonth;
     
-    // Блок переключения месяцев стрелками
+    // ИСПРАВЛЕНО: Стилизован блок навигации. Месяц и год в одну строку без лишних отступов, стрелки круглые и аккуратные по краям
     let navHtml = `
-<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
-    <button class="btn-gray" style="margin:0; padding: 4px 6px; border-radius: 8px; height: 32px; width: 32px; display: flex; align-items: center; justify-content: center;" onclick="adjustCalMonth('${iin}', -1)">
-        <span class="material-symbols-rounded" style="font-size: 16px;">chevron_left</span>
-    </button>
-    <b style="font-size: 13px; color: var(--text-color); flex: 1; text-align: center; white-space: nowrap;">${monthNames[month]} ${year}</b>
-    <button class="btn-gray" style="margin:0; padding: 4px 6px; border-radius: 8px; height: 32px; width: 32px; display: flex; align-items: center; justify-content: center;" onclick="adjustCalMonth('${iin}', 1)">
-        <span class="material-symbols-rounded" style="font-size: 16px;">chevron_right</span>
-    </button>
-</div>`;
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:var(--inner-bg, rgba(150,150,150,0.08)); color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', -1)">
+            <span class="material-symbols-rounded" style="font-size:20px; font-weight:bold; opacity:0.8;">chevron_left</span>
+        </button>
+        
+        <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">${monthNames[month]} ${year}</span>
+        
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:var(--inner-bg, rgba(150,150,150,0.08)); color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', 1)">
+            <span class="material-symbols-rounded" style="font-size:20px; font-weight:bold; opacity:0.8;">chevron_right</span>
+        </button>
+    </div>
+    `;
     
     // Заголовки дней недели (Пн-Вс)
     let daysOfWeek = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
