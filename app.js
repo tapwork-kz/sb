@@ -1646,15 +1646,18 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
   }
 }
 
-function generateHorizontalGrid(dataObj) { 
+function generateHorizontalGrid(dataObj, isCashier = false) { 
     if (!dataObj.headers || dataObj.headers.length === 0) return "<div style='padding:8px;text-align:center;color:gray;font-size:12px;'>Нет данных</div>"; 
     
     let pen = -1; 
-    if (window.ptsCfg) {
+    // ИСПРАВЛЕНО: Если это кассир, штрафной бейдж принудительно отключается и не выводится в ячейках
+    if (window.ptsCfg && !isCashier) {
         if (dataObj.title.includes("Ценников") || dataObj.title.includes("Ценники")) pen = window.ptsCfg.price;
         else if (dataObj.title.includes("Ревизия")) pen = window.ptsCfg.revsn;
         else if (dataObj.title.includes("уборка")) pen = window.ptsCfg.ub;
         else if (dataObj.title.includes("Отзыв")) pen = window.ptsCfg.rev;
+    } else {
+        pen = 0;
     }
     
     let penText = "";
@@ -1815,25 +1818,26 @@ function openDetails(type) {
   }
   else if (type === 'kpi') { document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date)); currentKpi.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: k.source, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); }); listHtml += "</div>"; }
   else if (type === 'report') { 
-      document.getElementById("details-title").innerText = "Мои отчеты"; 
-      listHtml = "<div style='padding-top:5px;'>"; 
-      
-      let roleStr = String(appState.role).toLowerCase();
-      let isCashier = roleStr.includes("кассир");
-      
-      // Фильтруем отчеты: если кассир, оставляем только те, где в названии есть "Отзыв"
-      let displayReports = myReports;
-      if (isCashier) {
-          displayReports = myReports.filter(rep => rep.title && rep.title.toLowerCase().includes("отзыв"));
+          document.getElementById("details-title").innerText = "Мои отчеты"; 
+          listHtml = "<div style='padding-top:5px;'>"; 
+          
+          let roleStr = String(appState.role).toLowerCase();
+          let isCashier = roleStr.includes("кассир") && !roleStr.includes("старший кассир");
+          
+          // Фильтруем отчеты: если кассир, оставляем только те, где в названии есть "Отзыв"
+          let displayReports = myReports;
+          if (isCashier) {
+              displayReports = myReports.filter(rep => rep.title && rep.title.toLowerCase().includes("отзыв"));
+          }
+          
+          if (displayReports.length > 0) {
+              // ИСПРАВЛЕНО: Передаем статус кассира в генератор сетки для скрытия бейджей
+              listHtml += displayReports.map(rep => generateHorizontalGrid(rep, isCashier)).join(''); 
+          } else {
+              listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Нет отчетов для отображения</div>";
+          }
+          listHtml += "</div>"; 
       }
-      
-      if (displayReports.length > 0) {
-          listHtml += displayReports.map(generateHorizontalGrid).join(''); 
-      } else {
-          listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Нет отчетов для отображения</div>";
-      }
-      listHtml += "</div>"; 
-  }
 else if (type === 'tabel') { 
       document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); 
       document.getElementById("details-title").innerText = "Табель / Штрафы"; 
@@ -1904,7 +1908,19 @@ function renderEmpDetailTab(tab, iin) {
       renderTabelCalendarData(iin); // Запуск асинхронной отрисовки календаря
       return;
   }
-  else if (tab === 'rep') { html = emp.reports.map(generateHorizontalGrid).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; }
+  else if (tab === 'rep') { 
+      let eRoleLow = String(emp.role || "").toLowerCase();
+      let isEmpCashier = eRoleLow.includes("кассир") && !eRoleLow.includes("старший кассир");
+      let displayReports = emp.reports || [];
+      
+      // ИСПРАВЛЕНО: При просмотре профиля кассира в админке отображаем строго только отчет «Отзыв»
+      if (isEmpCashier) {
+          displayReports = displayReports.filter(rep => rep.title && rep.title.toLowerCase().includes("отзыв"));
+      }
+      
+      // ИСПРАВЛЕНО: Передаем статус кассира для скрытия штрафных баллов с ячеек
+      html = displayReports.map(rep => generateHorizontalGrid(rep, isEmpCashier)).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; 
+  }
   else if (tab === 'pts') { 
     let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:12px; background:var(--card-bg); border:1px solid rgba(150,150,150,0.2); border-radius:12px; margin-bottom:8px;">
         <div id="flt-pts-acc" onclick="window.triggerEmpPtsReload_${iin}('filter', 'acc')" style="cursor:pointer; border-radius:8px; transition:0.2s; flex:1; width:70px; background:var(--bg-color); border:1px solid var(--border-color); display:flex; align-items:center; justify-content:center; height:36px; box-sizing:border-box; gap:4px; white-space:nowrap; overflow:hidden; padding:0 2px;">
