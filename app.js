@@ -1902,12 +1902,15 @@ async function renderTabelCalendarData(iin) {
     
     // Блок переключения месяцев стрелками
     let navHtml = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:0 2px;" class="no-swipe">
-        <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="adjustCalMonth('${iin}', -1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_left</span></button>
-        <b style="font-size:13px; color:var(--text-color);">${monthNames[month]} ${year}</b>
-        <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="adjustCalMonth('${iin}', 1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_right</span></button>
-    </div>
-    `;
+<div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+    <button class="btn-gray" style="margin:0; padding: 4px 6px; border-radius: 8px; height: 32px; width: 32px; display: flex; align-items: center; justify-content: center;" onclick="adjustCalMonth('${iin}', -1)">
+        <span class="material-symbols-rounded" style="font-size: 16px;">chevron_left</span>
+    </button>
+    <b style="font-size: 13px; color: var(--text-color); flex: 1; text-align: center; white-space: nowrap;">${monthNames[month]} ${year}</b>
+    <button class="btn-gray" style="margin:0; padding: 4px 6px; border-radius: 8px; height: 32px; width: 32px; display: flex; align-items: center; justify-content: center;" onclick="adjustCalMonth('${iin}', 1)">
+        <span class="material-symbols-rounded" style="font-size: 16px;">chevron_right</span>
+    </button>
+</div>`;
     
     // Заголовки дней недели (Пн-Вс)
     let daysOfWeek = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
@@ -2010,7 +2013,7 @@ async function renderTabelCalendarData(iin) {
     
     // ИСПРАВЛЕНО: Формат вывода РД изменен на "Факт / План" в точности как на главном экране
     let summaryHtml = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 6px 0; padding:4px 14px; background:rgba(150,150,150,0.05); border-radius:8px; gap:4px;" class="no-swipe">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 6px 0; padding:4px 20px; background:rgba(150,150,150,0.05); border-radius:8px; gap:4px;" class="no-swipe">
         <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
         <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
         <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
