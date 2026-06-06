@@ -1397,26 +1397,8 @@ function renderDashboardData(data, isSilent = false) {
   let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0; let kValEl = document.getElementById("kpi-val"); if(kValEl) kValEl.innerText = kpiValue + '%'; setKpiColor(kpiValue, document.getElementById("kpi-circle"), document.getElementById("kpi-val")); myKpiDetails = data.info?.kpiDetails || [];
   let infoTabel = document.getElementById("info-tabel"); 
   if(infoTabel) { 
+      // Возвращаем баннеру-полоске чистый первоначальный вид без аппендиксов календаря под ним
       infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${data.info?.tabel?.us ?? 0}</div>`; 
-      
-      // ИСПРАВЛЕНО: Динамически создаем блок личного круглого календаря продавца/кассира прямо под инфо-полоской
-      let userCalBox = document.getElementById("user-tabel-calendar-box");
-      if (!userCalBox) {
-          userCalBox = document.createElement("div");
-          userCalBox.id = "user-tabel-calendar-box";
-          userCalBox.style = "background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px; margin-top:12px;";
-          infoTabel.parentNode.insertBefore(userCalBox, infoTabel.nextSibling);
-      }
-      
-      // Настраиваем дефолтный месяц, если он пуст
-      if (!window.currentCalMonth || !window.currentCalYear) {
-          let d = new Date();
-          window.currentCalMonth = d.getMonth();
-          window.currentCalYear = d.getFullYear();
-      }
-      
-      // Запускаем асинхронную подгрузку и рендеринг календаря в созданный персональный бокс
-      renderTabelCalendarData(appState.iin, "user-tabel-calendar-box");
   }
 
   myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.type === "Штраф"); myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек"); window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
@@ -1793,8 +1775,39 @@ function openDetails(type) {
       }
       listHtml += "</div>"; 
   }
-  else if (type === 'tabel') { document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); document.getElementById("details-title").innerText = "Нарушения (Штрафы и Замечания)"; listHtml = "<div style='padding-top:5px;'>"; let currentFines = myMoneyFinesHistory.filter(i => isCurrentMonth(i.date)); currentFines.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); if (currentFines.length > 0) listHtml += currentFines.map(i => renderMoneyFineItem(i)).join(""); else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Штрафов в этом месяце нет</div>"; let myRemarks = JSON.parse(localStorage.getItem("dashData_" + appState.iin))?.info?.remarks || []; if (myRemarks.length > 0) { listHtml += `<div class="grid-details-title" style="color:#f39c12; margin-top:10px;">Замечания</div>` + groupAndRenderByMonth(myRemarks, r => { let authorStr = formatRemarkAuthor(r.authorName, r.authorRole); return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="color:#f39c12; font-size:12px;">${authorStr} <span style="float:right; color:gray; font-size:10px;">${r.date}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${formatRemarkText(r.details)}</div></div>`; }); } listHtml += "</div>"; }
+  else if (type === 'tabel') { 
+      document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); 
+      // ИСПРАВЛЕНО: Название заголовка раздела изменено на требуемое
+      document.getElementById("details-title").innerText = "Табель / Штрафы"; 
+      
+      // ИСПРАВЛЕНО: Календарь теперь создается на самом верху внутри личной ленты сотрудника
+      listHtml = `<div id="user-personal-calendar-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px; margin-bottom:16px;"></div>`;
+      listHtml += "<div style='padding-top:5px;'>"; 
+      
+      let currentFines = myMoneyFinesHistory.filter(i => isCurrentMonth(i.date)); 
+      currentFines.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); 
+      if (currentFines.length > 0) listHtml += currentFines.map(i => renderMoneyFineItem(i)).join(""); 
+      else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Штрафов в этом месяце нет</div>"; 
+      
+      let myRemarks = JSON.parse(localStorage.getItem("dashData_" + appState.iin))?.info?.remarks || []; 
+      if (myRemarks.length > 0) { 
+          listHtml += `<div class="grid-details-title" style="color:#f39c12; margin-top:14px;">Замечания</div>` + groupAndRenderByMonth(myRemarks, r => { let authorStr = formatRemarkAuthor(r.authorName, r.authorRole); return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="color:#f39c12; font-size:12px;">${authorStr} <span style="float:right; color:gray; font-size:10px;">${r.date}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${formatRemarkText(r.details)}</div></div>`; }); 
+      } 
+      listHtml += "</div>"; 
+  }
   document.getElementById("details-list").innerHTML = listHtml;
+
+  // ИСПРАВЛЕНО: Безопасный асинхронный запуск отрисовки личного круглого табеля под сгенерированный DOM-узел
+  if (type === 'tabel') {
+      if (!window.currentCalMonth || !window.currentCalYear) {
+          let d = new Date();
+          window.currentCalMonth = d.getMonth();
+          window.currentCalYear = d.getFullYear();
+      }
+      if (typeof renderTabelCalendarData === 'function') {
+          renderTabelCalendarData(appState.iin, "user-personal-calendar-box");
+      }
+  }
 }
 
 function openEmpKpiDetails(iin, fromDetails = false) { 
