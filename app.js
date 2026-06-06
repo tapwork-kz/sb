@@ -1395,7 +1395,29 @@ function renderDashboardData(data, isSilent = false) {
 
   let pAcc = document.getElementById("pt-acc"); if(pAcc) pAcc.innerText = data.info?.ptsAccrued ?? '-'; let pUse = document.getElementById("pt-use"); if(pUse) pUse.innerText = data.info?.ptsUsed ?? '-'; const remVal = parseFloat(String(data.info?.ptsLeft).replace(',','.')) || 0; const ptRemEl = document.getElementById("pt-rem"); if(ptRemEl) { ptRemEl.innerText = data.info?.ptsLeft ?? '-'; ptRemEl.style.color = remVal >= 0 ? "#27ae60" : "#e67e22"; } let pFin = document.getElementById("pt-fin"); if(pFin) pFin.innerText = data.info?.ptsFine ?? '-'; 
   let kpiValue = data.info?.kpiValue ?? data.info?.baseKpi ?? 0; let kValEl = document.getElementById("kpi-val"); if(kValEl) kValEl.innerText = kpiValue + '%'; setKpiColor(kpiValue, document.getElementById("kpi-circle"), document.getElementById("kpi-val")); myKpiDetails = data.info?.kpiDetails || [];
-  let infoTabel = document.getElementById("info-tabel"); if(infoTabel) { infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${data.info?.tabel?.us ?? 0}</div>`; }
+  let infoTabel = document.getElementById("info-tabel"); 
+  if(infoTabel) { 
+      infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${data.info?.tabel?.us ?? 0}</div>`; 
+      
+      // ИСПРАВЛЕНО: Динамически создаем блок личного круглого календаря продавца/кассира прямо под инфо-полоской
+      let userCalBox = document.getElementById("user-tabel-calendar-box");
+      if (!userCalBox) {
+          userCalBox = document.createElement("div");
+          userCalBox.id = "user-tabel-calendar-box";
+          userCalBox.style = "background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px; margin-top:12px;";
+          infoTabel.parentNode.insertBefore(userCalBox, infoTabel.nextSibling);
+      }
+      
+      // Настраиваем дефолтный месяц, если он пуст
+      if (!window.currentCalMonth || !window.currentCalYear) {
+          let d = new Date();
+          window.currentCalMonth = d.getMonth();
+          window.currentCalYear = d.getFullYear();
+      }
+      
+      // Запускаем асинхронную подгрузку и рендеринг календаря в созданный персональный бокс
+      renderTabelCalendarData(appState.iin, "user-tabel-calendar-box");
+  }
 
   myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.type === "Штраф"); myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек"); window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
   let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear; let monthSc = myScHistory.filter(p => p && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
@@ -1891,45 +1913,18 @@ function renderEmpDetailTab(tab, iin) {
   content.innerHTML = html;
 }
 
-// АСИНХРОННАЯ ОТРИСОВКА СЕТКИ КАЛЕНДАРЯ ТАБЕЛЯ
-async function renderTabelCalendarData(iin) {
-    let container = document.getElementById("tabel-calendar-container");
+// АСИНХРОННАЯ ОТРИСОВКА СЕТКИ КАЛЕНДАРЯ ТАБЕЛЯ (УНИВЕРСАЛЬНАЯ)
+async function renderTabelCalendarData(iin, containerId = "tabel-calendar-container") {
+    let container = document.getElementById(containerId);
     if (!container) return;
     
     let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
     let year = window.currentCalYear;
     let month = window.currentCalMonth;
     
-    // ИСПРАВЛЕНО: У кнопок стрелок полностью убран фон (background: none)
-    let navHtml = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
-        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', -1)">
-            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
-        </button>
-        
-        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
-            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">
-                ${monthNames[month]} ${year}
-            </span>
-            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
-                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
-                   onchange="window.onCalMonthPickerChange(this.value, '${iin}')">
-        </div>
-        
-        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', 1)">
-            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
-        </button>
-    </div>
-    `;
+    // Пока идут сетевые запросы, аккуратно показываем статус загрузки внутри целевого контейнера
+    container.innerHTML = `<div style="text-align:center; font-size:12px; padding:20px; color:gray;">Загрузка календаря табеля...</div>`;
     
-    // Заголовки дней недели (Пн-Вс)
-    let daysOfWeek = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-    let weekHeadersHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); text-align:center; font-size:11px; color:gray; font-weight:bold; margin-bottom:6px;">` + 
-        daysOfWeek.map(d => `<div>${d}</div>`).join("") + `</div>`;
-        
-    container.innerHTML = navHtml + weekHeadersHtml + `<div id="tabel-days-grid" style="text-align:center; font-size:12px; padding:15px 0; color:gray;">Загрузка табеля...</div>`;
-    
-    // Диапазон дат для отправки запроса в Supabase
     let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
     let lastDay = new Date(year, month + 1, 0).getDate();
     let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
@@ -1953,18 +1948,40 @@ async function renderTabelCalendarData(iin) {
         }
     } catch(e) { console.error("Ошибка загрузки дней табеля:", e); }
     
-    // Вычисляем смещение первого дня месяца
+    // ИСПРАВЛЕНО: Передаем containerId внутрь onclick кнопок, чтобы переключался нужный календарь
+    let navHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustCalMonth('${iin}', -1, '${containerId}')">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
+        </button>
+        
+        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">
+                ${monthNames[month]} ${year}
+            </span>
+            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
+                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
+                   onchange="window.onCalMonthPickerChange(this.value, '${iin}', '${containerId}')">
+        </div>
+        
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustCalMonth('${iin}', 1, '${containerId}')">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
+        </button>
+    </div>
+    `;
+    
+    let daysOfWeek = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+    let weekHeadersHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); text-align:center; font-size:11px; color:gray; font-weight:bold; margin-bottom:6px;">` + 
+        daysOfWeek.map(d => `<div>${d}</div>`).join("") + `</div>`;
+        
     let firstDayIndex = new Date(year, month, 1).getDay(); 
     let startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; 
     
     let gridHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:5px;">`;
-    
-    // Заполняем пустые клетки начала месяца
     for (let i = 0; i < startOffset; i++) {
         gridHtml += `<div></div>`;
     }
     
-    // Статусные стили и цвета
     let statusColors = {
         'РД': { color: '#27ae60', bg: 'rgba(39, 174, 96, 0.08)' }, 
         'УС': { color: '#9b59b6', bg: 'rgba(155, 89, 182, 0.08)' }, 
@@ -1977,7 +1994,6 @@ async function renderTabelCalendarData(iin) {
     
     let summary = { rd: 0, us: 0, bs: 0, bl: 0, pr: 0, ot: 0, v: 0 };
     
-    // Генерируем сетку дней
     for (let day = 1; day <= lastDay; day++) {
         let dayData = attendanceMap[day];
         let statusText = dayData ? dayData.status : "";
@@ -1999,13 +2015,11 @@ async function renderTabelCalendarData(iin) {
         }
         let hoursText = (dayData && displayHours && displayHours > 0) ? `${displayHours}ч` : "";
         
-        // ИСПРАВЛЕНО: Полностью удалена обводка у дней (border: none)
         let cellStyle = "background:var(--inner-bg, rgba(150,150,150,0.03)); color:var(--text-color); border:none;";
         if (statusText && statusColors[statusText]) {
             cellStyle = `background:${statusColors[statusText].bg}; color:${statusColors[statusText].color}; border:none;`;
         }
         
-        // ИСПРАВЛЕНО: Дни стали идеально круглыми (aspect-ratio: 1; border-radius: 50%), размеры шрифтов адаптированы под круг
         gridHtml += `
         <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1; border-radius:50%; box-sizing:border-box; padding:2px; ${cellStyle}">
             <span style="font-size:9px; font-weight:bold; opacity:0.5; margin-bottom:1px; line-height:1;">${day}</span>
@@ -2013,20 +2027,19 @@ async function renderTabelCalendarData(iin) {
             ${hoursText ? `<span style="font-size:7px; opacity:0.6; margin-top:1px; font-weight:bold; line-height:1;">${hoursText}</span>` : ''}
         </div>`;
     }
-    
     gridHtml += `</div>`;
     
     let planRd = lastDay - summary.v;
     if (planRd < 0) planRd = 0;
     
     let summaryHtml = `
-    <div style="display:flex; justify-content:space-around; align-items:center; margin:12px 0 8px 0; padding:8px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
-        <div class="tabel-item" style="color:#f39c12; font-size:12px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
-        <div class="tabel-item" style="color:#e67e22; font-size:12px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
-        <div class="tabel-item" style="color:#e74c3c; font-size:12px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
-        <div class="tabel-item" style="color:#f1c40f; font-size:12px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
-        <div class="tabel-item" style="color:#27ae60; font-size:12px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
-        <div class="tabel-item" style="color:#9b59b6; font-size:12px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
+    <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:12px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
+        <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
+        <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
+        <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
+        <div class="tabel-item" style="color:#f1c40f; font-size:11px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
+        <div class="tabel-item" style="color:#27ae60; font-size:11px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
+        <div class="tabel-item" style="color:#9b59b6; font-size:11px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
     </div>`;
     
     let legendHtml = `
@@ -2040,19 +2053,11 @@ async function renderTabelCalendarData(iin) {
         <div style="color:#7f8c8d; background:rgba(127,140,141,0.05); padding:3px; border-radius:6px;">В - Выходной</div>
     </div>`;
     
-    let daysGridEl = document.getElementById("tabel-days-grid");
-    if (daysGridEl) daysGridEl.outerHTML = gridHtml + summaryHtml + legendHtml;
+    container.innerHTML = navHtml + weekHeadersHtml + gridHtml + summaryHtml + legendHtml;
 }
-// ОБРАБОТЧИК ПРЯМОГО ВЫБОРА МЕСЯЦА И ГОДА ИЗ ПИКЕРА
-window.onCalMonthPickerChange = function(value, iin) {
-    if (!value) return;
-    let parts = value.split('-'); // Разделяет строку типа "2026-06" на ["2026", "06"]
-    window.currentCalYear = parseInt(parts[0], 10);
-    window.currentCalMonth = parseInt(parts[1], 10) - 1; // В JS месяцы идут от 0 до 11 (июнь — это index 5)
-    renderTabelCalendarData(iin);
-};
+
 // ОБРАБОТЧИК НАВИГАЦИИ СТРЕЛКАМИ С ПЕРЕХОДОМ ГОДА
-window.adjustCalMonth = function(iin, delta) {
+window.adjustCalMonth = function(iin, delta, containerId = "tabel-calendar-container") {
     window.currentCalMonth += delta;
     if (window.currentCalMonth > 11) {
         window.currentCalMonth = 0;
@@ -2061,7 +2066,16 @@ window.adjustCalMonth = function(iin, delta) {
         window.currentCalMonth = 11;
         window.currentCalYear -= 1;
     }
-    renderTabelCalendarData(iin);
+    renderTabelCalendarData(iin, containerId);
+};
+
+// ОБРАБОТЧИК ПРЯМОГО ВЫБОРА МЕСЯЦА И ГОДА ИЗ ПИКЕРА
+window.onCalMonthPickerChange = function(value, iin, containerId = "tabel-calendar-container") {
+    if (!value) return;
+    let parts = value.split('-');
+    window.currentCalYear = parseInt(parts[0], 10);
+    window.currentCalMonth = parseInt(parts[1], 10) - 1;
+    renderTabelCalendarData(iin, containerId);
 };
 
 async function executeRemark(iin, name) { let text = document.getElementById(`remark-text-${iin}`).value; if (!text) return showToast("Укажите текст замечания!", true); vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitRemark', { token: appState.token, targetIin: iin, targetName: name, text: text }); if (res.success) { showToast("Замечание отправлено!"); loadDashboard(true); closeDetails(); } else showToast(res.error, true); }
