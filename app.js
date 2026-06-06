@@ -832,8 +832,14 @@ function switchTab(tab, direction = null) {
       }
   }
 
-  let scroller = document.getElementById("scrollable-body"); 
-  if (scroller && lastActiveTab) savedScrollPos[lastActiveTab] = scroller.scrollTop;
+let scroller = document.getElementById("scrollable-body"); 
+  // ИСПРАВЛЕНО: Принудительно дублируем сохранение текущего скролла и в оперативку, и на диск перед переключением
+  if (scroller && lastActiveTab) {
+      savedScrollPos[lastActiveTab] = scroller.scrollTop;
+      if (appState.iin) {
+          localStorage.setItem("scrollPos_" + appState.iin + "_" + lastActiveTab, scroller.scrollTop);
+      }
+  }
   
   // 2. СОХРАНЯЕМ ТЕКУЩУЮ ВКЛАДКУ В ПАМЯТЬ
   if (tab !== 'details') { 
@@ -897,10 +903,11 @@ function switchTab(tab, direction = null) {
               }
           }, { passive: true });
       }
+      // ИСПРАВЛЕНО: Тайм-аут увеличен до 100мс, а восстановление проверяет поочередно ОЗУ и локальный диск для стабильности
       setTimeout(() => { 
-          let savedY = localStorage.getItem("scrollPos_" + appState.iin + "_" + tab);
-          scroller.scrollTop = savedY ? parseInt(savedY) : 0; 
-      }, 30);
+          let savedY = savedScrollPos[tab] || localStorage.getItem("scrollPos_" + (appState.iin || "") + "_" + tab);
+          scroller.scrollTop = savedY ? parseInt(savedY, 10) : 0; 
+      }, 100);
   }
 }
 
