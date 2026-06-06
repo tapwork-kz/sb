@@ -106,14 +106,20 @@
         <div id="form-swap" class="card form-dark hidden" style="padding:12px; background:transparent;">
           
           <div class="inner-block card" style="margin-bottom:12px; padding:12px; border:1px dashed var(--btn-color); background:var(--card-bg);">
-            <h3 style="margin:0 0 10px 0; font-size:14px; text-align:center;">Исправить смену за сегодня</h3>
+            <h3 style="margin:0 0 10px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">edit_calendar</span>
+              Исправить смену за сегодня
+            </h3>
             <select id="fs-fix-shift"><option value="" disabled selected>Выберите правильную смену</option><option value="09:00 - 19:00">09:00 - 19:00</option><option value="12:00 - 22:00">12:00 - 22:00</option></select>
             <button class="btn-green" onclick="submitFixShift()" style="margin-top:10px; font-size:13px; padding:10px;">Отправить исправление</button>
           </div>
           
           <div class="inner-block card" style="margin-bottom:12px; padding:12px; border:1px solid var(--border-color); background:var(--card-bg);">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
-               <h3 style="margin:0; font-size:14px;">Обмен сменами</h3>
+               <div style="display:flex; align-items:center; gap:6px;">
+                  <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">swap_horiz</span>
+                  <h3 style="margin:0; font-size:14px; text-align:left;">Обмен сменами</h3>
+               </div>
                <div style="width: 100px;">
                   <input type="text" id="fs-date" class="smart-date" data-realdate="" style="height:28px; line-height:26px; padding:0; margin:0; font-size:12px; text-align:center; background:var(--inner-bg); border:1px solid var(--border-color); border-radius:6px; color:var(--text-color); -webkit-appearance:none; appearance:none;">
                </div>
@@ -127,7 +133,10 @@
           </div>
 
           <div class="inner-block card" style="margin-bottom:12px; padding:12px; border:1px solid var(--border-color); background:var(--card-bg);">
-            <h3 style="margin:0 0 10px 0; font-size:14px; text-align:center;">Заявка в отпуск</h3>
+            <h3 style="margin:0 0 10px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px;">
+              <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
+              Заявка в отпуск
+            </h3>
             <div style="display:flex; gap:8px; margin-bottom:12px;">
               <div style="flex:1;">
                  <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Начало:</div>
