@@ -1048,34 +1048,16 @@ function renderDashboardData(data, isSilent = false) {
 
   if (isSeniorCashier) isCashier = false; 
 
-  // ИСПРАВЛЕНО: Кнопка плюс прижата к стенке вкладок (margin-right: 2px) и отображается СТРОГО только для Директоров / Супервайзеров (isDir)
+  // ИСПРАВЛЕНО: Кнопка плюс теперь видна только для должностей Директор, Супервайзер и прижата вплотную к стенке вкладок (margin-right: 2px)
   let mainTabs = document.getElementById("main-tabs");
   let admPlus = document.getElementById("nav-adm-plus-btn");
+  let isOnlyDirOrSup = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("супервайзер");
   
-  if (isDir) {
+  if (isOnlyDirOrSup) {
       if (!admPlus && mainTabs) {
           admPlus = document.createElement("div");
           admPlus.id = "nav-adm-plus-btn";
           admPlus.style = "font-size:28px; font-weight:300; color:var(--text-color); opacity:0.4; cursor:pointer; margin-right:2px; display:flex; align-items:center; justify-content:center; width:32px; height:32px; -webkit-tap-highlight-color:transparent; flex-shrink:0;";
-          admPlus.innerHTML = `<span class="material-symbols-rounded" style="font-size:28px;">add</span>`;
-          admPlus.onclick = (e) => { e.stopPropagation(); window.toggleAdminPlusMenu(); };
-          mainTabs.parentNode.insertBefore(admPlus, mainTabs);
-      }
-      if (admPlus) admPlus.style.display = "flex";
-  } else {
-      if (admPlus) admPlus.style.display = "none";
-  } 
-
-  // ИСПРАВЛЕНО: Добавление полупрозрачной кнопки плюс строго слева и вне рамки вкладок для административных ролей
-  let mainTabs = document.getElementById("main-tabs");
-  let admPlus = document.getElementById("nav-adm-plus-btn");
-  let isAnyAdmin = isDir || isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik;
-  
-  if (isAnyAdmin) {
-      if (!admPlus && mainTabs) {
-          admPlus = document.createElement("div");
-          admPlus.id = "nav-adm-plus-btn";
-          admPlus.style = "font-size:28px; font-weight:300; color:var(--text-color); opacity:0.4; cursor:pointer; margin-right:12px; display:flex; align-items:center; justify-content:center; width:32px; height:32px; -webkit-tap-highlight-color:transparent; flex-shrink:0;";
           admPlus.innerHTML = `<span class="material-symbols-rounded" style="font-size:28px;">add</span>`;
           admPlus.onclick = (e) => { e.stopPropagation(); window.toggleAdminPlusMenu(); };
           mainTabs.parentNode.insertBefore(admPlus, mainTabs);
@@ -2215,8 +2197,7 @@ window.toggleAdminPlusMenu = function() {
     
     menu = document.createElement("div");
     menu.id = "admin-plus-dropdown-menu";
-    // ИСПРАВЛЕНО: Меню сдвинуто к левому краю (left: 12px) ровно под прижатый к стенке плюс
-    menu.style = "position:fixed; top:60px; left:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:170px; animation:slide-up-fade 0.2s ease;";
+    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:170px; animation:slide-up-fade 0.2s ease;";
     menu.innerHTML = `
         <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminVacationForm();">
             <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
