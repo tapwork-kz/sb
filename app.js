@@ -2283,20 +2283,31 @@ window.toggleAdminPlusMenu = function() {
     }, 50);
 };
 
-// ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов продавцам
+// ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с сортировкой по отделам и алфавиту
 window.openAdminPointsForm = function() {
     let existingModal = document.getElementById("admin-points-modal-overlay");
     if (existingModal) existingModal.remove();
     
-    // Фильтруем и подгружаем только продавцов-консультантов
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
     let sellers = emps.filter(e => {
         let rLow = String(e.role || "").toLowerCase();
         return rLow.includes("продавец-консультант") || rLow.includes("продавец консультант");
     });
     
+    // ИСПРАВЛЕНО: Сортировка списка продавцов сначала по отделам (Цифра -> МБТ -> КБТ), а внутри отделов - строго по алфавиту
+    sellers.sort((a, b) => {
+        let dA = String(a.dept || "").toUpperCase().trim();
+        let dB = String(b.dept || "").toUpperCase().trim();
+        
+        let orderA = dA.includes("ЦИФРА") ? 1 : (dA.includes("МБТ") || dA.includes("MBT")) ? 2 : dA.includes("КБТ") ? 3 : 4;
+        let orderB = dB.includes("ЦИФРА") ? 1 : (dB.includes("МБТ") || dB.includes("MBT")) ? 2 : dB.includes("КБТ") ? 3 : 4;
+        
+        if (orderA !== orderB) return orderA - orderB;
+        return String(a.name || "").localeCompare(String(b.name || ""), "ru");
+    });
+    
     let optionsHtml = `<option value="" disabled selected>Выберите продавца</option>` + 
-        sellers.map(s => `<option value="${s.iin}">${s.name} (${s.dept || 'СЦ'})</option>`).join('');
+        sellers.map(s => `<option value="${s.iin}">${s.dept || 'СЦ'} | ${s.name}</option>`).join('');
     
     let modal = document.createElement("div");
     modal.id = "admin-points-modal-overlay";
@@ -2335,9 +2346,10 @@ window.openAdminPointsForm = function() {
     document.body.appendChild(modal);
 };
 
-// ИСПРАВЛЕНО: Валидация, присвоение типа «Вознаграждение» и отправка баллов в базу данных
+// ИСПРАВЛЕНО: Формирование развернутого описания (Кому, Сколько, Причина) для отображения в запросах и истории баллов
 window.submitAdminPoints = function() {
-    let targetIin = document.getElementById("adm-pts-seller").value;
+    let sellerSelect = document.getElementById("adm-pts-seller");
+    let targetIin = sellerSelect.value;
     let pointsVal = document.getElementById("adm-pts-val").value;
     let reasonText = document.getElementById("adm-pts-reason").value;
     
@@ -2345,14 +2357,17 @@ window.submitAdminPoints = function() {
     if (!pointsVal || parseFloat(pointsVal) <= 0) return showToast("Укажите корректное количество баллов!", true);
     if (!reasonText.trim()) return showToast("Заполните причину награждения!", true);
     
+    let chosenSellerText = sellerSelect.options[sellerSelect.selectedIndex].text;
     let modal = document.getElementById("admin-points-modal-overlay");
     if (modal) modal.remove();
     
     let ptsFormatted = "+" + parseFloat(pointsVal);
-    let meta = JSON.stringify({ points: ptsFormatted, reason: reasonText.trim() });
     
-    // Запускаем отправку с системным типом "Вознаграждение", который запишется в лог и историю баллов продавца
-    executeSubmit("Вознаграждение", reasonText.trim(), targetIin, meta, "Мотивационные баллы успешно начислены продавцу!");
+    // ИСПРАВЛЕНО: Теперь в деталях запроса явно пишется адресат и сумма баллов. Это решит проблему отображения в админ-списке и запишет операцию в лог продавца
+    let fullDetailsStr = `Кому: ${chosenSellerText} | Баллы: ${ptsFormatted} | Причина: ${reasonText.trim()}`;
+    let meta = JSON.stringify({ points: ptsFormatted, target_iin: targetIin, reason: reasonText.trim() });
+    
+    executeSubmit("Вознаграждение", fullDetailsStr, targetIin, meta, "Мотивационные баллы успешно начислены продавцу!");
 };
 
 // Отрисовка стандартного окна заявки в отпуск для интерфейса руководителя
