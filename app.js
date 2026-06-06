@@ -1902,16 +1902,16 @@ async function renderTabelCalendarData(iin) {
     
     // Блок переключения месяцев стрелками
     let navHtml = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:0 2px;" class="no-swipe">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:0 6px;" class="no-swipe">
         <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="adjustCalMonth('${iin}', -1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_left</span></button>
         <b style="font-size:13px; color:var(--text-color);">${monthNames[month]} ${year}</b>
         <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="adjustCalMonth('${iin}', 1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_right</span></button>
     </div>
     `;
     
-    // Заголовки дней недели (Пн-Вс)
+    // ИСПРАВЛЕНО: Добавлен отступ padding: 0 6px, чтобы дни недели не липли к краям стенок
     let daysOfWeek = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-    let weekHeadersHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); text-align:center; font-size:11px; color:gray; font-weight:bold; margin-bottom:6px;">` + 
+    let weekHeadersHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); text-align:center; font-size:11px; color:gray; font-weight:bold; margin-bottom:6px; padding:0 6px;">` + 
         daysOfWeek.map(d => `<div>${d}</div>`).join("") + `</div>`;
         
     container.innerHTML = navHtml + weekHeadersHtml + `<div id="tabel-days-grid" style="text-align:center; font-size:12px; padding:15px 0; color:gray;">Загрузка табеля...</div>`;
@@ -1944,7 +1944,8 @@ async function renderTabelCalendarData(iin) {
     let firstDayIndex = new Date(year, month, 1).getDay(); 
     let startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; 
     
-    let gridHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:5px;">`;
+    // ИСПРАВЛЕНО: Добавлен боковой отступ padding: 0 6px для календарной сетки дней от стенок карточки
+    let gridHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:5px; padding:0 6px;">`;
     
     // Заполняем пустые клетки начала месяца
     for (let i = 0; i < startOffset; i++) {
@@ -1962,24 +1963,25 @@ async function renderTabelCalendarData(iin) {
         'В':  { color: '#7f8c8d', bg: 'rgba(127, 140, 141, 0.06)' }  
     };
     
-    // Объявляем счетчики для подведения итогов за выбранный месяц
-    let summary = { rd: 0, us: 0, bs: 0, bl: 0, pr: 0, ot: 0 };
+    // ИСПРАВЛЕНО: Добавили счетчик "v" для точного подсчета выходных дней за выбранный месяц
+    let summary = { rd: 0, us: 0, bs: 0, bl: 0, pr: 0, ot: 0, v: 0 };
     
     // Генерируем сетку дней
     for (let day = 1; day <= lastDay; day++) {
         let dayData = attendanceMap[day];
-        let statusText = dayData ? dayData.status : "";
         
-        // Калькулируем итоги месяца на лету на основе выгруженных из базы данных
-        if (statusText) {
-            let st = String(statusText).toUpperCase().trim();
-            if (st === 'РД') summary.rd++;
-            else if (st === 'УС') summary.us++;
-            else if (st === 'БС') summary.bs++;
-            else if (st === 'БЛ') summary.bl++;
-            else if (st === 'ПР') summary.pr++;
-            else if (st === 'ОТ') summary.ot++;
-        }
+        // Если в базе нет отметки, то по умолчанию считаем этот день выходным (В)
+        let statusText = dayData ? dayData.status : "";
+        let st = statusText ? String(statusText).toUpperCase().trim() : "В";
+        
+        // Калькулируем итоги месяца на лету
+        if (st === 'РД') summary.rd++;
+        else if (st === 'УС') summary.us++;
+        else if (st === 'БС') summary.bs++;
+        else if (st === 'БЛ') summary.bl++;
+        else if (st === 'ПР') summary.pr++;
+        else if (st === 'ОТ') summary.ot++;
+        else if (st === 'В' || st === 'V') summary.v++;
         
         // Все смены 9, 12 и 13 принудительно отображаем как 10ч
         let displayHours = dayData ? dayData.hours : 0;
@@ -2003,20 +2005,24 @@ async function renderTabelCalendarData(iin) {
     
     gridHtml += `</div>`;
     
-    // Генерируем красивую горизонтальную инфо-панель итогов под календарную сетку
+    // ИСПРАВЛЕНО: Вычисляем динамический план рабочих дней (Дни месяца минус Выходные)
+    let planRd = lastDay - summary.v;
+    if (planRd < 0) planRd = 0;
+    
+    // ИСПРАВЛЕНО: Изменены внешние отступы (margin: 12px 6px 6px 6px), чтобы полоса отлепилась от краев стенок, а РД выводит "Факт / План"
     let summaryHtml = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 6px 0; padding:4px 6px; background:rgba(150,150,150,0.05); border-radius:8px; gap:4px;" class="no-swipe">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 6px 6px 6px; padding:4px 6px; background:rgba(150,150,150,0.05); border-radius:8px; gap:4px;" class="no-swipe">
         <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
         <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
         <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
         <div class="tabel-item" style="color:#f1c40f; font-size:11px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
-        <div class="tabel-item" style="color:#27ae60; font-size:11px;"><span class="tabel-lbl">РД.</span>${summary.rd}</div>
+        <div class="tabel-item" style="color:#27ae60; font-size:11px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
         <div class="tabel-item" style="color:#9b59b6; font-size:11px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
     </div>`;
     
-    // Маленькая легенда под календарем
+    // ИСПРАВЛЕНО: Добавлен боковой отступ (padding: 0 6px) для блока легенды
     let legendHtml = `
-    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-top:10px; font-size:9px; font-weight:bold; text-align:center;">
+    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-top:10px; font-size:9px; font-weight:bold; text-align:center; padding: 0 6px;">
         <div style="color:#27ae60; background:rgba(39,174,96,0.05); padding:3px; border-radius:6px;">РД - Рабочий</div>
         <div style="color:#9b59b6; background:rgba(155,89,182,0.05); padding:3px; border-radius:6px;">УС - Усиление</div>
         <div style="color:#f39c12; background:rgba(243,156,18,0.05); padding:3px; border-radius:6px;">БС - Личный</div>
