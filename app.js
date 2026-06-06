@@ -526,10 +526,21 @@ async function callBackend(actionName, payloadData = {}) {
               sInfo.reports_data.forEach(rep => {
                   emp.reportErrors += rep.errors; 
                   let ptPenPerErr = 0; let kpiPenPerErr = 0;
-                  if (rep.title.includes("Ценников") || rep.title.includes("Ценники")) { ptPenPerErr = ptsCfg.price; kpiPenPerErr = kpiCfg.price; } 
-                  else if (rep.title.includes("Ревизия")) { ptPenPerErr = ptsCfg.revsn; kpiPenPerErr = kpiCfg.revsn; } 
-                  else if (rep.title.includes("уборка")) { ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; } 
-                  else if (rep.title.includes("Отзыв")) { ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; }
+                  
+                  // ИСПРАВЛЕНО: Приводим название отчета к нижнему регистру для бронебойного поиска совпадений
+                  let titleLow = String(rep.title || "").toLowerCase();
+                  
+                  if (titleLow.includes("ценник") || titleLow.includes("ценников")) { 
+                      ptPenPerErr = ptsCfg.price; kpiPenPerErr = kpiCfg.price; 
+                  } else if (titleLow.includes("ревизия") || titleLow.includes("ревизи")) { 
+                      ptPenPerErr = ptsCfg.revsn; kpiPenPerErr = kpiCfg.revsn; 
+                  } else if (titleLow.includes("уборка") || titleLow.includes("уборк")) { 
+                      ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; 
+                  } else if (titleLow.includes("отзыв") || titleLow.includes("отзывы")) { 
+                      // Теперь "Отзыв" полноценно участвует в автоматических штрафах по баллам при отсутствии отчетов
+                      ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; 
+                  }
+                  
                   let totalKpiPenalty = rep.errors * kpiPenPerErr;
                   if (totalKpiPenalty !== 0) { 
                       emp.kpi += totalKpiPenalty; 
