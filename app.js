@@ -2020,13 +2020,13 @@ async function renderTabelCalendarData(iin) {
     if (planRd < 0) planRd = 0;
     
     let summaryHtml = `
-    <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:12px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
-        <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
-        <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
-        <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
-        <div class="tabel-item" style="color:#f1c40f; font-size:11px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
-        <div class="tabel-item" style="color:#27ae60; font-size:11px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
-        <div class="tabel-item" style="color:#9b59b6; font-size:11px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
+    <div style="display:flex; justify-content:space-around; align-items:center; margin:12px 0 8px 0; padding:8px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
+        <div class="tabel-item" style="color:#f39c12; font-size:12px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
+        <div class="tabel-item" style="color:#e67e22; font-size:12px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
+        <div class="tabel-item" style="color:#e74c3c; font-size:12px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
+        <div class="tabel-item" style="color:#f1c40f; font-size:12px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
+        <div class="tabel-item" style="color:#27ae60; font-size:12px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
+        <div class="tabel-item" style="color:#9b59b6; font-size:12px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
     </div>`;
     
     let legendHtml = `
