@@ -1787,8 +1787,7 @@ function openEmpDetails(iin) {
   document.getElementById("details-kpi-circle-container").innerHTML = "";
   
   // ИСПРАВЛЕНО: Добавлен таб "Табель" на первое место, настроена адаптивная прокрутка кнопок без конфликтов со свайпами страницы
-  // ИСПРАВЛЕНО: Сохранена плавная прокрутка, объединены вкладки Табель и Нарушения в один общий раздел
-  let tabsHtml = `<div style="display:flex; gap:4px; margin-bottom:12px; padding:0 4px; overflow-x:auto;" class="no-swipe"><button id="emp-tab-rep" class="admin-flt" onclick="renderEmpDetailTab('rep', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Отчет</button><button id="emp-tab-pts" class="admin-flt" onclick="renderEmpDetailTab('pts', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Баллы</button><button id="emp-tab-viol" class="admin-flt" onclick="renderEmpDetailTab('viol', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Табель / Штрафы</button></div><div id="emp-detail-content" class="slide-up-fade"></div>`;
+  let tabsHtml = `<div style="display:flex; gap:4px; margin-bottom:12px; padding:0 4px; overflow-x:auto;" class="no-swipe"><button id="emp-tab-tabel" class="admin-flt" onclick="renderEmpDetailTab('tabel', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Табель</button><button id="emp-tab-rep" class="admin-flt" onclick="renderEmpDetailTab('rep', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Отчет</button><button id="emp-tab-pts" class="admin-flt" onclick="renderEmpDetailTab('pts', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Баллы</button><button id="emp-tab-viol" class="admin-flt" onclick="renderEmpDetailTab('viol', '${iin}')" style="font-size:12px; padding:6px 10px; min-width:max-content;">Нарушения</button></div><div id="emp-detail-content" class="slide-up-fade"></div>`;
   
   document.getElementById("details-list").innerHTML = tabsHtml; 
   renderEmpDetailTab(window.currentEmpDetailTab || 'tabel', iin); 
@@ -1883,36 +1882,13 @@ function renderEmpDetailTab(tab, iin) {
     }; setTimeout(() => window[`triggerEmpPtsReload_${iin}`]('search'), 100);
   }
   else if (tab === 'viol') {
-    // Инициализируем переменные месяца и года текущей датой, если они пусты
-    if (!window.currentCalMonth || !window.currentCalYear) {
-        let d = new Date();
-        window.currentCalMonth = d.getMonth();
-        window.currentCalYear = d.getFullYear();
-    }
-
-    // 1. Первым делом вставляем блок календаря табеля на самый верх вкладки
-    html += `<div id="tabel-calendar-container" style="background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px; margin-bottom:12px;"></div>`;
-
-    // 2. Затем выводим кнопки управления штрафами и замечаниями, а также формы
-    html += `<div style="display:flex; gap:8px; margin-bottom:12px; margin-top:12px;"><button class="btn-red" onclick="document.getElementById('fine-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0; flex:1;">Выписать штраф</button><button class="btn-orange" onclick="document.getElementById('remark-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0; flex:1;">Сделать замечание</button></div>`;
+    html = `<div style="display:flex; gap:8px; margin-bottom:12px;"><button class="btn-red" onclick="document.getElementById('fine-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0;">Выписать штраф</button><button class="btn-orange" onclick="document.getElementById('remark-form-${iin}').classList.toggle('hidden')" style="padding:10px; font-size:12px; margin:0;">Сделать замечание</button></div>`;
     html += `<div id="fine-form-${iin}" class="hidden inner-block slide-up-fade" style="border:1px solid #e74c3c; background:rgba(231, 76, 60, 0.05);"><input type="text" id="fine-reason-${iin}" placeholder="Причина штрафа..." style="box-sizing: border-box; width:100%; height:36px; margin-top:0; margin-bottom:8px; font-size:13px; background:var(--card-bg);"><div style="display:flex; gap:8px; margin-bottom:8px;"><input type="number" id="fine-amount-${iin}" placeholder="0 (Баллы)" style="box-sizing: border-box; height:36px; margin:0; flex:1; font-size:14px; background:var(--card-bg);"><input type="number" id="fine-money-${iin}" placeholder="0 (Сумма ₸)" style="box-sizing: border-box; height:36px; margin:0; flex:1; font-size:14px; background:var(--card-bg);"></div><button class="btn-red" onclick="executeFine('${iin}', '${emp.name}')" style="padding:8px; font-size:12px; margin:0;">Подтвердить штраф</button></div>`;
     html += `<div id="remark-form-${iin}" class="hidden inner-block slide-up-fade" style="border:1px solid #f39c12; background:rgba(243, 156, 18, 0.05);"><textarea id="remark-text-${iin}" placeholder="Текст замечания..." style="box-sizing: border-box; width:100%; height:60px; margin-bottom:8px; border-radius:8px; padding:8px; border:1px solid var(--border-color); background:var(--card-bg); color:var(--text-color); font-family:inherit; resize:none;"></textarea><button class="btn-orange" onclick="executeRemark('${iin}', '${emp.name}')" style="padding:8px; font-size:12px; margin:0;">Отправить замечание</button></div>`;
-    
-    // 3. Формируем списки штрафов и замечаний, которые расположатся в самом низу
-    let allFines = (emp.ptsHistory || []).filter(p => p.type === "Штраф"); 
-    let finesHtml = groupAndRenderByMonth(allFines, p => renderMoneyFineItem({...p, moneyFine: parseFloat(String(p.moneyFine).replace(',', '.')) || 0})); 
-    let remarksHtml = groupAndRenderByMonth((emp.remarks || []), r => { let desc = formatRemarkText(r.details); let authorStr = formatRemarkAuthor(r.authorName, r.authorRole); return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="font-size:12px;"><b style="color:#f39c12;">${authorStr}</b> <span style="float:right; color:gray; font-size:10px;">${r.date || ''}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${desc}</div></div>`; });
-    
-    if (allFines.length > 0) html += `<div class="grid-details-title" style="color:#e74c3c; margin-top:14px;">Штрафы (Сумма)</div>${finesHtml}`; 
-    if ((emp.remarks || []).length > 0) html += `<div class="grid-details-title" style="color:#f39c12; margin-top:14px;">Замечания</div>${remarksHtml}`; 
-    if (allFines.length === 0 && (emp.remarks || []).length === 0) html += `<p style='text-align:center;color:gray;font-size:12px; margin-top:15px;'>Нарушений нет</p>`;
-    
-    content.innerHTML = html;
-    
-    // 4. Запускаем асинхронную загрузку дней табеля из Supabase именно для выбранного сотрудника
-    renderTabelCalendarData(iin);
-    return;
+    let allFines = (emp.ptsHistory || []).filter(p => p.type === "Штраф"); let finesHtml = groupAndRenderByMonth(allFines, p => renderMoneyFineItem({...p, moneyFine: parseFloat(String(p.moneyFine).replace(',', '.')) || 0})); let remarksHtml = groupAndRenderByMonth((emp.remarks || []), r => { let desc = formatRemarkText(r.details); let authorStr = formatRemarkAuthor(r.authorName, r.authorRole); let d = r.date ? String(r.date) : ""; return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="font-size:12px;"><b style="color:#f39c12;">${authorStr}</b> <span style="float:right; color:gray; font-size:10px;">${r.date}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${desc}</div></div>`; });
+    if (allFines.length > 0) html += `<div class="grid-details-title" style="color:#e74c3c; margin-top:10px;">Штрафы (Сумма)</div>${finesHtml}`; if ((emp.remarks || []).length > 0) html += `<div class="grid-details-title" style="color:#f39c12; margin-top:10px;">Замечания</div>${remarksHtml}`; if (allFines.length === 0 && (emp.remarks || []).length === 0) html += `<p style='text-align:center;color:gray;font-size:12px; margin-top:15px;'>Нарушений нет</p>`;
   }
+  content.innerHTML = html;
 }
 
 // АСИНХРОННАЯ ОТРИСОВКА СЕТКИ КАЛЕНДАРЯ ТАБЕЛЯ
@@ -1924,12 +1900,12 @@ async function renderTabelCalendarData(iin) {
     let year = window.currentCalYear;
     let month = window.currentCalMonth;
     
-    // ИСПРАВЛЕНО: Добавлен префикс window. в onclick для 100% стабильности вызова на смартфонах
+    // Блок переключения месяцев стрелками
     let navHtml = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px; padding:0 2px;" class="no-swipe">
-        <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="window.adjustCalMonth('${iin}', -1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_left</span></button>
+        <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="adjustCalMonth('${iin}', -1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_left</span></button>
         <b style="font-size:13px; color:var(--text-color);">${monthNames[month]} ${year}</b>
-        <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="window.adjustCalMonth('${iin}', 1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_right</span></button>
+        <button class="btn-gray" style="margin:0; padding:4px 10px; border-radius:8px; height:32px; display:flex; align-items:center;" onclick="adjustCalMonth('${iin}', 1)"><span class="material-symbols-rounded" style="font-size:18px;">chevron_right</span></button>
     </div>
     `;
     
@@ -1978,7 +1954,7 @@ async function renderTabelCalendarData(iin) {
     // Статусные стили и цвета
     let statusColors = {
         'РД': { color: '#27ae60', bg: 'rgba(39, 174, 96, 0.08)' }, 
-        'УС': { color: '#9b59b6', bg: 'rgba(155, 89, 182, 0.08)' }, // Фиолетовый цвет переработки
+        'УС': { color: '#9b59b6', bg: 'rgba(155, 89, 182, 0.08)' }, 
         'БС': { color: '#f39c12', bg: 'rgba(243, 156, 18, 0.08)' }, 
         'БЛ': { color: '#e67e22', bg: 'rgba(230, 126, 34, 0.08)' }, 
         'ПР': { color: '#e74c3c', bg: 'rgba(231, 76, 60, 0.08)' }, 
@@ -1986,10 +1962,24 @@ async function renderTabelCalendarData(iin) {
         'В':  { color: '#7f8c8d', bg: 'rgba(127, 140, 141, 0.06)' }  
     };
     
+    // Объявляем счетчики для подведения итогов за выбранный месяц
+    let summary = { rd: 0, us: 0, bs: 0, bl: 0, pr: 0, ot: 0 };
+    
     // Генерируем сетку дней
     for (let day = 1; day <= lastDay; day++) {
         let dayData = attendanceMap[day];
         let statusText = dayData ? dayData.status : "";
+        
+        // Калькулируем итоги месяца на лету на основе выгруженных из базы данных
+        if (statusText) {
+            let st = String(statusText).toUpperCase().trim();
+            if (st === 'РД') summary.rd++;
+            else if (st === 'УС') summary.us++;
+            else if (st === 'БС') summary.bs++;
+            else if (st === 'БЛ') summary.bl++;
+            else if (st === 'ПР') summary.pr++;
+            else if (st === 'ОТ') summary.ot++;
+        }
         
         // Все смены 9, 12 и 13 принудительно отображаем как 10ч
         let displayHours = dayData ? dayData.hours : 0;
@@ -2013,7 +2003,18 @@ async function renderTabelCalendarData(iin) {
     
     gridHtml += `</div>`;
     
-    // Легенда под календарем
+    // Генерируем красивую горизонтальную инфо-панель итогов под календарную сетку
+    let summaryHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 6px 0; padding:4px 6px; background:rgba(150,150,150,0.05); border-radius:8px; gap:4px;" class="no-swipe">
+        <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
+        <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
+        <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
+        <div class="tabel-item" style="color:#f1c40f; font-size:11px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
+        <div class="tabel-item" style="color:#27ae60; font-size:11px;"><span class="tabel-lbl">РД.</span>${summary.rd}</div>
+        <div class="tabel-item" style="color:#9b59b6; font-size:11px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
+    </div>`;
+    
+    // Маленькая легенда под календарем
     let legendHtml = `
     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-top:10px; font-size:9px; font-weight:bold; text-align:center;">
         <div style="color:#27ae60; background:rgba(39,174,96,0.05); padding:3px; border-radius:6px;">РД - Рабочий</div>
@@ -2026,7 +2027,7 @@ async function renderTabelCalendarData(iin) {
     </div>`;
     
     let daysGridEl = document.getElementById("tabel-days-grid");
-    if (daysGridEl) daysGridEl.outerHTML = gridHtml + legendHtml;
+    if (daysGridEl) daysGridEl.outerHTML = gridHtml + summaryHtml + legendHtml;
 }
 
 // ОБРАБОТЧИК НАВИГАЦИИ СТРЕЛКАМИ С ПЕРЕХОДОМ ГОДА
