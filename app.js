@@ -162,7 +162,7 @@ function generateDatePanelHTML(idPrefix, onChangeFuncName, extraHtml = "") {
     // Формируем блок с баллами (extraHtml), если он есть, отделяя его тонкой линией снизу
     let extraSection = extraHtml ? `<div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border-color);">${extraHtml}</div>` : "";
     
-    return `<div class="inner-block card date-panel-wrapper" style="padding:1px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;">${extraSection}<div class="no-swipe" style="display:flex; gap:6px; align-items:center; justify-content:space-between; width:100%;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; min-width:0; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; height:36px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:13px; letter-spacing:-0.5px; -webkit-appearance:none; appearance:none;"><span style="color:gray; font-weight:bold; font-size:16px; flex-shrink:0; margin:0 2px;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; min-width:0; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; height:36px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:13px; letter-spacing:-0.5px; -webkit-appearance:none; appearance:none;"><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><div style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none; box-sizing:border-box;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></div></div><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><div style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none; box-sizing:border-box;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></div></div></div></div>`;
+    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;">${extraSection}<div class="no-swipe" style="display:flex; gap:6px; align-items:center; justify-content:space-between; width:100%;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; min-width:0; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; height:36px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:13px; letter-spacing:-0.5px; -webkit-appearance:none; appearance:none;"><span style="color:gray; font-weight:bold; font-size:16px; flex-shrink:0; margin:0 2px;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; min-width:0; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; height:36px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:13px; letter-spacing:-0.5px; -webkit-appearance:none; appearance:none;"><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><div style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none; box-sizing:border-box;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></div></div><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><div style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none; box-sizing:border-box;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></div></div></div></div>`;
 }
 
 function setPanelDates(type, val, idPrefix, reloadFn) {
@@ -720,6 +720,31 @@ document.addEventListener("DOMContentLoaded", async () => {
           text-align: center; display: flex; align-items: center; justify-content: center; min-height: 34px;
         }
         input[type="date"], input[type="month"] { -webkit-appearance: listbox !important; appearance: auto !important; text-align: center; }
+        
+        /* ИСПРАВЛЕНО: Убираем пустые рамки и гигантские пустоты во вкладке создания заявок (Раздел плюс) */
+        #content-create .card, #content-create .inner-block,
+        #content-time .card, #content-time .inner-block,
+        #info-dashboard .card, #info-dashboard .inner-block {
+          padding: 6px 10px !important;
+          margin-bottom: 8px !important;
+        }
+        
+        /* Сжимаем отступы вокруг заголовков форм */
+        #content-create h3, #content-create h4, #content-create .grid-details-title {
+          margin-top: 2px !important;
+          margin-bottom: 6px !important;
+          font-size: 13px !important;
+        }
+        
+        /* Убираем гигантские поля у инпутов, селекторов и кнопок внутри карточек */
+        #content-create input, #content-create select, #content-create textarea {
+          margin-top: 2px !important;
+          margin-bottom: 4px !important;
+        }
+        #content-create button {
+          margin-top: 4px !important;
+          margin-bottom: 2px !important;
+        }
       `;
       document.head.appendChild(dateStyle);
 
