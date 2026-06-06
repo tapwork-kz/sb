@@ -720,31 +720,6 @@ document.addEventListener("DOMContentLoaded", async () => {
           text-align: center; display: flex; align-items: center; justify-content: center; min-height: 34px;
         }
         input[type="date"], input[type="month"] { -webkit-appearance: listbox !important; appearance: auto !important; text-align: center; }
-        
-        /* ИСПРАВЛЕНО: Убираем пустые рамки и гигантские пустоты во вкладке создания заявок (Раздел плюс) */
-        #content-create .card, #content-create .inner-block,
-        #content-time .card, #content-time .inner-block,
-        #info-dashboard .card, #info-dashboard .inner-block {
-          padding: 6px 10px !important;
-          margin-bottom: 8px !important;
-        }
-        
-        /* Сжимаем отступы вокруг заголовков форм */
-        #content-create h3, #content-create h4, #content-create .grid-details-title {
-          margin-top: 2px !important;
-          margin-bottom: 6px !important;
-          font-size: 13px !important;
-        }
-        
-        /* Убираем гигантские поля у инпутов, селекторов и кнопок внутри карточек */
-        #content-create input, #content-create select, #content-create textarea {
-          margin-top: 2px !important;
-          margin-bottom: 4px !important;
-        }
-        #content-create button {
-          margin-top: 4px !important;
-          margin-bottom: 2px !important;
-        }
       `;
       document.head.appendChild(dateStyle);
 
