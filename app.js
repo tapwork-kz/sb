@@ -1901,13 +1901,22 @@ async function renderTabelCalendarData(iin) {
     let month = window.currentCalMonth;
     
     // ИСПРАВЛЕНО: Стилизован блок навигации. Месяц и год в одну строку без лишних отступов, стрелки круглые и аккуратные по краям
+    // ИСПРАВЛЕНО: Название месяца сделано кликабельным. При тапе открывается нативный выбор месяца и года
     let navHtml = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
         <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:var(--inner-bg, rgba(150,150,150,0.08)); color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', -1)">
             <span class="material-symbols-rounded" style="font-size:20px; font-weight:bold; opacity:0.8;">chevron_left</span>
         </button>
         
-        <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">${monthNames[month]} ${year}</span>
+        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:4px 10px; background:var(--inner-bg, rgba(150,150,150,0.05)); border-radius:8px;">
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">
+                ${monthNames[month]} ${year} <span style="font-size:9px; opacity:0.4; margin-left:3px; vertical-align:middle;">▼</span>
+            </span>
+            <!-- Полностью прозрачный нативный инпут поверх текста для вызова системного пикера -->
+            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
+                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
+                   onchange="window.onCalMonthPickerChange(this.value, '${iin}')">
+        </div>
         
         <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:var(--inner-bg, rgba(150,150,150,0.08)); color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', 1)">
             <span class="material-symbols-rounded" style="font-size:20px; font-weight:bold; opacity:0.8;">chevron_right</span>
@@ -2040,7 +2049,14 @@ async function renderTabelCalendarData(iin) {
     let daysGridEl = document.getElementById("tabel-days-grid");
     if (daysGridEl) daysGridEl.outerHTML = gridHtml + summaryHtml + legendHtml;
 }
-
+// ОБРАБОТЧИК ПРЯМОГО ВЫБОРА МЕСЯЦА И ГОДА ИЗ ПИКЕРА
+window.onCalMonthPickerChange = function(value, iin) {
+    if (!value) return;
+    let parts = value.split('-'); // Разделяет строку типа "2026-06" на ["2026", "06"]
+    window.currentCalYear = parseInt(parts[0], 10);
+    window.currentCalMonth = parseInt(parts[1], 10) - 1; // В JS месяцы идут от 0 до 11 (июнь — это index 5)
+    renderTabelCalendarData(iin);
+};
 // ОБРАБОТЧИК НАВИГАЦИИ СТРЕЛКАМИ С ПЕРЕХОДОМ ГОДА
 window.adjustCalMonth = function(iin, delta) {
     window.currentCalMonth += delta;
