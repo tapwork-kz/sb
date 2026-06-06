@@ -833,14 +833,14 @@ function switchTab(tab, direction = null) {
   }
 
 let scroller = document.getElementById("scrollable-body"); 
-  // ИСПРАВЛЕНО: Принудительно дублируем сохранение текущего скролла и в оперативку, и на диск перед переключением
-  if (scroller && lastActiveTab) {
-      savedScrollPos[lastActiveTab] = scroller.scrollTop;
-      if (appState.iin) {
-          localStorage.setItem("scrollPos_" + appState.iin + "_" + lastActiveTab, scroller.scrollTop);
-      }
+  // ИСПРАВЛЕНО: Запоминаем позицию предыдущей вкладки перед переключением в уникальную переменную
+  if (scroller && window.currentActiveTab && appState.iin) {
+      localStorage.setItem("scrollPos_" + appState.iin + "_" + window.currentActiveTab, scroller.scrollTop);
   }
   
+  // Переключаем маркер текущего экрана на целевой (включая details)
+  window.currentActiveTab = tab;
+
   // 2. СОХРАНЯЕМ ТЕКУЩУЮ ВКЛАДКУ В ПАМЯТЬ
   if (tab !== 'details') { 
       lastActiveTab = tab; 
@@ -866,10 +866,9 @@ let scroller = document.getElementById("scrollable-body");
   let isZavSklad = roleStr.includes("заведующий складом"); 
   let isInfoConsultant = roleStr.includes("инфо-консультант");
   let isSeniorCashier = roleStr.includes("старший кассир"); 
-  let isGruzchik = roleStr.includes("грузчик"); // ДОБАВЛЕНО
+  let isGruzchik = roleStr.includes("грузчик"); 
   let isCashier = roleStr.includes("кассир") && !isSeniorCashier; 
   
-  // ИСПРАВЛЕНО: Все менеджерские роли и грузчик надежно исключены из обычных продавцов
   let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier && !isGruzchik;
   
   let isCreateTabActive = (tab === 'create'); let isAnyFormActive = isCreateTabActive && document.getElementById("menu-list").classList.contains("hidden"); let dash = document.getElementById("info-dashboard"); 
@@ -884,7 +883,6 @@ let scroller = document.getElementById("scrollable-body");
   if(tab === 'adm-outs') renderAdminOuts(); 
   
   if(tab === 'adm-main') { 
-      // ИСПРАВЛЕНО: Для Старшего кассира, Инфо-консультанта и Завсклада сохраняем подвкладку "Смена"
       if (typeof window.currentAdminMainView === 'undefined' || !window.currentAdminMainView) { 
           window.currentAdminMainView = 'plan'; 
       } 
@@ -893,21 +891,20 @@ let scroller = document.getElementById("scrollable-body");
   
   if(tab === 'adm-inbox') renderAdminHistory(currentHistFilter);
   
-  // 4. ВОССТАНОВЛЕНИЕ И ТРЕКИНГ СКРОЛЛА
+  // 4. ТРЕКИНГ И ДИНАМИЧЕСКОЕ СОХРАНЕНИЕ СКРОЛЛА ПО НАСТОЯЩЕЙ ВКЛАДКЕ
   if (scroller) { 
       if (!window.scrollListenerAdded) {
           window.scrollListenerAdded = true;
           scroller.addEventListener("scroll", () => {
-              if (lastActiveTab && appState.iin) {
-                  localStorage.setItem("scrollPos_" + appState.iin + "_" + lastActiveTab, scroller.scrollTop);
+              if (window.currentActiveTab && appState.iin) {
+                  localStorage.setItem("scrollPos_" + appState.iin + "_" + window.currentActiveTab, scroller.scrollTop);
               }
           }, { passive: true });
       }
-      // ИСПРАВЛЕНО: Тайм-аут увеличен до 100мс, а восстановление проверяет поочередно ОЗУ и локальный диск для стабильности
       setTimeout(() => { 
-          let savedY = savedScrollPos[tab] || localStorage.getItem("scrollPos_" + (appState.iin || "") + "_" + tab);
+          let savedY = localStorage.getItem("scrollPos_" + (appState.iin || "") + "_" + tab);
           scroller.scrollTop = savedY ? parseInt(savedY, 10) : 0; 
-      }, 100);
+      }, 50);
   }
 }
 
@@ -2390,6 +2387,15 @@ function renderAdminEmps(dept, btnElement) {
        });
        
        listContent.innerHTML = aupHtml || "<p style='color:gray; font-size:12px; text-align:center;'>Персонал не найден</p>";
+   }
+
+   // ИСПРАВЛЕНО: Бронебойное восстановление скролла списка сотрудников сразу после его перерисовки из базы данных
+   if (window.currentActiveTab === 'adm-main') {
+       let savedY = localStorage.getItem("scrollPos_" + (appState.iin || "") + "_adm-main");
+       let scrollerEl = document.getElementById("scrollable-body");
+       if (scrollerEl && savedY) {
+           setTimeout(() => { scrollerEl.scrollTop = parseInt(savedY, 10); }, 30);
+       }
    }
 }
 
