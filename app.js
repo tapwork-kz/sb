@@ -1775,28 +1775,23 @@ function openDetails(type) {
       }
       listHtml += "</div>"; 
   }
-  else if (type === 'tabel') { 
+else if (type === 'tabel') { 
       document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); 
-      document.getElementById("details-title").innerText = "Табель"; 
+      document.getElementById("details-title").innerText = "Табель / Штрафы"; 
       
-      // ИСПРАВЛЕНО: Создаем пустые контейнеры для календаря и динамического списка нарушений
-      listHtml = `<div id="user-personal-calendar-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px; margin-bottom:16px;"></div>`;
-      listHtml += `<div id="user-personal-violations-list" style="padding-top:5px;"></div>`; 
+      // ИСПРАВЛЕНО: Готовим чистый контейнер под календарь (нарушения подгрузятся внутрь него автоматически ниже)
+      listHtml = `<div id="user-personal-calendar-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px;"></div>`;
+      
+      setTimeout(() => {
+          if (!window.currentCalMonth || !window.currentCalYear) {
+              let d = new Date();
+              window.currentCalMonth = d.getMonth();
+              window.currentCalYear = d.getFullYear();
+          }
+          renderTabelCalendarData(appState.iin, "user-personal-calendar-box");
+      }, 50);
   }
   document.getElementById("details-list").innerHTML = listHtml;
-
-  // ИСПРАВЛЕНО: Запуск первоначального рендеринга данных табеля и нарушений в личной карточке
-  if (type === 'tabel') {
-      if (!window.currentCalMonth || !window.currentCalYear) {
-          let d = new Date();
-          window.currentCalMonth = d.getMonth();
-          window.currentCalYear = d.getFullYear();
-      }
-      if (typeof renderTabelCalendarData === 'function') {
-          renderTabelCalendarData(appState.iin, "user-personal-calendar-box");
-      }
-  }
-}
 
   // ИСПРАВЛЕНО: Безопасный асинхронный запуск отрисовки личного круглого табеля под сгенерированный DOM-узел
   if (type === 'tabel') {
@@ -2067,7 +2062,43 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
         <div style="color:#7f8c8d; background:rgba(127,140,141,0.05); padding:3px; border-radius:6px;">В - Выходной</div>
     </div>`;
     
-    container.innerHTML = navHtml + weekHeadersHtml + gridHtml + summaryHtml + legendHtml;
+    // ИСПРАВЛЕНО: Динамический сбор, фильтрация и рендеринг нарушений (штрафов и замечаний) строго за выбранный месяц
+    let targetMonthStr = ("0" + (month + 1)).slice(-2) + "." + year;
+    let finesSource = [];
+    let remarksSource = [];
+    
+    let empMatch = (typeof window.adminEmployeesGlobal !== 'undefined' && window.adminEmployeesGlobal) ? window.adminEmployeesGlobal.find(e => String(e.iin).trim() === String(iin).trim()) : null;
+    if (empMatch) {
+        finesSource = (empMatch.ptsHistory || []).filter(p => p.type === "Штраф");
+        remarksSource = empMatch.remarks || [];
+    } else {
+        finesSource = (typeof myMoneyFinesHistory !== 'undefined') ? myMoneyFinesHistory : [];
+        let dashDataStr = localStorage.getItem("dashData_" + (window.appState?.iin || ""));
+        remarksSource = dashDataStr ? (JSON.parse(dashDataStr)?.info?.remarks || []) : [];
+    }
+    
+    let currentFines = finesSource.filter(i => i && typeof i.date === 'string' && i.date.includes(targetMonthStr));
+    currentFines.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+    
+    let violHtml = `<div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--border-color);">`;
+    if (currentFines.length > 0) {
+        violHtml += `<div class="grid-details-title" style="color:#e74c3c; margin-top:4px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Штрафы (Сумма)</div>` + currentFines.map(i => renderMoneyFineItem(i)).join("");
+    } else {
+        violHtml += `<div style="padding:12px; text-align:center; color:gray; font-size:12px;">Штрафов в этом месяце нет</div>`;
+    }
+    
+    let currentRemarks = remarksSource.filter(r => r && typeof r.date === 'string' && r.date.includes(targetMonthStr));
+    currentRemarks.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+    
+    if (currentRemarks.length > 0) {
+        violHtml += `<div class="grid-details-title" style="color:#f39c12; margin-top:14px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Замечания</div>` + currentRemarks.map(r => {
+            let authorStr = formatRemarkAuthor(r.authorName, r.authorRole);
+            return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="color:#f39c12; font-size:12px;">${authorStr} <span style="float:right; color:gray; font-size:10px;">${r.date}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${formatRemarkText(r.details)}</div></div>`;
+        }).join("");
+    }
+    violHtml += `</div>`;
+    
+    container.innerHTML = navHtml + weekHeadersHtml + gridHtml + summaryHtml + legendHtml + violHtml;
 }
 
 // ОБРАБОТЧИК НАВИГАЦИИ СТРЕЛКАМИ С ПЕРЕХОДОМ ГОДА
