@@ -1057,7 +1057,7 @@ function renderDashboardData(data, isSilent = false) {
       if (!admPlus && mainTabs) {
           admPlus = document.createElement("div");
           admPlus.id = "nav-adm-plus-btn";
-          admPlus.style = "font-size:28px; font-weight:300; color:var(--text-color); opacity:0.4; cursor:pointer; margin-right:2px; display:flex; align-items:center; justify-content:center; width:32px; height:32px; -webkit-tap-highlight-color:transparent; flex-shrink:0;";
+          admPlus.style = "font-size:28px; font-weight:300; color:var(--text-color); opacity:0.4; cursor:pointer; margin-right:1px; display:flex; align-items:center; justify-content:center; width:32px; height:32px; -webkit-tap-highlight-color:transparent; flex-shrink:0;";
           admPlus.innerHTML = `<span class="material-symbols-rounded" style="font-size:28px;">add</span>`;
           admPlus.onclick = (e) => { e.stopPropagation(); window.toggleAdminPlusMenu(); };
           mainTabs.parentNode.insertBefore(admPlus, mainTabs);
@@ -2391,14 +2391,22 @@ function renderAdminEmps(dept, btnElement) {
    let container = document.getElementById("admin-emp-list"); 
    let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear;
    
-   // Переключатель подразделов на самом верху (отступы минимизированы)
-   let tabsHtml = `
-   <div class="no-swipe" style="display:flex; gap:6px; margin-bottom:8px; padding:0 4px;">
-       <button class="admin-flt ${window.currentEmpSubTab === 'sellers' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='sellers'; renderAdminEmps(currentEmpDept, null);" style="flex:1;">Продавцы</button>
-       <button class="admin-flt ${window.currentEmpSubTab === 'aup' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='aup'; renderAdminEmps(currentEmpDept, null);" style="flex:1;">АУП / Персонал</button>
-   </div>
-   <div id="emp-sub-list-content"></div>
-   `;
+   // ИСПРАВЛЕНО: Проверяем роль. Если не Директор/Супервайзер — принудительно включаем "sellers" и скрываем переключатели вкладок
+   let roleStr = String(appState.role).toLowerCase();
+   let isOnlyDirOrSup = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("супервайзер");
+   if (!isOnlyDirOrSup) {
+       window.currentEmpSubTab = 'sellers';
+   }
+
+   let tabsHtml = "";
+   if (isOnlyDirOrSup) {
+       tabsHtml += `
+       <div class="no-swipe" style="display:flex; gap:6px; margin-bottom:8px; padding:0 4px;">
+           <button class="admin-flt ${window.currentEmpSubTab === 'sellers' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='sellers'; renderAdminEmps(currentEmpDept, null);" style="flex:1;">Продавцы</button>
+           <button class="admin-flt ${window.currentEmpSubTab === 'aup' ? 'active-flt' : ''}" onclick="window.currentEmpSubTab='aup'; renderAdminEmps(currentEmpDept, null);" style="flex:1;">АУП / Персонал</button>
+       </div>`;
+   }
+   tabsHtml += `<div id="emp-sub-list-content"></div>`;
    
    container.innerHTML = tabsHtml;
    let listContent = document.getElementById("emp-sub-list-content");
