@@ -1900,13 +1900,11 @@ async function renderTabelCalendarData(iin) {
     let year = window.currentCalYear;
     let month = window.currentCalMonth;
     
-    // ИСПРАВЛЕНО: Стилизован блок навигации. Месяц и год в одну строку без лишних отступов, стрелки круглые и аккуратные по краям
-    // ИСПРАВЛЕНО: Название месяца сделано кликабельным. При тапе открывается нативный выбор месяца и года
-    // ИСПРАВЛЕНО: Убрана серая обводка-плашка и стрелочка. Месяц выглядит обычно, но сохраняет скрытую кликабельность
+    // ИСПРАВЛЕНО: У кнопок стрелок полностью убран фон (background: none)
     let navHtml = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
-        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:var(--inner-bg, rgba(150,150,150,0.08)); color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', -1)">
-            <span class="material-symbols-rounded" style="font-size:20px; font-weight:bold; opacity:0.8;">chevron_left</span>
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', -1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
         </button>
         
         <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
@@ -1918,8 +1916,8 @@ async function renderTabelCalendarData(iin) {
                    onchange="window.onCalMonthPickerChange(this.value, '${iin}')">
         </div>
         
-        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:var(--inner-bg, rgba(150,150,150,0.08)); color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', 1)">
-            <span class="material-symbols-rounded" style="font-size:20px; font-weight:bold; opacity:0.8;">chevron_right</span>
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="adjustCalMonth('${iin}', 1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
         </button>
     </div>
     `;
@@ -1977,7 +1975,6 @@ async function renderTabelCalendarData(iin) {
         'В':  { color: '#7f8c8d', bg: 'rgba(127, 140, 141, 0.06)' }  
     };
     
-    // ИСПРАВЛЕНО: Добавлен счетчик выходных дней (v) для точного расчета плана на лету
     let summary = { rd: 0, us: 0, bs: 0, bl: 0, pr: 0, ot: 0, v: 0 };
     
     // Генерируем сетку дней
@@ -1985,7 +1982,6 @@ async function renderTabelCalendarData(iin) {
         let dayData = attendanceMap[day];
         let statusText = dayData ? dayData.status : "";
         
-        // Калькулируем итоги месяца на лету на основе выгруженных из базы данных
         if (statusText) {
             let st = String(statusText).toUpperCase().trim();
             if (st === 'РД') summary.rd++;
@@ -1994,38 +1990,37 @@ async function renderTabelCalendarData(iin) {
             else if (st === 'БЛ') summary.bl++;
             else if (st === 'ПР') summary.pr++;
             else if (st === 'ОТ') summary.ot++;
-            else if (st === 'В' || st === 'V') summary.v++; // Считаем выходные за этот месяц
+            else if (st === 'В' || st === 'V') summary.v++;
         }
         
-        // Все смены 9, 12 и 13 принудительно отображаем как 10ч
         let displayHours = dayData ? dayData.hours : 0;
         if (displayHours === 9 || displayHours === 12 || displayHours === 13) {
             displayHours = 10;
         }
         let hoursText = (dayData && displayHours && displayHours > 0) ? `${displayHours}ч` : "";
         
-        let cellStyle = "background:var(--inner-bg, rgba(150,150,150,0.03)); color:var(--text-color); border:1px solid var(--border-color);";
+        // ИСПРАВЛЕНО: Полностью удалена обводка у дней (border: none)
+        let cellStyle = "background:var(--inner-bg, rgba(150,150,150,0.03)); color:var(--text-color); border:none;";
         if (statusText && statusColors[statusText]) {
-            cellStyle = `background:${statusColors[statusText].bg}; color:${statusColors[statusText].color}; border: 1px solid ${statusColors[statusText].color}25;`;
+            cellStyle = `background:${statusColors[statusText].bg}; color:${statusColors[statusText].color}; border:none;`;
         }
         
+        // ИСПРАВЛЕНО: Дни стали идеально круглыми (aspect-ratio: 1; border-radius: 50%), размеры шрифтов адаптированы под круг
         gridHtml += `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:42px; border-radius:8px; padding:2px 0; box-sizing:border-box; ${cellStyle}">
-            <span style="font-size:10px; font-weight:bold; opacity:0.5; margin-bottom:1px;">${day}</span>
-            <b style="font-size:11px; text-transform:uppercase; letter-spacing:-0.3px;">${statusText || '-'}</b>
-            ${hoursText ? `<span style="font-size:8px; opacity:0.6; margin-top:1px; font-weight:bold;">${hoursText}</span>` : ''}
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1; border-radius:50%; box-sizing:border-box; padding:2px; ${cellStyle}">
+            <span style="font-size:9px; font-weight:bold; opacity:0.5; margin-bottom:1px; line-height:1;">${day}</span>
+            <b style="font-size:10px; text-transform:uppercase; letter-spacing:-0.3px; line-height:1;">${statusText || '-'}</b>
+            ${hoursText ? `<span style="font-size:7px; opacity:0.6; margin-top:1px; font-weight:bold; line-height:1;">${hoursText}</span>` : ''}
         </div>`;
     }
     
     gridHtml += `</div>`;
     
-    // ИСПРАВЛЕНО: Рассчитываем динамический план рабочих дней для выбранного месяца
     let planRd = lastDay - summary.v;
     if (planRd < 0) planRd = 0;
     
-    // ИСПРАВЛЕНО: Формат вывода РД изменен на "Факт / План" в точности как на главном экране
     let summaryHtml = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin:12px 0 6px 0; padding:4px 20px; background:rgba(150,150,150,0.05); border-radius:8px; gap:4px;" class="no-swipe">
+    <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:12px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
         <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
         <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
         <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
@@ -2034,14 +2029,13 @@ async function renderTabelCalendarData(iin) {
         <div class="tabel-item" style="color:#9b59b6; font-size:11px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
     </div>`;
     
-    // Маленькая легенда под календарем
     let legendHtml = `
     <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-top:10px; font-size:9px; font-weight:bold; text-align:center;">
         <div style="color:#27ae60; background:rgba(39,174,96,0.05); padding:3px; border-radius:6px;">РД - Рабочий</div>
         <div style="color:#9b59b6; background:rgba(155,89,182,0.05); padding:3px; border-radius:6px;">УС - Усиление</div>
         <div style="color:#f39c12; background:rgba(243,156,18,0.05); padding:3px; border-radius:6px;">БС - Личный</div>
         <div style="color:#e67e22; background:rgba(230,126,34,0.05); padding:3px; border-radius:6px;">БЛ - Больнич.</div>
-        <div style="color:#e74c3c; background:rgba(231,76,60,0.05); padding:3px; border-radius:6px;">ПР - Прогул</div>
+        <div style="color:#e74c3c; background:rgba(231, 76, 60, 0.05); padding:3px; border-radius:6px;">ПР - Прогул</div>
         <div style="color:#f1c40f; background:rgba(241,196,15,0.05); padding:3px; border-radius:6px;">ОТ - Отпуск</div>
         <div style="color:#7f8c8d; background:rgba(127,140,141,0.05); padding:3px; border-radius:6px;">В - Выходной</div>
     </div>`;
