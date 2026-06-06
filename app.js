@@ -1048,19 +1048,20 @@ function renderDashboardData(data, isSilent = false) {
 
   if (isSeniorCashier) isCashier = false; 
 
-  // ИСПРАВЛЕНО: Добавление полупрозрачной кнопки плюс строго слева и вне рамки вкладок для административных ролей
+  // ИСПРАВЛЕНО: Кнопка плюс перенесена на правую сторону от вкладок и доступна строго Директорам, Управляющим и Супервайзерам
   let mainTabs = document.getElementById("main-tabs");
   let admPlus = document.getElementById("nav-adm-plus-btn");
-  let isAnyAdmin = isDir || isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik;
+  let isAllowedRole = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("супервайзер");
   
-  if (isAnyAdmin) {
+  if (isAllowedRole) {
       if (!admPlus && mainTabs) {
           admPlus = document.createElement("div");
           admPlus.id = "nav-adm-plus-btn";
-          admPlus.style = "font-size:28px; font-weight:300; color:var(--text-color); opacity:0.4; cursor:pointer; margin-right:12px; display:flex; align-items:center; justify-content:center; width:32px; height:32px; -webkit-tap-highlight-color:transparent; flex-shrink:0;";
+          admPlus.style = "font-size:28px; font-weight:300; color:var(--text-color); opacity:0.4; cursor:pointer; margin-left:12px; display:flex; align-items:center; justify-content:center; width:32px; height:32px; -webkit-tap-highlight-color:transparent; flex-shrink:0;";
           admPlus.innerHTML = `<span class="material-symbols-rounded" style="font-size:28px;">add</span>`;
           admPlus.onclick = (e) => { e.stopPropagation(); window.toggleAdminPlusMenu(); };
-          mainTabs.parentNode.insertBefore(admPlus, mainTabs);
+          // Вставляем строго после (справа) от контейнера вкладок
+          mainTabs.parentNode.insertBefore(admPlus, mainTabs.nextSibling);
       }
       if (admPlus) admPlus.style.display = "flex";
   } else {
@@ -2187,7 +2188,7 @@ window.onCalMonthPickerChange = function(value, iin, containerId = "tabel-calend
     renderTabelCalendarData(iin, containerId);
 };
 
-// ИСПРАВЛЕНО: Логика переключения раскрывающегося списка меню административного плюса
+// ИСПРАВЛЕНО: Меню теперь открывается с правой стороны экрана, позиционируясь точно под новой кнопкой плюс
 window.toggleAdminPlusMenu = function() {
     let menu = document.getElementById("admin-plus-dropdown-menu");
     if (menu) {
@@ -2197,7 +2198,8 @@ window.toggleAdminPlusMenu = function() {
     
     menu = document.createElement("div");
     menu.id = "admin-plus-dropdown-menu";
-    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:170px; animation:slide-up-fade 0.2s ease;";
+    // Изменено со значения left:16px на right:16px для выравнивания по правой стенке
+    menu.style = "position:fixed; top:60px; right:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:170px; animation:slide-up-fade 0.2s ease;";
     menu.innerHTML = `
         <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminVacationForm();">
             <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
