@@ -2239,7 +2239,7 @@ window.onCalMonthPickerChange = function(value, iin, containerId = "tabel-calend
     renderTabelCalendarData(iin, containerId);
 };
 
-// ИСПРАВЛЕНО: Логика переключения раскрывающегося списка меню административного плюса
+// ИСПРАВЛЕНО: Добавлен новый пункт «Начисление мотиваций» с иконкой наградной звезды в меню плюса
 window.toggleAdminPlusMenu = function() {
     let menu = document.getElementById("admin-plus-dropdown-menu");
     if (menu) {
@@ -2247,11 +2247,26 @@ window.toggleAdminPlusMenu = function() {
         return;
     }
     
+    // Инъекция CSS-правил для красивой стилизации строк "Вознаграждение" в истории баллов
+    if (!document.getElementById("reward-history-styler")) {
+        let style = document.createElement("style");
+        style.id = "reward-history-styler";
+        style.innerHTML = `
+            .req-item-reward { border-left-color: #2ecc71 !important; background: rgba(46, 204, 113, 0.04) !important; }
+            .reward-prefix { background: #2ecc71; color: white; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; margin-right: 6px; display: inline-block; vertical-align: middle; }
+        `;
+        document.head.appendChild(style);
+    }
+    
     menu = document.createElement("div");
     menu.id = "admin-plus-dropdown-menu";
-    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:170px; animation:slide-up-fade 0.2s ease;";
+    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
     menu.innerHTML = `
-        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminVacationForm();">
+        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
+            <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
+            <span>Начисление мотиваций</span>
+        </div>
+        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
             <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
             <span>Заявка в отпуск</span>
         </div>
@@ -2268,7 +2283,79 @@ window.toggleAdminPlusMenu = function() {
     }, 50);
 };
 
-// ИСПРАВЛЕНО: Отрисовка стандартного окна заявки в отпуск для интерфейса руководителя
+// ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов продавцам
+window.openAdminPointsForm = function() {
+    let existingModal = document.getElementById("admin-points-modal-overlay");
+    if (existingModal) existingModal.remove();
+    
+    // Фильтруем и подгружаем только продавцов-консультантов
+    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
+    let sellers = emps.filter(e => {
+        let rLow = String(e.role || "").toLowerCase();
+        return rLow.includes("продавец-консультант") || rLow.includes("продавец консультант");
+    });
+    
+    let optionsHtml = `<option value="" disabled selected>Выберите продавца</option>` + 
+        sellers.map(s => `<option value="${s.iin}">${s.name} (${s.dept || 'СЦ'})</option>`).join('');
+    
+    let modal = document.createElement("div");
+    modal.id = "admin-points-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:340px; background:var(--card-bg); padding:14px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+            <h3 style="margin:0 0 12px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
+              <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
+              Начисление мотиваций
+            </h3>
+            
+            <div style="margin-bottom:10px;">
+                <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Сотрудник:</div>
+                <select id="adm-pts-seller" style="width:100%; height:38px; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-size:13px; padding:0 8px;">
+                    ${optionsHtml}
+                </select>
+            </div>
+            
+            <div style="margin-bottom:10px;">
+                <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Количество баллов:</div>
+                <input type="number" id="adm-pts-val" placeholder="Например: 15" min="1" style="width:100%; height:38px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); padding:0 10px; font-size:13px;">
+            </div>
+            
+            <div style="margin-bottom:14px;">
+                <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Причина начисления:</div>
+                <input type="text" id="adm-pts-reason" placeholder="За отличные продажи / Trade-In" style="width:100%; height:38px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); padding:0 10px; font-size:13px;">
+            </div>
+            
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <button class="btn-gray" onclick="document.getElementById('admin-points-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px;">Отмена</button>
+                <button class="btn-green" onclick="window.submitAdminPoints();" style="margin:0; padding:10px; font-size:13px; height:38px;">Начислить</button>
+            </div>
+        </div>
+    `;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+};
+
+// ИСПРАВЛЕНО: Валидация, присвоение типа «Вознаграждение» и отправка баллов в базу данных
+window.submitAdminPoints = function() {
+    let targetIin = document.getElementById("adm-pts-seller").value;
+    let pointsVal = document.getElementById("adm-pts-val").value;
+    let reasonText = document.getElementById("adm-pts-reason").value;
+    
+    if (!targetIin) return showToast("Выберите продавца из списка!", true);
+    if (!pointsVal || parseFloat(pointsVal) <= 0) return showToast("Укажите корректное количество баллов!", true);
+    if (!reasonText.trim()) return showToast("Заполните причину награждения!", true);
+    
+    let modal = document.getElementById("admin-points-modal-overlay");
+    if (modal) modal.remove();
+    
+    let ptsFormatted = "+" + parseFloat(pointsVal);
+    let meta = JSON.stringify({ points: ptsFormatted, reason: reasonText.trim() });
+    
+    // Запускаем отправку с системным типом "Вознаграждение", который запишется в лог и историю баллов продавца
+    executeSubmit("Вознаграждение", reasonText.trim(), targetIin, meta, "Мотивационные баллы успешно начислены продавцу!");
+};
+
+// Отрисовка стандартного окна заявки в отпуск для интерфейса руководителя
 window.openAdminVacationForm = function() {
     let existingModal = document.getElementById("admin-vacation-modal-overlay");
     if (existingModal) existingModal.remove();
@@ -2302,7 +2389,7 @@ window.openAdminVacationForm = function() {
     document.body.appendChild(modal);
 };
 
-// ИСПРАВЛЕНО: Валидация и отправка данных отпуска из окна администратора
+// Валидация и отправка данных отпуска из окна администратора
 window.submitAdminVacation = function() {
     let start = document.getElementById("adm-vac-start").value; 
     let end = document.getElementById("adm-vac-end").value; 
