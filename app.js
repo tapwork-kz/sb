@@ -1777,25 +1777,26 @@ function openDetails(type) {
   }
   else if (type === 'tabel') { 
       document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); 
-      // ИСПРАВЛЕНО: Название заголовка раздела изменено на требуемое
-      document.getElementById("details-title").innerText = "Табель / Штрафы"; 
+      document.getElementById("details-title").innerText = "Табель"; 
       
-      // ИСПРАВЛЕНО: Календарь теперь создается на самом верху внутри личной ленты сотрудника
+      // ИСПРАВЛЕНО: Создаем пустые контейнеры для календаря и динамического списка нарушений
       listHtml = `<div id="user-personal-calendar-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px; margin-bottom:16px;"></div>`;
-      listHtml += "<div style='padding-top:5px;'>"; 
-      
-      let currentFines = myMoneyFinesHistory.filter(i => isCurrentMonth(i.date)); 
-      currentFines.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); 
-      if (currentFines.length > 0) listHtml += currentFines.map(i => renderMoneyFineItem(i)).join(""); 
-      else listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Штрафов в этом месяце нет</div>"; 
-      
-      let myRemarks = JSON.parse(localStorage.getItem("dashData_" + appState.iin))?.info?.remarks || []; 
-      if (myRemarks.length > 0) { 
-          listHtml += `<div class="grid-details-title" style="color:#f39c12; margin-top:14px;">Замечания</div>` + groupAndRenderByMonth(myRemarks, r => { let authorStr = formatRemarkAuthor(r.authorName, r.authorRole); return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="color:#f39c12; font-size:12px;">${authorStr} <span style="float:right; color:gray; font-size:10px;">${r.date}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${formatRemarkText(r.details)}</div></div>`; }); 
-      } 
-      listHtml += "</div>"; 
+      listHtml += `<div id="user-personal-violations-list" style="padding-top:5px;"></div>`; 
   }
   document.getElementById("details-list").innerHTML = listHtml;
+
+  // ИСПРАВЛЕНО: Запуск первоначального рендеринга данных табеля и нарушений в личной карточке
+  if (type === 'tabel') {
+      if (!window.currentCalMonth || !window.currentCalYear) {
+          let d = new Date();
+          window.currentCalMonth = d.getMonth();
+          window.currentCalYear = d.getFullYear();
+      }
+      if (typeof renderTabelCalendarData === 'function') {
+          renderTabelCalendarData(appState.iin, "user-personal-calendar-box");
+      }
+  }
+}
 
   // ИСПРАВЛЕНО: Безопасный асинхронный запуск отрисовки личного круглого табеля под сгенерированный DOM-узел
   if (type === 'tabel') {
