@@ -1937,6 +1937,33 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
     let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
     let lastDay = new Date(year, month + 1, 0).getDate();
     let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+    let targetMonthStr = ("0" + (month + 1)).slice(-2) + "." + year;
+
+    // ИСПРАВЛЕНО: Заранее собираем и группируем баллы (плюсовые и минусовые) по дням выбранного месяца для бейджей
+    let ptsSourceAll = [];
+    let empMatchForPts = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)) : null;
+    if (empMatchForPts) {
+        ptsSourceAll = empMatchForPts.ptsHistory || [];
+    } else {
+        ptsSourceAll = (typeof myMoneyFinesHistory !== 'undefined') ? window.adminHistoryGlobal || [] : [];
+        if (!ptsSourceAll.length && typeof myDisplayPointsHistory !== 'undefined') ptsSourceAll = myDisplayPointsHistory;
+    }
+
+    let dailyPoints = {};
+    ptsSourceAll.forEach(p => {
+        if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
+            let dayNum = parseInt(p.date.split('.')[0], 10);
+            if (!isNaN(dayNum)) {
+                if (!dailyPoints[dayNum]) dailyPoints[dayNum] = { plus: 0, minus: 0 };
+                let valNum = parseFloat(String(p.val).replace('+', '').replace(',', '.')) || 0;
+                if (valNum > 0) {
+                    dailyPoints[dayNum].plus += valNum;
+                } else if (valNum < 0 || p.type === "Штраф" || p.type === "Списание") {
+                    dailyPoints[dayNum].minus += Math.abs(valNum);
+                }
+            }
+        }
+    });
     
     let attendanceMap = {};
     try {
@@ -1957,7 +1984,6 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
         }
     } catch(e) { console.error("Ошибка загрузки дней табеля:", e); }
     
-    // ИСПРАВЛЕНО: Передаем containerId внутрь onclick кнопок, чтобы переключался нужный календарь
     let navHtml = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
         <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustCalMonth('${iin}', -1, '${containerId}')">
@@ -2029,8 +2055,24 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
             cellStyle = `background:${statusColors[statusText].bg}; color:${statusColors[statusText].color}; border:none;`;
         }
         
+        // ИСПРАВЛЕНО: Генерируем компактные бейджи баллов на календарные дни (абсолютное позиционирование)
+        let ptsBadgeHtml = "";
+        if (dailyPoints[day]) {
+            let dp = dailyPoints[day];
+            ptsBadgeHtml = `<div style="position:absolute; top:-4px; right:-4px; display:flex; flex-direction:column; gap:1px; z-index:5; pointer-events:none;">`;
+            if (dp.plus > 0) {
+                ptsBadgeHtml += `<span style="background:#27ae60; color:white; font-size:7.5px; font-weight:bold; padding:1px 3px; border-radius:4px; line-height:1; box-shadow:0 1px 2px rgba(0,0,0,0.15);">+${String(dp.plus).replace('.', ',')}</span>`;
+            }
+            if (dp.minus > 0) {
+                ptsBadgeHtml += `<span style="background:#e74c3c; color:white; font-size:7.5px; font-weight:bold; padding:1px 3px; border-radius:4px; line-height:1; box-shadow:0 1px 2px rgba(0,0,0,0.15); text-shadow:none;">-${String(dp.minus).replace('.', ',')}</span>`;
+            }
+            ptsBadgeHtml += `</div>`;
+        }
+        
+        // Добавлено свойство position:relative для корректного отображения наложенных бейджей
         gridHtml += `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1; border-radius:50%; box-sizing:border-box; padding:2px; ${cellStyle}">
+        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1; border-radius:50%; box-sizing:border-box; padding:2px; position:relative; ${cellStyle}">
+            ${ptsBadgeHtml}
             <span style="font-size:9px; font-weight:bold; opacity:0.5; margin-bottom:1px; line-height:1;">${day}</span>
             <b style="font-size:10px; text-transform:uppercase; letter-spacing:-0.3px; line-height:1;">${statusText || '-'}</b>
             ${hoursText ? `<span style="font-size:7px; opacity:0.6; margin-top:1px; font-weight:bold; line-height:1;">${hoursText}</span>` : ''}
@@ -2042,13 +2084,13 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
     if (planRd < 0) planRd = 0;
     
     let summaryHtml = `
-    <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:6px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
-        <div class="tabel-item" style="color:#f39c12; font-size:12px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
-        <div class="tabel-item" style="color:#e67e22; font-size:12px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
-        <div class="tabel-item" style="color:#e74c3c; font-size:12px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
-        <div class="tabel-item" style="color:#f1c40f; font-size:12px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
-        <div class="tabel-item" style="color:#27ae60; font-size:12px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
-        <div class="tabel-item" style="color:#9b59b6; font-size:12px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
+    <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:12px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
+        <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
+        <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
+        <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
+        <div class="tabel-item" style="color:#f1c40f; font-size:11px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
+        <div class="tabel-item" style="color:#27ae60; font-size:11px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
+        <div class="tabel-item" style="color:#9b59b6; font-size:11px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
     </div>`;
     
     let legendHtml = `
@@ -2062,8 +2104,7 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
         <div style="color:#7f8c8d; background:rgba(127,140,141,0.05); padding:3px; border-radius:6px;">В - Выходной</div>
     </div>`;
     
-    // ИСПРАВЛЕНО: Динамический сбор, фильтрация и рендеринг нарушений (штрафов и замечаний) строго за выбранный месяц
-    let targetMonthStr = ("0" + (month + 1)).slice(-2) + "." + year;
+    // Динамический сбор, фильтрация и рендеринг нарушений (штрафов и замечаний) строго за выбранный месяц
     let finesSource = [];
     let remarksSource = [];
     
@@ -2082,9 +2123,9 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
     
     let violHtml = `<div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--border-color);">`;
     if (currentFines.length > 0) {
-        violHtml += `<div class="grid-details-title" style="color:#e74c3c; margin-top:4px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Нарушения</div>` + currentFines.map(i => renderMoneyFineItem(i)).join("");
+        violHtml += `<div class="grid-details-title" style="color:#e74c3c; margin-top:4px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Штрафы (Сумма)</div>` + currentFines.map(i => renderMoneyFineItem(i)).join("");
     } else {
-        violHtml += `<div style="padding:12px; text-align:center; color:gray; font-size:12px;">. . .</div>`;
+        violHtml += `<div style="padding:12px; text-align:center; color:gray; font-size:12px;">Штрафов в этом месяце нет</div>`;
     }
     
     let currentRemarks = remarksSource.filter(r => r && typeof r.date === 'string' && r.date.includes(targetMonthStr));
