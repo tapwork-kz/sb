@@ -2042,13 +2042,13 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
     if (planRd < 0) planRd = 0;
     
     let summaryHtml = `
-    <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:12px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
-        <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
-        <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
-        <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
-        <div class="tabel-item" style="color:#f1c40f; font-size:11px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
-        <div class="tabel-item" style="color:#27ae60; font-size:11px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
-        <div class="tabel-item" style="color:#9b59b6; font-size:11px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
+    <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:6px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
+        <div class="tabel-item" style="color:#f39c12; font-size:12px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
+        <div class="tabel-item" style="color:#e67e22; font-size:12px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
+        <div class="tabel-item" style="color:#e74c3c; font-size:12px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
+        <div class="tabel-item" style="color:#f1c40f; font-size:12px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
+        <div class="tabel-item" style="color:#27ae60; font-size:12px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
+        <div class="tabel-item" style="color:#9b59b6; font-size:12px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
     </div>`;
     
     let legendHtml = `
@@ -2082,9 +2082,9 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
     
     let violHtml = `<div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--border-color);">`;
     if (currentFines.length > 0) {
-        violHtml += `<div class="grid-details-title" style="color:#e74c3c; margin-top:4px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Штрафы (Сумма)</div>` + currentFines.map(i => renderMoneyFineItem(i)).join("");
+        violHtml += `<div class="grid-details-title" style="color:#e74c3c; margin-top:4px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Нарушения</div>` + currentFines.map(i => renderMoneyFineItem(i)).join("");
     } else {
-        violHtml += `<div style="padding:12px; text-align:center; color:gray; font-size:12px;">Штрафов в этом месяце нет</div>`;
+        violHtml += `<div style="padding:12px; text-align:center; color:gray; font-size:12px;">. . .</div>`;
     }
     
     let currentRemarks = remarksSource.filter(r => r && typeof r.date === 'string' && r.date.includes(targetMonthStr));
