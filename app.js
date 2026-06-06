@@ -2010,7 +2010,7 @@ async function renderTabelCalendarData(iin) {
     
     // ИСПРАВЛЕНО: Выравнивание изменено на space-around, увеличены отступы padding в точности как на скриншоте наружного табеля
     let summaryHtml = `
-    <div style="display:flex; justify-content:space-around; align-items:center; margin:12px 0 6px 0; padding:12px 6px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
+    <div style="display:flex; justify-content:space-around; align-items:center; margin:12px 0 6px 0; padding:10px 6px; background:rgba(150,150,150,0.05); border-radius:8px;" class="no-swipe">
         <div class="tabel-item" style="color:#f39c12; font-size:11px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
         <div class="tabel-item" style="color:#e67e22; font-size:11px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
         <div class="tabel-item" style="color:#e74c3c; font-size:11px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
