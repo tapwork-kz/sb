@@ -527,7 +527,7 @@ async function callBackend(actionName, payloadData = {}) {
                   emp.reportErrors += rep.errors; 
                   let ptPenPerErr = 0; let kpiPenPerErr = 0;
                   
-                  // ИСПРАВЛЕНО: Безопасное приведение к нижнему регистру для поиска совпадений по всем отчетам
+                  // ИСПРАВЛЕНО: Приводим название отчета к нижнему регистру для поиска совпадений по всем отчетам
                   let titleLow = String(rep.title || "").toLowerCase();
                   
                   if (titleLow.includes("ценник") || titleLow.includes("ценников")) { 
@@ -538,6 +538,12 @@ async function callBackend(actionName, payloadData = {}) {
                       ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; 
                   } else if (titleLow.includes("отзыв") || titleLow.includes("отзывы")) { 
                       ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; 
+                  }
+                  
+                  // ИСПРАВЛЕНО: Если это должность обычного Кассира, то автоматические штрафы по баллам на них не действуют
+                  let uRoleLow = String(u.role || "").toLowerCase();
+                  if (uRoleLow.includes("кассир") && !uRoleLow.includes("старший кассир")) {
+                      ptPenPerErr = 0;
                   }
                   
                   let totalKpiPenalty = rep.errors * kpiPenPerErr;
