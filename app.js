@@ -527,7 +527,7 @@ async function callBackend(actionName, payloadData = {}) {
                   emp.reportErrors += rep.errors; 
                   let ptPenPerErr = 0; let kpiPenPerErr = 0;
                   
-                  // ИСПРАВЛЕНО: Приводим название отчета к нижнему регистру для бронебойного поиска совпадений
+                  // ИСПРАВЛЕНО: Безопасное приведение к нижнему регистру для поиска совпадений по всем отчетам
                   let titleLow = String(rep.title || "").toLowerCase();
                   
                   if (titleLow.includes("ценник") || titleLow.includes("ценников")) { 
@@ -537,7 +537,6 @@ async function callBackend(actionName, payloadData = {}) {
                   } else if (titleLow.includes("уборка") || titleLow.includes("уборк")) { 
                       ptPenPerErr = ptsCfg.ub; kpiPenPerErr = kpiCfg.ub; 
                   } else if (titleLow.includes("отзыв") || titleLow.includes("отзывы")) { 
-                      // Теперь "Отзыв" полноценно участвует в автоматических штрафах по баллам при отсутствии отчетов
                       ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; 
                   }
                   
@@ -548,11 +547,31 @@ async function callBackend(actionName, payloadData = {}) {
                   }
                   if (ptPenPerErr !== 0 && rep.values && rep.headers) {
                       let currentYear = new Date().getFullYear();
+                      let dObj = new Date();
+                      let backupDateStr = ("0" + dObj.getDate()).slice(-2) + "." + ("0" + (dObj.getMonth() + 1)).slice(-2) + "." + dObj.getFullYear();
+
                       rep.values.forEach((v, idx) => {
                           if (v === '✖' || String(v).toLowerCase() === 'x' || String(v).includes('✖')) {
-                              let rawDate = rep.headers[idx] || "";
-                              let rDate = rawDate.length === 5 ? `${rawDate}.${currentYear}` : rawDate;
-                              let histItem = { date: rDate || formatDateLocal(new Date()), type: "Списание", source: rep.title, reason: "Отсутствие отчета", val: -Math.abs(ptPenPerErr), approver: "", moneyFine: 0, kpiChange: kpiPenPerErr };
+                              let rawDate = String(rep.headers[idx] || "").trim();
+                              let rDate = "";
+                              
+                              // ИСПРАВЛЕНО: Умный разбор и приведение даты заголовка к строгому системному стандарту DD.MM.YYYY
+                              if (rawDate) {
+                                  let dateParts = rawDate.split('.');
+                                  if (dateParts.length === 2) {
+                                      rDate = ("0" + dateParts[0]).slice(-2) + "." + ("0" + dateParts[1]).slice(-2) + "." + currentYear;
+                                  } else if (dateParts.length === 3) {
+                                      let yr = dateParts[2];
+                                      if (yr.length === 2) yr = "20" + yr;
+                                      rDate = ("0" + dateParts[0]).slice(-2) + "." + ("0" + dateParts[1]).slice(-2) + "." + yr;
+                                  } else {
+                                      rDate = backupDateStr;
+                                  }
+                              } else {
+                                  rDate = backupDateStr;
+                              }
+
+                              let histItem = { date: rDate, type: "Списание", source: rep.title, reason: "Отсутствие отчета", val: -Math.abs(ptPenPerErr), approver: "", moneyFine: 0, kpiChange: kpiPenPerErr };
                               emp.ptsHistory.push(histItem);
                               emp.pts.fin += Math.abs(ptPenPerErr);
                           }
