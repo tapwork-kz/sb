@@ -312,7 +312,7 @@ async function callBackend(actionName, payloadData = {}) {
                           } catch(e){}
                           
                           let pointsStr = metaObj.points || ("+" + pointsVal);
-                          let tgMessage = `${empName} <b>вознагражден</b> ${pointsStr} 🏅 мотивационными баллами за ${reasonStr}`;
+                          let tgMessage = `${empName} *вознагражден* ${pointsStr} 🏅 мотивационными баллами за ${reasonStr}`;
                           
                           fetch(GAS_URL, { 
                               method: "POST", 
@@ -332,7 +332,7 @@ async function callBackend(actionName, payloadData = {}) {
                       
                       // Меняем заглавную "С" на строчную для бесшовного слияния предложения
                       let periodStr = String(req.details || "").replace(/^С /, "с ");
-                      let tgMessage = `${empName} будет находиться на <b>трудовом отпуске</b>🌴 в период ${periodStr}.`;
+                      let tgMessage = `${empName} будет находиться на *трудовом отпуске*🌴 в период ${periodStr}.`;
                       
                       fetch(GAS_URL, { 
                           method: "POST", 
