@@ -2254,6 +2254,12 @@ window.toggleAdminPlusMenu = function() {
         style.innerHTML = `
             .req-item-reward { border-left-color: #2ecc71 !important; background: rgba(46, 204, 113, 0.04) !important; }
             .reward-prefix { background: #2ecc71; color: white; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; margin-right: 6px; display: inline-block; vertical-align: middle; }
+            
+            /* ИСПРАВЛЕНО: Изумрудный окрас текста со значением + и типом Вознаграждения в истории */
+            div[data-type="Вознаграждение"], .type-вознаграждение, .pts-reward-text {
+                color: #27ae60 !important;
+                font-weight: bold;
+            }
         `;
         document.head.appendChild(style);
     }
@@ -2283,7 +2289,7 @@ window.toggleAdminPlusMenu = function() {
     }, 50);
 };
 
-// ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с сортировкой по отделам и алфавиту
+// ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с сортировкой по отделам и алфавиту, вывод ФИО (Отдел)
 window.openAdminPointsForm = function() {
     let existingModal = document.getElementById("admin-points-modal-overlay");
     if (existingModal) existingModal.remove();
@@ -2294,7 +2300,7 @@ window.openAdminPointsForm = function() {
         return rLow.includes("продавец-консультант") || rLow.includes("продавец консультант");
     });
     
-    // ИСПРАВЛЕНО: Сортировка списка продавцов сначала по отделам (Цифра -> МБТ -> КБТ), а внутри отделов - строго по алфавиту
+    // Сортировка списка продавцов сначала по отделам (Цифра -> МБТ -> КБТ), а внутри отделов - строго по алфавиту
     sellers.sort((a, b) => {
         let dA = String(a.dept || "").toUpperCase().trim();
         let dB = String(b.dept || "").toUpperCase().trim();
@@ -2306,8 +2312,9 @@ window.openAdminPointsForm = function() {
         return String(a.name || "").localeCompare(String(b.name || ""), "ru");
     });
     
+    // ИСПРАВЛЕНО: Выводим в выпадающем списке сначала ФИО, а затем отдел в скобках
     let optionsHtml = `<option value="" disabled selected>Выберите продавца</option>` + 
-        sellers.map(s => `<option value="${s.iin}">${s.dept || 'СЦ'} | ${s.name}</option>`).join('');
+        sellers.map(s => `<option value="${s.iin}">${s.name} (${s.dept || 'СЦ'})</option>`).join('');
     
     let modal = document.createElement("div");
     modal.id = "admin-points-modal-overlay";
@@ -2346,8 +2353,8 @@ window.openAdminPointsForm = function() {
     document.body.appendChild(modal);
 };
 
-// ИСПРАВЛЕНО: Формирование развернутого описания (Кому, Сколько, Причина) для отображения в запросах и истории баллов
-window.submitAdminPoints = function() {
+// ИСПРАВЛЕНО: Каждый пункт на своей строке, автоматическое начисление баллов и мгновенная запись в историю продавца с типом Вознаграждение
+window.submitAdminPoints = async function() {
     let sellerSelect = document.getElementById("adm-pts-seller");
     let targetIin = sellerSelect.value;
     let pointsVal = document.getElementById("adm-pts-val").value;
@@ -2363,11 +2370,63 @@ window.submitAdminPoints = function() {
     
     let ptsFormatted = "+" + parseFloat(pointsVal);
     
-    // ИСПРАВЛЕНО: Теперь в деталях запроса явно пишется адресат и сумма баллов. Это решит проблему отображения в админ-списке и запишет операцию в лог продавца
-    let fullDetailsStr = `Кому: ${chosenSellerText} | Баллы: ${ptsFormatted} | Причина: ${reasonText.trim()}`;
+    // ИСПРАВЛЕНО: Каждый пункт выводится строго со своей строки (через перенос \n) в пре-врап карточке
+    let fullDetailsStr = `Кому: ${chosenSellerText}\nБаллы: ${ptsFormatted}\nПричина: ${reasonText.trim()}`;
     let meta = JSON.stringify({ points: ptsFormatted, target_iin: targetIin, reason: reasonText.trim() });
     
-    executeSubmit("Вознаграждение", fullDetailsStr, targetIin, meta, "Мотивационные баллы успешно начислены продавцу!");
+    // 1. Прямая запись в таблицу 'requests' от ИИН самого продавца со статусом 'approved' для синхронизации на сервере
+    try {
+        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+            await supabaseClient.from('requests').insert([{
+                iin: targetIin,
+                type: "Вознаграждение",
+                details: fullDetailsStr,
+                target_iin: targetIin,
+                meta: meta,
+                status: "approved", 
+                approver: window.appState?.iin || "Админ",
+                created_at: new Date().toISOString()
+            }]);
+        }
+    } catch (e) {
+        console.error("Ошибка сохранения вознаграждения в БД:", e);
+    }
+
+    // 2. Локальное ОЗУ-начисление: мгновенно добавляем операцию в историю и баланс продавца, чтобы изменения отобразились сразу
+    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
+    let emp = emps.find(e => String(e.iin).trim() === String(targetIin).trim());
+    if (emp) {
+        if (!emp.ptsHistory) emp.ptsHistory = [];
+        let dObj = new Date();
+        let dateStr = ("0" + dObj.getDate()).slice(-2) + "." + ("0" + (dObj.getMonth() + 1)).slice(-2) + "." + dObj.getFullYear();
+        
+        // Вставляем запись в локальную историю баллов продавца
+        emp.ptsHistory.push({
+            date: dateStr,
+            type: "Вознаграждение",
+            source: "Администратор",
+            reason: reasonText.trim(),
+            val: ptsFormatted,
+            approver: window.appState?.iin || "Админ"
+        });
+        
+        // Прибавляем баланс к начислениям (acc) и остатку (rem)
+        if (!emp.pts) emp.pts = { acc: 0, use: 0, rem: 0, fin: 0 };
+        emp.pts.acc = (parseFloat(emp.pts.acc) || 0) + parseFloat(pointsVal);
+        emp.pts.rem = (parseFloat(emp.pts.rem) || 0) + parseFloat(pointsVal);
+        
+        if (typeof parseCustomDate === 'function') {
+            emp.ptsHistory.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+        }
+    }
+    
+    // Перерисовываем интерфейсы админки на лету для мгновенного обновления цифр на экране
+    if (typeof loadDashboard === 'function') loadDashboard(true);
+    if (typeof renderAdminEmps === 'function' && typeof currentEmpDept !== 'undefined') {
+        renderAdminEmps(currentEmpDept, null);
+    }
+    
+    showToast("Мотивационные баллы успешно начислены продавцу!");
 };
 
 // Отрисовка стандартного окна заявки в отпуск для интерфейса руководителя
