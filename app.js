@@ -2449,13 +2449,16 @@ window.submitAdminVacation = function() {
             executeSubmit("Трудовой отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
         };
 
-// ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с ФИО сначала и отделами в скобках
+// ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с ФИО сначала и отделами в скобках (исключены заблокированные FALSE)
 window.openAdminPointsForm = function() {
     let existingModal = document.getElementById("admin-points-modal-overlay");
     if (existingModal) existingModal.remove();
     
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
     let sellers = emps.filter(e => {
+        // ИСПРАВЛЕНО: Отсекаем уволенных/заблокированных сотрудников со статусом FALSE
+        if (String(e.login_status).toUpperCase() === 'FALSE') return false;
+        
         let rLow = String(e.role || "").toLowerCase();
         return rLow.includes("продавец-консультант") || rLow.includes("продавец консультант");
     });
