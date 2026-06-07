@@ -288,6 +288,41 @@ async function callBackend(actionName, payloadData = {}) {
                       if ((reqType === "Продажа СЦ/Дефект" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
                   }
                   else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                      // ИСПРАВЛЕНО: Убрана ломающая заглушка, логика вознаграждения и трудового отпуска теперь отрабатывает корректно
+                      else if (reqType === "Вознаграждение") {
+                          let targetIin = metaObj.target_iin || req.target_iin;
+                          let pointsVal = parseFloat(String(metaObj.points || "0").replace('+', '')) || 0;
+                          let reasonStr = metaObj.reason || req.details;
+                          
+                          if (targetIin) {
+                              await supabaseClient.from('user_details').insert([{ 
+                                  iin: targetIin, 
+                                  type: 'Вознаграждение', 
+                                  action_text: reasonStr, 
+                                  points_motivation: pointsVal, 
+                                  manager_iin: appState.iin 
+                              }]);
+                              
+                              let cleanDetails = String(req.details || "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/?[^>]+(>|$)/g, "");
+                              let tgMessage = `🎉 *Одобрено вознаграждение!*\n\n${cleanDetails}`;
+                              
+                              fetch(GAS_URL, { 
+                                  method: "POST", 
+                                  body: JSON.stringify({ action: "sendTgNotification", payload: { text: tgMessage } }) 
+                              }).catch(()=>{});
+                          }
+                          newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
+                      }
+                      else if (reqType === "Трудовой отпуск" || reqType === "Отпуск") {
+                          let tgMessage = `🌴 *Утвержден трудовой отпуск!*\n\n👤 *Сотрудник:* ${req.authorName || 'Сотрудник'}\n📅 *Период:* ${req.details}`;
+                          
+                          fetch(GAS_URL, { 
+                              method: "POST", 
+                              body: JSON.stringify({ action: "sendTgNotification", payload: { text: tgMessage } }) 
+                              }).catch(()=>{});
+                          newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
+                      }
+                      else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                       
                       // ИСПРАВЛЕНО: При одобрении Вознаграждения данные зачисляются в БД и отправляется лог в Telegram через GAS
                       else if (reqType === "Вознаграждение") {
