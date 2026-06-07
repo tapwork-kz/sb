@@ -2249,6 +2249,99 @@ window.adjustCalMonth = function(iin, delta, containerId = "tabel-calendar-conta
     renderTabelCalendarData(iin, containerId);
 };
 
+// ИСПРАВЛЕНО: Возвращена логика выпадающего списка административного плюса и стили вознаграждений
+window.toggleAdminPlusMenu = function() {
+    let menu = document.getElementById("admin-plus-dropdown-menu");
+    if (menu) {
+        menu.remove();
+        return;
+    }
+    
+    if (!document.getElementById("reward-history-styler")) {
+        let style = document.createElement("style");
+        style.id = "reward-history-styler";
+        style.innerHTML = `
+            .req-item-reward { border-left-color: #2ecc71 !important; background: rgba(46, 204, 113, 0.04) !important; }
+            .reward-prefix { background: #2ecc71; color: white; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; margin-right: 6px; display: inline-block; vertical-align: middle; }
+        `;
+        document.head.appendChild(style);
+    }
+    
+    menu = document.createElement("div");
+    menu.id = "admin-plus-dropdown-menu";
+    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
+    menu.innerHTML = `
+        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
+            <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
+            <span>Начисление мотиваций</span>
+        </div>
+        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
+            <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
+            <span>Заявка в отпуск</span>
+        </div>
+    `;
+    
+    document.body.appendChild(menu);
+    setTimeout(() => {
+        let closeFn = () => {
+            let m = document.getElementById("admin-plus-dropdown-menu");
+            if(m) m.remove();
+            document.removeEventListener("click", closeFn);
+        };
+        document.addEventListener("click", closeFn);
+    }, 50);
+};
+
+// ИСПРАВЛЕНО: Возвращена отрисовка модального окна заявки в отпуск для интерфейса руководителя
+window.openAdminVacationForm = function() {
+    let existingModal = document.getElementById("admin-vacation-modal-overlay");
+    if (existingModal) existingModal.remove();
+    
+    let modal = document.createElement("div");
+    modal.id = "admin-vacation-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:340px; background:var(--card-bg); padding:14px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+            <h3 style="margin:0 0 12px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
+              <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
+              Заявка в отпуск
+            </h3>
+            <div style="display:flex; gap:8px; margin-bottom:12px;">
+              <div style="flex:1;">
+                 <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Начало:</div>
+                 <input type="date" id="adm-vac-start" style="width:100%; height:36px; line-height:34px; padding:0; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-family:inherit; text-align:center; -webkit-appearance:none; appearance:none;">
+              </div>
+              <div style="flex:1;">
+                 <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Конец:</div>
+                 <input type="date" id="adm-vac-end" style="width:100%; height:36px; line-height:34px; padding:0; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-family:inherit; text-align:center; -webkit-appearance:none; appearance:none;">
+              </div>
+            </div>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
+                <button class="btn-gray" onclick="document.getElementById('admin-vacation-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px;">Отмена</button>
+                <button class="btn-green" onclick="window.submitAdminVacation();" style="margin:0; padding:10px; font-size:13px; height:38px;">Отправить</button>
+            </div>
+        </div>
+    `;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+};
+
+// ИСПРАВЛЕНО: Возвращена валидация и отправка данных отпуска из окна администратора
+window.submitAdminVacation = function() {
+    let start = document.getElementById("adm-vac-start").value; 
+    let end = document.getElementById("adm-vac-end").value; 
+    if (!start || !end) return showToast("Выберите даты начала и конца отпуска!", true); 
+    if (new Date(start) > new Date(end)) return showToast("Дата конца не может быть раньше начала!", true); 
+    let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
+    let details = `С ${formatD(start)} по ${formatD(end)}`; 
+    let meta = JSON.stringify({ startDate: start, endDate: end }); 
+    
+    let modal = document.getElementById("admin-vacation-modal-overlay");
+    if (modal) modal.remove();
+    
+    executeSubmit("Отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
+};
+
 // ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с ФИО сначала и отделами в скобках
 window.openAdminPointsForm = function() {
     let existingModal = document.getElementById("admin-points-modal-overlay");
