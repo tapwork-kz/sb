@@ -1920,24 +1920,16 @@ function openDetails(type) {
   }
   else if (type === 'report') { 
           document.getElementById("details-title").innerText = "Мои отчеты"; 
-          listHtml = "<div style='padding-top:5px;'>"; 
-          
-          let roleStr = String(appState.role).toLowerCase();
-          let isCashier = roleStr.includes("кассир") && !roleStr.includes("старший кассир");
-          
-          // Фильтруем отчеты: если кассир, оставляем только те, где в названии есть "Отзыв"
-          let displayReports = myReports;
-          if (isCashier) {
-              displayReports = myReports.filter(rep => rep.title && rep.title.toLowerCase().includes("отзыв"));
+          // ИСПРАВЛЕНО: Инициализация календаря для просмотра личных исторических отчетов продавца/кассира
+          if (!window.currentMyRepMonth || !window.currentMyRepYear) {
+              let d = new Date();
+              window.currentMyRepMonth = d.getMonth();
+              window.currentMyRepYear = d.getFullYear();
           }
-          
-          if (displayReports.length > 0) {
-              // ИСПРАВЛЕНО: Передаем статус кассира в генератор сетки для скрытия бейджей
-              listHtml += displayReports.map(rep => generateHorizontalGrid(rep, isCashier)).join(''); 
-          } else {
-              listHtml += "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>Нет отчетов для отображения</div>";
-          }
-          listHtml += "</div>"; 
+          listHtml = `<div id="my-reports-calendar-container"></div>`;
+          document.getElementById("details-list").innerHTML = listHtml;
+          renderMyPersonalReportsData(); 
+          return;
       }
 else if (type === 'tabel') { 
       document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); 
@@ -2445,6 +2437,94 @@ window.onRepMonthPickerChange = function(value, iin) {
     window.currentRepYear = parseInt(parts[0], 10);
     window.currentRepMonth = parseInt(parts[1], 10) - 1;
     renderEmpReportsData(iin);
+};
+
+// ИСПРАВЛЕНО: Асинхронная подгрузка и отрисовка личных отчетов продавца/кассира за выбранный месяц
+async function renderMyPersonalReportsData() {
+    let container = document.getElementById("my-reports-calendar-container");
+    if (!container) return;
+    
+    let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    let year = window.currentMyRepYear;
+    let month = window.currentMyRepMonth;
+    
+    container.innerHTML = `<div style="text-align:center; font-size:12px; padding:20px; color:gray;">Загрузка моих отчетов за выбранный месяц...</div>`;
+    
+    let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
+    let lastDay = new Date(year, month + 1, 0).getDate();
+    let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+    
+    let displayReports = [];
+    let roleStr = String(appState.role).toLowerCase();
+    let isCashier = roleStr.includes("кассир") && !roleStr.includes("старший кассир");
+    
+    try {
+        // Достаем из таблицы самый свежий слепок отчетов текущего аккаунта за выбранный месяц
+        let { data: repList, error } = await supabaseClient
+            .from('user_sheet_info')
+            .select('*')
+            .eq('iin', appState.iin)
+            .gte('date', startDateStr)
+            .lte('date', endDateStr)
+            .order('date', { ascending: false })
+            .limit(1);
+            
+        if (!error && repList && repList.length > 0) {
+            displayReports = repList[0].reports_data || [];
+        }
+    } catch(e) { console.error("Ошибка загрузки истории личных отчетов:", e); }
+    
+    let navHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustMyRepMonth(-1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
+        </button>
+        
+        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">
+                ${monthNames[month]} ${year}
+            </span>
+            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
+                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
+                   onchange="window.onMyRepMonthPickerChange(this.value)">
+        </div>
+        
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustMyRepMonth(1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
+        </button>
+    </div>
+    `;
+    
+    // Если это кассир, оставляем только отзывы
+    if (isCashier) {
+        displayReports = displayReports.filter(rep => rep.title && rep.title.toLowerCase().includes("отзыв"));
+    }
+    
+    let reportsHtml = displayReports.map(rep => generateHorizontalGrid(rep, isCashier)).join('') || "<p style='text-align:center;color:gray;font-size:12px;padding:20px 0;'>Отчетов за этот месяц нет</p>";
+    
+    container.innerHTML = navHtml + reportsHtml;
+}
+
+// Переключение месяцев стрелками для личных отчетов
+window.adjustMyRepMonth = function(delta) {
+    window.currentMyRepMonth += delta;
+    if (window.currentMyRepMonth > 11) {
+        window.currentMyRepMonth = 0;
+        window.currentMyRepYear += 1;
+    } else if (window.currentMyRepMonth < 0) {
+        window.currentMyRepMonth = 11;
+        window.currentMyRepYear -= 1;
+    }
+    renderMyPersonalReportsData();
+};
+
+// Переключение месяца через встроенный пикер для личных отчетов
+window.onMyRepMonthPickerChange = function(value) {
+    if (!value) return;
+    let parts = value.split('-');
+    window.currentMyRepYear = parseInt(parts[0], 10);
+    window.currentMyRepMonth = parseInt(parts[1], 10) - 1;
+    renderMyPersonalReportsData();
 };
 
 // ИСПРАВЛЕНО: Возвращена логика выпадающего списка административного плюса и стили вознаграждений
