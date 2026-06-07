@@ -1807,9 +1807,9 @@ function renderMoneyFineItem(i) { let roleStr = String(appState.role).toLowerCas
 
 function openDetails(type) {
   let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); document.getElementById("details-kpi-circle-container").innerHTML = ""; let listHtml = "";
-  if (type === 'sc') { document.getElementById("details-title").innerText = "Детали СЦ | Фокус"; listHtml = generateDatePanelHTML('my-sc', 'window.triggerMyScReload'); listHtml += "<div id='my-sc-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; document.getElementById("details-list").innerHTML = listHtml; window.triggerMyScReload = function(t, val) { if(t && t !== 'search') setPanelDates(t, val, 'my-sc', () => window.triggerMyScReload('search')); else { let startParts = document.getElementById('my-sc-start').value.split('-'); let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime(); let endParts = document.getElementById('my-sc-end').value.split('-'); let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime(); let arr = myScHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; }); arr.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); let h = ""; if(arr.length > 0) { h += arr.map((i, idx) => buildStandardRow({title: `${idx + 1}. ${i.reason}`, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, hasBorder: false})).join(""); } else { h = "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; } document.getElementById('my-sc-list-container').innerHTML = h; } }; window.triggerMyScReload('search'); return; } 
+  if (type === 'sc') { document.getElementById("details-title").innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; vertical-align:middle; margin-right:6px; color:#e67e22;">shopping_bag</span> СЦ | Фокус`; listHtml = generateDatePanelHTML('my-sc', 'window.triggerMyScReload'); listHtml += "<div id='my-sc-list-container' class='card' style='padding:0; overflow:hidden;'></div>"; document.getElementById("details-list").innerHTML = listHtml; window.triggerMyScReload = function(t, val) { if(t && t !== 'search') setPanelDates(t, val, 'my-sc', () => window.triggerMyScReload('search')); else { let startParts = document.getElementById('my-sc-start').value.split('-'); let st = new Date(startParts[0], startParts[1]-1, startParts[2], 0, 0, 0).getTime(); let endParts = document.getElementById('my-sc-end').value.split('-'); let en = new Date(endParts[0], endParts[1]-1, endParts[2], 23, 59, 59).getTime(); let arr = myScHistory.filter(i => { let rd = parseCustomDate(i.date); return rd >= st && rd <= en; }); arr.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date)); let h = ""; if(arr.length > 0) { h += arr.map((i, idx) => buildStandardRow({title: `${idx + 1}. ${i.reason}`, typeText: i.source, typeColor: getSourceColor(i.source), dateText: i.date, hasBorder: false})).join(""); } else { h = "<div style='padding:15px;text-align:center;color:gray;font-size:13px;'>В выбранном периоде пусто</div>"; } document.getElementById('my-sc-list-container').innerHTML = h; } }; window.triggerMyScReload('search'); return; } 
   else if (type === 'points') { 
-      document.getElementById("details-title").innerText = "История Баллов"; 
+      document.getElementById("details-title").innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; vertical-align:middle; margin-right:6px; color:#f1c40f;">history</span>История Баллов`; 
       
       let acc = document.getElementById("pt-acc") ? document.getElementById("pt-acc").innerText : 0;
       let use = document.getElementById("pt-use") ? document.getElementById("pt-use").innerText : 0;
@@ -1889,7 +1889,7 @@ function openDetails(type) {
       return; 
   }
   else if (type === 'kpi') { 
-      document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; 
+      document.getElementById("details-title").innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; vertical-align:middle; margin-right:6px; color:#3390ec;">analytics</span> КФ. ЭФФ.`; 
       listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
       let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date)); 
       
@@ -1934,7 +1934,7 @@ function openDetails(type) {
       }
 else if (type === 'tabel') { 
       document.getElementById("btn-details-back").onclick = () => switchTab(lastActiveTab); 
-      document.getElementById("details-title").innerText = "Табель / Штрафы"; 
+      document.getElementById("details-title").innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; vertical-align:middle; margin-right:6px; color:#e74c3c;">calendar_today</span> Табель`; 
       
       // ИСПРАВЛЕНО: Готовим чистый контейнер под календарь (нарушения подгрузятся внутрь него автоматически ниже)
       listHtml = `<div id="user-personal-calendar-box" style="background:var(--card-bg); border:1px solid var(--border-color); padding:10px; border-radius:12px;"></div>`;
