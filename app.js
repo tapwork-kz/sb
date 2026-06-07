@@ -274,8 +274,24 @@ async function callBackend(actionName, payloadData = {}) {
               else if ((currentStatus === "pending_admin_view" || currentStatus === "pending") && reqAction === "viewed") { newStatus = "viewed"; isHandled = true; responseMsg = "Просмотрено"; }
               else if ((currentStatus === "pending_admin" || currentStatus === "pending") && reqAction === "approve_admin") {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
-                  if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
+                  if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount || 0))), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                  // ИСПРАВЛЕНО: Добавлена полноценная ветка одобрения Вознаграждения с физической записью баллов сотруднику в user_details
+                  else if (reqType === "Вознаграждение") {
+                      let pts = parseFloat(String(metaObj.points || "0").replace('+', '')) || 0;
+                      let targetIin = metaObj.target_iin || req.target_iin;
+                      let reasonStr = metaObj.reason || req.details;
+                      
+                      await supabaseClient.from('user_details').insert([{ 
+                          iin: targetIin, 
+                          type: "Вознаграждение", 
+                          category: "Вознаграждение", 
+                          action_text: reasonStr, 
+                          points_motivation: pts, 
+                          manager_iin: appState.iin 
+                      }]);
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
+                  }
                   else if (reqType === "Продажа СЦ/Дефект" || reqType === "Продажа Trade-In" || metaObj.type || reqType === metaObj.type) { 
                       let earnSourceType = (reqType === "Продажа Trade-In") ? "Trade-In" : (metaObj.type || reqType); 
                       // Берем точные значения баллов и KPI из сформированной заявки (или БД)
@@ -979,6 +995,9 @@ function getSourceColor(src) {
     
     // Новый оранжево-красноватый цвет для всех отчетов и табеля
     if(s.includes('ценник') || s.includes('ревизи') || s.includes('табел') || s.includes('уборк') || s.includes('отзыв') || s.includes('отчет')) return '#d35400';
+    
+    // ИСПРАВЛЕНО: Добавлен красивый изумрудный цвет для отображения типа Вознаграждение
+    if(s.includes('вознагражд')) return '#2ecc71';
     
     if(s.includes('сц')) return '#e67e22'; 
     if(s.includes('trade-in')) return '#8e44ad'; 
@@ -1727,6 +1746,10 @@ function renderHistoryItem(i, isCompact = false) {
     }
     
     let bColor = rawNum > 0 ? "#27ae60" : (isPenalty ? "#e74c3c" : "#f39c12");
+    // ИСПРАВЛЕНО: Задаем рамке карточки изумрудный цвет, если это тип Вознаграждение
+    if (String(i.type).toLowerCase() === "вознаграждение" || String(i.source).toLowerCase() === "вознаграждение") {
+        bColor = "#2ecc71";
+    }
     
     return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, borderColor: bColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
 }
