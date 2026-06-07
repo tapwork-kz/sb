@@ -1741,14 +1741,29 @@ function renderHistoryItem(i, isCompact = false) {
     let rightText = isDirOrZav ? formatShortName(String(i.type).toLowerCase() === 'штраф' ? i.source : i.approver) : "";
     
     // Если это списание из отчетов или системы, выводим "Система"
-    if (i.type === "Списание" || i.approver === "Система" || i.approver === "Отчет") {
-        rightText = "Система";
+        if (i.type === "Списание" || i.approver === "Система" || i.approver === "Отчет") {
+            rightText = "Система";
+        }
+        
+        let bColor = rawNum > 0 ? "#27ae60" : (isPenalty ? "#e74c3c" : "#f39c12");
+        
+        // ИСПРАВЛЕНО: Генерация иконок для системных типов и Вознаграждения в истории баллов
+        let iconHtml = "";
+        let sType = String(finalType || "").toLowerCase();
+        let sReason = String(i.reason || "").toLowerCase();
+        let sSrc = String(i.source || "").toLowerCase();
+        
+        if (sType.includes("ценник") || sReason.includes("ценник")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">sell</span>`;
+        else if (sType.includes("ревизи") || sReason.includes("ревизи")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">fact_check</span>`;
+        else if (sType.includes("уборк") || sReason.includes("уборк")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">cleaning_services</span>`;
+        else if (sType.includes("отзыв") || sReason.includes("отзыв")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">rate_review</span>`;
+        else if (sType.includes("табель") || sReason.includes("отсутствие отчета")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">calendar_today</span>`;
+        else if (sType.includes("вознагражд") || sSrc.includes("вознагражд")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">stars</span>`;
+        
+        finalType = iconHtml + finalType;
+
+        return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, borderColor: bColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
     }
-    
-    let bColor = rawNum > 0 ? "#27ae60" : (isPenalty ? "#e74c3c" : "#f39c12");
-    
-    return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, borderColor: bColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
-}
 
 function renderMoneyFineItem(i) { let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); let moneyVal = parseFloat(String(i.moneyFine).replace(',', '.')) || 0; let ptsVal = parseFloat(String(i.val).replace(',', '.')) || 0; let badgeHtml = ""; if (moneyVal !== 0) badgeHtml += `<span class="detail-fine" style="margin-left:10px; white-space:nowrap;">${formatNumberWithSpaces(String(moneyVal).replace('.',','))} ₸</span>`; if (ptsVal !== 0) badgeHtml += `<span class="detail-fine" style="margin-left:10px; white-space:nowrap;">${String(ptsVal).replace('.',',')} б.</span>`; if (badgeHtml === "") badgeHtml = `<span class="detail-fine" style="margin-left:10px;">0</span>`; let issuerHtml = (i.source && isDirOrZav) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${formatShortName(i.source)}</span>` : ''; return `<div class="req-item" style="border-left-color: #e74c3c; border-left-width: 2px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;"><div style="flex:1;"><b style="font-size:12px; color:#e74c3c; display:inline-block; margin-bottom:3px;">Штраф</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div><span style="color:gray;font-size:10px;">${i.date}</span></div>${issuerHtml}</div></div><div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">${badgeHtml}</div></div>`; }
 
@@ -1835,7 +1850,36 @@ function openDetails(type) {
       window.triggerMyPtsReload('search'); 
       return; 
   }
-  else if (type === 'kpi') { document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date)); currentKpi.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: k.source, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); }); listHtml += "</div>"; }
+  else if (type === 'kpi') { 
+      document.getElementById("details-title").innerText = "Детали КФ. ЭФФ."; 
+      listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
+      let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date)); 
+      
+      currentKpi.forEach(k => { 
+          let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); 
+          let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; 
+          let srcColor = getSourceColor(k.source); 
+          let dispName = k.name; 
+          if (k.source === "База" || k.name === "Ошибки") dispName = k.name; 
+          if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } 
+          
+          // ИСПРАВЛЕНО: Генерация иконок для системных типов в КФ. ЭФФ. текущего пользователя
+          let iconHtml = "";
+          let sSrc = String(k.source || "").toLowerCase();
+          let sName = String(k.name || "").toLowerCase();
+          
+          if (sSrc.includes("ценник") || sName.includes("ценник")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">sell</span>`;
+          else if (sSrc.includes("ревизи") || sName.includes("ревизи")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">fact_check</span>`;
+          else if (sSrc.includes("уборк") || sName.includes("уборк")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">cleaning_services</span>`;
+          else if (sSrc.includes("отзыв") || sName.includes("отзыв")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">rate_review</span>`;
+          else if (sSrc.includes("табель") || sName.includes("больничн") || sName.includes("прогул")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">calendar_today</span>`;
+          
+          let displaySource = iconHtml + k.source;
+
+          listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: displaySource, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); 
+      }); 
+      listHtml += "</div>"; 
+  }
   else if (type === 'report') { 
           document.getElementById("details-title").innerText = "Мои отчеты"; 
           listHtml = "<div style='padding-top:5px;'>"; 
@@ -1890,7 +1934,32 @@ else if (type === 'tabel') {
 
 function openEmpKpiDetails(iin, fromDetails = false) { 
   const emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return; let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => { if (fromDetails) openEmpDetails(iin); else switchTab(prevTab); }; document.getElementById("details-title").innerText = "КФ. ЭФФ: " + emp.name; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
-  let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; emp.kpiDetails.forEach(k => { let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; let srcColor = getSourceColor(k.source); let dispName = k.name; if (k.source === "База" || k.name === "Ошибки") dispName = k.name; if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: k.source, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); }); listHtml += "</div>"; document.getElementById("details-list").innerHTML = listHtml; 
+  let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
+  
+  emp.kpiDetails.forEach(k => { 
+      let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); 
+      let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; 
+      let srcColor = getSourceColor(k.source); 
+      let dispName = k.name; 
+      if (k.source === "База" || k.name === "Ошибки") dispName = k.name; 
+      if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } 
+      
+      // ИСПРАВЛЕНО: Генерация иконок для системных типов в КФ. ЭФФ. при просмотре сотрудника админом
+      let iconHtml = "";
+      let sSrc = String(k.source || "").toLowerCase();
+      let sName = String(k.name || "").toLowerCase();
+      
+      if (sSrc.includes("ценник") || sName.includes("ценник")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">sell</span>`;
+      else if (sSrc.includes("ревизи") || sName.includes("ревизи")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">fact_check</span>`;
+      else if (sSrc.includes("уборк") || sName.includes("уборк")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">cleaning_services</span>`;
+      else if (sSrc.includes("отзыв") || sName.includes("отзыв")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">rate_review</span>`;
+      else if (sSrc.includes("табель") || sName.includes("больничн") || sName.includes("прогул")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">calendar_today</span>`;
+      
+      let displaySource = iconHtml + k.source;
+
+      listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: displaySource, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); 
+  }); 
+  listHtml += "</div>"; document.getElementById("details-list").innerHTML = listHtml; 
 }
 
 function openEmpDetails(iin) {
