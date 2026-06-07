@@ -720,7 +720,9 @@ async function callBackend(actionName, payloadData = {}) {
                       histItem.val = "+" + ptsMotivation; 
                   }
                   if (ud.iin === appState.iin) { myPtsHistory.push(histItem); }
-                  if (empMap[ud.iin]) { empMap[ud.iin].ptsHistory.push(histItem); if (histItem.type === "Начисление") { empMap[ud.iin].pts.acc += ptsMotivation; if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; else empMap[ud.iin].sales.sc++; } if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); }
+                  if (empMap[ud.iin]) { empMap[ud.iin].ptsHistory.push(histItem); if (histItem.type === "Начисление") { empMap[ud.iin].pts.acc += ptsMotivation; 
+                  // ИСПРАВЛЕНО: Начисление вознаграждения больше не накручивает счетчик проданных товаров СЦ/Фокус сотрудника в БД
+                  if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; else if (histItem.source !== "Вознаграждение") empMap[ud.iin].sales.sc++; } if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); }
               }
               if (kpiChange !== 0) {
                   let kName = cleanActionText || ud.type; let kSource = dynamicType;
@@ -1517,7 +1519,9 @@ function renderDashboardData(data, isSilent = false) {
       infoTabel.innerHTML = `<div class="tabel-item" style="color:#f39c12"><span class="tabel-lbl">БС.</span>${data.info?.tabel?.bs ?? 0}</div><div class="tabel-item" style="color:#e67e22"><span class="tabel-lbl">БЛ.</span>${data.info?.tabel?.bl ?? 0}</div><div class="tabel-item" style="color:#e74c3c"><span class="tabel-lbl">ПР.</span>${data.info?.tabel?.pr ?? 0}</div><div class="tabel-item" style="color:#f1c40f"><span class="tabel-lbl">ОТ.</span>${data.info?.tabel?.ot ?? 0}</div><div class="tabel-item" style="color:#27ae60"><span class="tabel-lbl">РД.</span>${data.info?.tabel?.rd ?? 0}</div><div class="tabel-item" style="color:#9b59b6"><span class="tabel-lbl">УС.</span>${data.info?.tabel?.us ?? 0}</div>`; 
   }
 
-  myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.type === "Штраф"); myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек"); window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
+  myReports = data.info?.reports || []; myPointsHistory = data.info?.myPtsHistory || []; myMoneyFinesHistory = myPointsHistory.filter(p => p && p.type === "Штраф"); 
+  // ИСПРАВЛЕНО: Исключаем Вознаграждение из подсчета проданных СЦ/Фокус товаров продавца в баннере
+  myScHistory = myPointsHistory.filter(p => p && p.type === "Начисление" && p.source !== "Горячий чек" && p.source !== "Вознаграждение"); window.myCurrentKpi = kpiValue; myDisplayPointsHistory = myPointsHistory.filter(p => { let ptsVal = parseFloat(String(p.val).replace(',', '.')) || 0; if (p.type === "KPI" && p.source !== "Горячий чек") return false; if (p.type === "KPI" && p.source === "Горячий чек" && ptsVal === 0) return false; return ptsVal !== 0; });
   let currentMonth = new Date().getMonth() + 1; let currentYear = new Date().getFullYear(); let monthSuffix = ("0" + currentMonth).slice(-2) + "." + currentYear; let monthSc = myScHistory.filter(p => p && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
   let countSc = monthSc.filter(p => p && (p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект")).length; 
   let countFocus = monthSc.filter(p => p && (p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект")).length; 
@@ -2889,7 +2893,8 @@ function renderAdminEmps(dept, btnElement) {
            groupEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
            
            sellersHtml += groupEmps.map((e, idx) => {
-               let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
+               // ИСПРАВЛЕНО: Исключаем Вознаграждения из подсчета СЦ/Фокус в общем списке продавцов панели администратора
+               let monthScHist = e.ptsHistory.filter(p => p.type === "Начисление" && p.source !== "Горячий чек" && p.source !== "Вознаграждение" && typeof p.date === 'string' && p.date.includes(monthSuffix)); 
                let curMonthSc = monthScHist.filter(p => p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект").length; 
                let curMonthFocus = monthScHist.filter(p => p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект").length; 
                let kpiFontSize = e.kpi % 1 !== 0 ? '8px' : '10px';
