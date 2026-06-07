@@ -288,52 +288,60 @@ async function callBackend(actionName, payloadData = {}) {
                       if ((reqType === "Продажа СЦ/Дефект" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
                   }
                   else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                  
+                  // ИСПРАВЛЕНО: Новый аккуратный формат текста для начислений вознаграждений в Telegram
+                  else if (reqType === "Вознаграждение") {
+                      let targetIin = metaObj.target_iin || req.target_iin;
+                      let pointsVal = parseFloat(String(metaObj.points || "0").replace('+', '')) || 0;
+                      let reasonStr = metaObj.reason || req.details;
                       
-                      // ИСПРАВЛЕНО: Логика одобрения Вознаграждения с отправкой очищенного текста в Telegram
-                      else if (reqType === "Вознаграждение") {
-                          let targetIin = metaObj.target_iin || req.target_iin;
-                          let pointsVal = parseFloat(String(metaObj.points || "0").replace('+', '')) || 0;
-                          let reasonStr = metaObj.reason || req.details;
+                      if (targetIin) {
+                          await supabaseClient.from('user_details').insert([{ 
+                              iin: targetIin, 
+                              type: 'Вознаграждение', 
+                              action_text: reasonStr, 
+                              points_motivation: pointsVal, 
+                              manager_iin: appState.iin 
+                          }]);
                           
-                          if (targetIin) {
-                              await supabaseClient.from('user_details').insert([{ 
-                                  iin: targetIin, 
-                                  type: 'Вознаграждение', 
-                                  action_text: reasonStr, 
-                                  points_motivation: pointsVal, 
-                                  manager_iin: appState.iin 
-                              }]);
-                              
-                              // Очищаем HTML-теги карточки, заменяя переносы строк для читаемости в мессенджере
-                              let cleanDetails = String(req.details || "").replace(/<br\s*\/?>/gi, "\n").replace(/<\/?[^>]+(>|$)/g, "");
-                              let tgMessage = `🎉 *Одобрено вознаграждение!*\n\n${cleanDetails}`;
-                              
-                              fetch(GAS_URL, { 
-                                  method: "POST", 
-                                  body: JSON.stringify({ action: "sendTgNotification", payload: { text: tgMessage } }) 
-                              }).catch(()=>{});
-                          }
-                          newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
-                      }
-                      
-                      // ИСПРАВЛЕНО: Выделенный блок для Трудового отпуска с подгрузкой ФИО автора из таблицы пользователей
-                      else if (reqType === "Трудовой отпуск" || reqType === "Отпуск") {
-                          let employeeName = req.author_iin;
+                          // Запрашиваем ФИО сотрудника по его ИИН из базы данных
+                          let empName = targetIin;
                           try {
-                              let { data: authUser } = await supabaseClient.from('users').select('full_name').eq('iin', req.author_iin).maybeSingle();
-                              if (authUser && authUser.full_name) employeeName = authUser.full_name;
+                              let { data: uData } = await supabaseClient.from('users').select('full_name').eq('iin', targetIin).maybeSingle();
+                              if (uData && uData.full_name) empName = uData.full_name;
                           } catch(e){}
                           
-                          let tgMessage = `🌴 *Утвержден трудовой отпуск!*\n\n👤 *Сотрудник:* ${employeeName}\n📅 *Период:* ${req.details}`;
+                          let pointsStr = metaObj.points || ("+" + pointsVal);
+                          let tgMessage = `${empName} вознагражден ${pointsStr} 🏅 мотивационными баллами за ${reasonStr}`;
                           
                           fetch(GAS_URL, { 
                               method: "POST", 
                               body: JSON.stringify({ action: "sendTgNotification", payload: { text: tgMessage } }) 
                           }).catch(()=>{});
-                          
-                          newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
                       }
-                      else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
+                  }
+                  
+                  // ИСПРАВЛЕНО: Выделенная ветка и новый аккуратный формат текста для трудовых отпусков
+                  else if (reqType === "Трудовой отпуск" || reqType === "Отпуск") {
+                      let empName = req.author_iin;
+                      try {
+                          let { data: uData } = await supabaseClient.from('users').select('full_name').eq('iin', req.author_iin).maybeSingle();
+                          if (uData && uData.full_name) empName = uData.full_name;
+                      } catch(e){}
+                      
+                      // Меняем заглавную "С" на строчную для бесшовного слияния предложения
+                      let periodStr = String(req.details || "").replace(/^С /, "с ");
+                      let tgMessage = `${empName} будет находиться на трудовом отпуске🌴 в период ${periodStr}.`;
+                      
+                      fetch(GAS_URL, { 
+                          method: "POST", 
+                          body: JSON.stringify({ action: "sendTgNotification", payload: { text: tgMessage } }) 
+                      }).catch(()=>{});
+                      
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
+                  }
+                  else { newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   }
           }
       }
@@ -2487,12 +2495,12 @@ window.openAdminPointsForm = function() {
             
             <div style="margin-bottom:10px;">
                 <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Количество баллов:</div>
-                <input type="number" id="adm-pts-val" placeholder="Например: 15" min="1" style="width:100%; height:38px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); padding:0 10px; font-size:13px;">
+                <input type="number" id="adm-pts-val" placeholder="Начисляемые баллы" min="1" style="width:100%; height:38px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); padding:0 10px; font-size:13px;">
             </div>
             
             <div style="margin-bottom:14px;">
                 <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Причина начисления:</div>
-                <input type="text" id="adm-pts-reason" placeholder="За отличные продажи / Trade-In" style="width:100%; height:38px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); padding:0 10px; font-size:13px;">
+                <input type="text" id="adm-pts-reason" placeholder="Укажите за что" style="width:100%; height:38px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); padding:0 10px; font-size:13px;">
             </div>
             
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
