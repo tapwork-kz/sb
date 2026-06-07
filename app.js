@@ -1919,7 +1919,8 @@ function openDetails(type) {
       listHtml += "</div>"; 
   }
   else if (type === 'report') { 
-          document.getElementById("details-title").innerText = "Мои отчеты"; 
+          // ИСПРАВЛЕНО: Заменили innerText на innerHTML и добавили системную иконку отчетов
+          document.getElementById("details-title").innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; vertical-align:middle; margin-right:6px; color:#3390ec;">assignment</span>Мои отчеты`; 
           // ИСПРАВЛЕНО: Инициализация календаря для просмотра личных исторических отчетов продавца/кассира
           if (!window.currentMyRepMonth || !window.currentMyRepYear) {
               let d = new Date();
