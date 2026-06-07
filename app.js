@@ -383,7 +383,8 @@ async function callBackend(actionName, payloadData = {}) {
           supabaseClient.from('requests').select('*').order('created_at', { ascending: false }), 
           supabaseClient.from('user_details').select('*').order('created_at', { ascending: false }), 
           supabaseClient.from('sheet_kpi_params').select('*').order('date', { ascending: false }).limit(1), 
-          supabaseClient.from('user_sheet_info').select('*'), 
+          // ИСПРАВЛЕНО: Сортируем накопительные строки отчётов по дате убывания. Метод .find() ниже теперь гарантированно заберет самый свежий слепок отчетов за сегодня
+          supabaseClient.from('user_sheet_info').select('*').order('date', { ascending: false }), 
           supabaseClient.from('store_sc_items').select('*').order('date', { ascending: false }).limit(1), 
           supabaseClient.from('trade_in_models').select('model_name').order('sort_order', { ascending: true }),
           supabaseClient.from('emp_attendance_days').select('*').gte('date', startMStr).lte('date', endMStr)
@@ -2034,17 +2035,16 @@ function renderEmpDetailTab(tab, iin) {
       return;
   }
   else if (tab === 'rep') { 
-      let eRoleLow = String(emp.role || "").toLowerCase();
-      let isEmpCashier = eRoleLow.includes("кассир") && !eRoleLow.includes("старший кассир");
-      let displayReports = emp.reports || [];
-      
-      // ИСПРАВЛЕНО: При просмотре профиля кассира в админке отображаем строго только отчет «Отзыв»
-      if (isEmpCashier) {
-          displayReports = displayReports.filter(rep => rep.title && rep.title.toLowerCase().includes("отзыв"));
+      // ИСПРАВЛЕНО: Инициализируем календарь отчётов и подготавливаем узел для асинхронного вывода истории
+      if (!window.currentRepMonth || !window.currentRepYear) {
+          let d = new Date();
+          window.currentRepMonth = d.getMonth();
+          window.currentRepYear = d.getFullYear();
       }
-      
-      // ИСПРАВЛЕНО: Передаем статус кассира для скрытия штрафных баллов с ячеек
-      html = displayReports.map(rep => generateHorizontalGrid(rep, isEmpCashier)).join('') || "<p style='text-align:center;color:gray;font-size:12px;'>Отчетов нет</p>"; 
+      html = `<div id="rep-calendar-container"></div>`;
+      content.innerHTML = html;
+      renderEmpReportsData(iin); // Запуск асинхронной подгрузки накопительных отчётов за выбранный месяц
+      return;
   }
   else if (tab === 'pts') { 
     let pointsHeader = `<div style="display:flex; justify-content:space-between; align-items:center; gap:6px; padding:12px; background:var(--card-bg); border:1px solid rgba(150,150,150,0.2); border-radius:12px; margin-bottom:8px;">
@@ -2353,6 +2353,98 @@ window.adjustCalMonth = function(iin, delta, containerId = "tabel-calendar-conta
         window.currentCalYear -= 1;
     }
     renderTabelCalendarData(iin, containerId);
+};
+
+// ИСПРАВЛЕНО: Асинхронная подгрузка и отрисовка сетки отчётов за выбранный месяц с переключателем
+async function renderEmpReportsData(iin) {
+    let container = document.getElementById("rep-calendar-container");
+    if (!container) return;
+    
+    let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    let year = window.currentRepYear;
+    let month = window.currentRepMonth;
+    
+    container.innerHTML = `<div style="text-align:center; font-size:12px; padding:20px; color:gray;">Загрузка отчетов за выбранный месяц...</div>`;
+    
+    let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
+    let lastDay = new Date(year, month + 1, 0).getDate();
+    let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+    
+    let displayReports = [];
+    let isEmpCashier = false;
+    
+    try {
+        let emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin));
+        if (emp) {
+            let eRoleLow = String(emp.role || "").toLowerCase();
+            isEmpCashier = eRoleLow.includes("кассир") && !eRoleLow.includes("старший кассир");
+        }
+        
+        // Достаем самый свежий и полный слепок отчетов внутри выбранного диапазона дат
+        let { data: repList, error } = await supabaseClient
+            .from('user_sheet_info')
+            .select('*')
+            .eq('iin', iin)
+            .gte('date', startDateStr)
+            .lte('date', endDateStr)
+            .order('date', { ascending: false })
+            .limit(1);
+            
+        if (!error && repList && repList.length > 0) {
+            displayReports = repList[0].reports_data || [];
+        }
+    } catch(e) { console.error("Ошибка загрузки истории отчетов:", e); }
+    
+    let navHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustRepMonth('${iin}', -1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
+        </button>
+        
+        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">
+                ${monthNames[month]} ${year}
+            </span>
+            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
+                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
+                   onchange="window.onRepMonthPickerChange(this.value, '${iin}')">
+        </div>
+        
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustRepMonth('${iin}', 1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
+        </button>
+    </div>
+    `;
+    
+    if (isEmpCashier) {
+        displayReports = displayReports.filter(rep => rep.title && rep.title.toLowerCase().includes("отзыв"));
+    }
+    
+    let reportsHtml = displayReports.map(rep => generateHorizontalGrid(rep, isEmpCashier)).join('') || "<p style='text-align:center;color:gray;font-size:12px;padding:20px 0;'>Отчетов за этот месяц нет</p>";
+    
+    container.innerHTML = navHtml + reportsHtml;
+}
+
+// Переключение месяцев стрелками для отчетов
+window.adjustRepMonth = function(iin, delta) {
+    window.currentRepMonth += delta;
+    if (window.currentRepMonth > 11) {
+        window.currentRepMonth = 0;
+        window.currentRepYear += 1;
+    } else if (window.currentRepMonth < 0) {
+        window.currentRepMonth = 11;
+        window.currentRepYear -= 1;
+    }
+    renderEmpReportsData(iin);
+};
+
+// Переключение месяца через встроенный пикер
+window.onRepMonthPickerChange = function(value, iin) {
+    if (!value) return;
+    let parts = value.split('-');
+    window.currentRepYear = parseInt(parts[0], 10);
+    window.currentRepMonth = parseInt(parts[1], 10) - 1;
+    renderEmpReportsData(iin);
 };
 
 // ИСПРАВЛЕНО: Возвращена логика выпадающего списка административного плюса и стили вознаграждений
