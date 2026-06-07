@@ -722,7 +722,7 @@ async function callBackend(actionName, payloadData = {}) {
               // Возвращаем dateStr (которое содержит точное время) в свойство date для отображения в углу
               let reqObj = { id: r.id, date: dateStr, authorIin: r.author_iin, authorName: author.full_name || r.author_iin, authorRole: author.role || "Продавец", authorDept: author.dept || "", adminDisplayName: author.dept ? `${author.full_name} — ${author.dept}` : author.full_name, type: r.type, details: r.details, targetIin: r.target_iin, targetName: target.full_name || "", status: r.status === 'pending' ? 'pending_admin' : r.status, meta: r.metadata ? JSON.stringify(r.metadata) : "{}" };
               let isDismissedByMe = false; try { if (metaObj.dismissedBy && metaObj.dismissedBy.includes(appState.iin)) isDismissedByMe = true; } catch(e) {}
-              if (reqObj.type === "Отпуск" && !["rejected", "rejected_by_user", "rejected_notify_user", "rejected_notify_zav"].includes(reqObj.status)) { globalVacations.push(reqObj); }
+              if (reqObj.type === "Трудовой отпуск" && !["rejected", "rejected_by_user", "rejected_notify_user", "rejected_notify_zav"].includes(reqObj.status)) { globalVacations.push(reqObj); }
               if (r.type === "Замечание" && (r.status === "approved" || r.status === "pending_user_reply" || r.status === "pending_admin_view_remark")) { if (empMap[r.target_iin]) empMap[r.target_iin].remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr }); if (r.target_iin === appState.iin) { if (!localData.info.remarks) localData.info.remarks = []; localData.info.remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr }); } }
               if (isDir) { if (reqObj.status === "pending_admin" || reqObj.status === "pending_admin_view") adminInbox.push(reqObj); if (reqObj.status === "pending_admin_view_remark" && !isDismissedByMe) adminInbox.push(reqObj); if (reqObj.type === "Замечание" && reqObj.status === "pending_user_reply" && reqObj.authorIin !== appState.iin && !isDismissedByMe) adminInbox.push(reqObj); if (["approved", "rejected", "viewed", "rejected_by_user", "rejected_notify_user", "approved_notify_zav", "rejected_notify_zav"].includes(reqObj.status) || isDismissedByMe) { if (adminHistory.length < 200) adminHistory.push(reqObj); } }
               if (isZavSklad) { if ((reqObj.status === "rejected_notify_zav" || reqObj.status === "approved_notify_zav") && reqObj.authorIin === appState.iin) userInbox.push(reqObj); else if (reqObj.status === "pending_user" && reqObj.targetIin === appState.iin) userInbox.push(reqObj); else if (reqObj.status === "rejected_notify_user" && reqObj.authorIin === appState.iin) userInbox.push(reqObj); else if (reqObj.status === "pending_user_reply" && reqObj.targetIin === appState.iin) userInbox.push(reqObj); else if (reqObj.type === "Замечание" && (reqObj.status === "pending_user_reply" || reqObj.status === "pending_admin_view_remark") && reqObj.targetIin !== appState.iin && reqObj.authorIin !== appState.iin && !isDismissedByMe) userInbox.push(reqObj); else if (reqObj.status === "notify_user_fine" && reqObj.targetIin === appState.iin && !isDismissedByMe) userInbox.push(reqObj); if (["approved", "rejected", "viewed", "rejected_by_user", "rejected_notify_user", "approved_notify_zav", "rejected_notify_zav", "viewed_fine"].includes(reqObj.status) || isDismissedByMe) { if (adminHistory.length < 200) adminHistory.push(reqObj); } }
@@ -1004,7 +1004,8 @@ function getSourceColor(src) {
     if(s.includes('исправл')) return '#3498db'; 
     if(s.includes('мотивац')) return '#3390ec'; 
     // ИСПРАВЛЕНО: Присваиваем красивый изумрудный цвет для типа "Вознаграждение" в ленте истории
-    if(s.includes('вознагражд')) return '#2ecc71'; 
+    if(s.includes('вознагражд')) return '#2ecc71';
+    if(s.includes('отпуск')) return '#f39c12'; 
     
     let hash = 0; 
     for(let i = 0; i < s.length; i++) {
@@ -2406,10 +2407,11 @@ window.submitAdminVacation = function() {
     let meta = JSON.stringify({ startDate: start, endDate: end }); 
     
     let modal = document.getElementById("admin-vacation-modal-overlay");
-    if (modal) modal.remove();
-    
-    executeSubmit("Отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
-};
+            if (modal) modal.remove();
+            
+            // ИСПРАВЛЕНО: Исправлен тип запроса на отправку "Трудовой отпуск"
+            executeSubmit("Трудовой отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
+        };
 
 // ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с ФИО сначала и отделами в скобках
 window.openAdminPointsForm = function() {
