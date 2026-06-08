@@ -2573,6 +2573,10 @@ window.toggleAdminPlusMenu = function() {
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeSummary();">
+                <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">history_toggle_off</span>
+                <span>Переработки</span>
+            </div>
             <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
                 <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
                 <span>Штрафы</span>
@@ -3780,4 +3784,153 @@ window.submitCashierOvertimeForm = async function() {
     } else {
         showToast("Ошибка отправки: " + (res?.error || "неизвестно"), true);
     }
+};
+
+// ИСПРАВЛЕНО: Функция создания модального окна сводной ведомости переработок
+window.openAdminOvertimeSummary = function() {
+    let existingModal = document.getElementById("admin-overtime-summary-modal-overlay");
+    if (existingModal) existingModal.remove();
+    
+    if (!window.currentOvertimeSummaryMonth || !window.currentOvertimeSummaryYear) {
+        let d = new Date();
+        window.currentOvertimeSummaryMonth = d.getMonth();
+        window.currentOvertimeSummaryYear = d.getFullYear();
+    }
+    
+    let modal = document.createElement("div");
+    modal.id = "admin-overtime-summary-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:360px; background:var(--card-bg); padding:14px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; max-height:80vh; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+            <h3 style="margin:0 0 12px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
+              <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">history_toggle_off</span>
+              Сводка по переработкам
+            </h3>
+            
+            <div id="admin-overtime-nav-container"></div>
+            
+            <div id="admin-overtime-scroll-area" style="flex:1; overflow-y:auto; margin-bottom:12px; padding-right:2px;"></div>
+            
+            <button class="btn-gray" onclick="document.getElementById('admin-overtime-summary-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px; width:100%;">Закрыть</button>
+        </div>
+    `;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+    
+    window.renderAdminOvertimeSummaryData();
+};
+
+// ИСПРАВЛЕНО: Асинхронный подсчет отработанных дней и часов усилений (УС) за выбранный месяц
+window.renderAdminOvertimeSummaryData = async function() {
+    let navContainer = document.getElementById("admin-overtime-nav-container");
+    let scrollArea = document.getElementById("admin-overtime-scroll-area");
+    if (!navContainer || !scrollArea) return;
+    
+    let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    let year = window.currentOvertimeSummaryYear;
+    let month = window.currentOvertimeSummaryMonth;
+    
+    let navHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustOvertimeSummaryMonth(-1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
+        </button>
+        
+        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
+                ${monthNames[month]} ${year}
+            </span>
+            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
+                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
+                   onchange="window.onOvertimeSummaryMonthPickerChange(this.value)">
+        </div>
+        
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustOvertimeSummaryMonth(1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
+        </button>
+    </div>
+    `;
+    navContainer.innerHTML = navHtml;
+    
+    scrollArea.innerHTML = `<div style="text-align:center; color:gray; font-size:12px; padding:20px 0;">Загрузка данных переработок...</div>`;
+    
+    let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
+    let lastDay = new Date(year, month + 1, 0).getDate();
+    let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+    
+    let ovMap = {};
+    try {
+        // Подтягиваем посуточные записи за выбранный месяц со статусом УС (Усиление/Переработка)
+        let { data: attList, error } = await supabaseClient
+            .from('emp_attendance_days')
+            .select('*')
+            .gte('date', startDateStr)
+            .lte('date', endDateStr)
+            .eq('status', 'УС');
+            
+        if (!error && attList) {
+            attList.forEach(row => {
+                let iin = row.iin;
+                if (!ovMap[iin]) {
+                    ovMap[iin] = { days: 0, hours: 0 };
+                }
+                ovMap[iin].days += 1;
+                ovMap[iin].hours += parseFloat(row.hours || 0);
+            });
+        }
+    } catch (e) { console.error("Ошибка загрузки сводки переработок:", e); }
+    
+    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
+    let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+    validEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    
+    let listHtml = "";
+    let totalOvertimesCount = 0;
+    
+    validEmps.forEach(e => {
+        let ovData = ovMap[e.iin];
+        if (ovData && ovData.days > 0) {
+            totalOvertimesCount++;
+            let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
+            listHtml += `
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+                <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    ${e.name}${deptStr}
+                </div>
+                <div style="font-size:11px; color:gray; display:flex; gap:12px; align-items:center;">
+                    <span>Дней усиления: <b style="color:var(--text-color);">${ovData.days}</b></span>
+                    <span>Всего переработано: <b style="color:#f39c12;">${ovData.hours} ч.</b></span>
+                </div>
+            </div>`;
+        }
+    });
+    
+    if (totalOvertimesCount === 0) {
+        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Переработок за этот месяц не зафиксировано</p>`;
+    }
+    
+    scrollArea.innerHTML = listHtml;
+};
+
+// Переключение месяцев стрелками
+window.adjustOvertimeSummaryMonth = function(delta) {
+    window.currentOvertimeSummaryMonth += delta;
+    if (window.currentOvertimeSummaryMonth > 11) {
+        window.currentOvertimeSummaryMonth = 0;
+        window.currentOvertimeSummaryYear += 1;
+    } else if (window.currentOvertimeSummaryMonth < 0) {
+        window.currentOvertimeSummaryMonth = 11;
+        window.currentOvertimeSummaryYear -= 1;
+    }
+    window.renderAdminOvertimeSummaryData();
+};
+
+// Переключение месяца через встроенный пикер календаря
+window.onOvertimeSummaryMonthPickerChange = function(value) {
+    if (!value) return;
+    let parts = value.split('-');
+    window.currentOvertimeSummaryYear = parseInt(parts[0], 10);
+    window.currentOvertimeSummaryMonth = parseInt(parts[1], 10) - 1;
+    window.renderAdminOvertimeSummaryData();
 };
