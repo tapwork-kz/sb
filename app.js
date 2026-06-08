@@ -4364,17 +4364,17 @@ window.renderAdminTabelSummaryData = async function() {
                 ${e.name}${deptStr}
             </div>
             <div style="font-size:11px; color:gray; display:flex; gap:6px; flex-wrap:wrap; align-items:center; line-height:1.2;">
-                <span>РД: <b style="color:var(--text-color);">${s.fact} / ${s.plan}</b></span>
-                <span style="color:var(--border-color);">|</span>
-                <span>УС: <b style="color:#9b59b6;">${s.US}</b></span>
+                <span>БС: <b style="color:#f1c40f;">${s.BS}</b></span>
                 <span style="color:var(--border-color);">|</span>
                 <span>БЛ: <b style="color:#e67e22;">${s.BL}</b></span>
                 <span style="color:var(--border-color);">|</span>
+                <span>ПР: <b style="color:#e74c3c;">${s.PR}</b></span>
+                <span style="color:var(--border-color);">|</span>
                 <span>ОТ: <b style="color:#27ae60;">${s.OT}</b></span>
                 <span style="color:var(--border-color);">|</span>
-                <span>БС: <b style="color:#f1c40f;">${s.BS}</b></span>
+                <span>РД: <b style="color(--text-color);">${s.fact} / ${s.plan}</b></span>
                 <span style="color:var(--border-color);">|</span>
-                <span>ПР: <b style="color:#e74c3c;">${s.PR}</b></span>
+                <span>УС: <b style="color:#9b59b6;">${s.US}</b></span>
             </div>
         </div>`;
     });
@@ -4407,24 +4407,31 @@ window.onAdminTabelSummaryMonthPickerChange = function(value) {
     window.renderAdminTabelSummaryData();
 };
 
-// ИСПРАВЛЕНО: Функция-обработчик клика по сотруднику из административного табеля
+// ИСПРАВЛЕНО: Перенаправление клика со сводного табеля в ПОЛНУЮ карточку сотрудника (профиль)
 window.handleAdminTabelRowClick = function(targetIin) {
     if (!targetIin) return;
     
-    // 1. Закрываем текущее модальное окно сводного табеля, чтобы оно не перекрывало карточку
+    // 1. Закрываем модальное окно сводного табеля, чтобы освободить экран
     let modal = document.getElementById("admin-tabel-summary-modal-overlay");
     if (modal) modal.remove();
     
-    // 2. Вызываем штатное открытие карточки/деталей сотрудника по его IIN.
-    // Скрипт автоматически выберет рабочую функцию вашей админ-панели:
-    if (typeof window.openDetails === 'function') {
-        window.openDetails('tabel', targetIin);
-    } else if (typeof window.openEmpDetails === 'function') {
-        window.openEmpDetails(targetIin);
-    } else if (typeof window.showEmpDetails === 'function') {
-        window.showEmpDetails(targetIin);
+    // 2. Автоматическая цепочка вызова полной карточки сотрудника (профайла)
+    if (typeof window.openEmpProfile === 'function') {
+        window.openEmpProfile(targetIin);
+    } else if (typeof window.openEmpCard === 'function') {
+        window.openEmpCard(targetIin);
+    } else if (typeof window.showEmpCard === 'function') {
+        window.showEmpCard(targetIin);
+    } else if (typeof window.openAdminEmpDetails === 'function') {
+        window.openAdminEmpDetails(targetIin);
     } else {
-        // Фолбек: если используется стандартный вызов через общую шину личного кабинета
-        if (typeof openDetails === 'function') openDetails('tabel', targetIin);
+        // ФОЛБЕК: Если функции выше не сработали, выполните этот поиск:
+        // Загляните в вашу функцию renderAdminEmps() и посмотрите, какая функция там 
+        // вызывается при клике на сотрудника. И просто пропишите её ниже вместо openEmpProfile:
+        if (typeof openEmpProfile === 'function') {
+            openEmpProfile(targetIin);
+        } else {
+            showToast("Функция карточки не найдена. Проверить имя в app.js", true);
+        }
     }
 };
