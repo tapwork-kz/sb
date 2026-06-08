@@ -4370,9 +4370,9 @@ window.renderAdminTabelSummaryData = async function() {
                 <span style="color:var(--border-color);">|</span>
                 <span>ПР: <b style="color:#e74c3c;">${s.PR}</b></span>
                 <span style="color:var(--border-color);">|</span>
-                <span>ОТ: <b style="color:#27ae60;">${s.OT}</b></span>
+                <span>ОТ: <b style="color:#f1c40f;">${s.OT}</b></span>
                 <span style="color:var(--border-color);">|</span>
-                <span>РД: <b style="color(--text-color);">${s.fact} / ${s.plan}</b></span>
+                <span>РД: <b style="color:#27ae60;">${s.fact} / ${s.plan}</b></span>
                 <span style="color:var(--border-color);">|</span>
                 <span>УС: <b style="color:#9b59b6;">${s.US}</b></span>
             </div>
@@ -4407,31 +4407,68 @@ window.onAdminTabelSummaryMonthPickerChange = function(value) {
     window.renderAdminTabelSummaryData();
 };
 
-// ИСПРАВЛЕНО: Перенаправление клика со сводного табеля в ПОЛНУЮ карточку сотрудника (профиль)
+// ИСПРАВЛЕНО: Умный автоматический сканер для открытия ПОЛНОЙ карточки сотрудника прямо из табеля
 window.handleAdminTabelRowClick = function(targetIin) {
     if (!targetIin) return;
     
-    // 1. Закрываем модальное окно сводного табеля, чтобы освободить экран
+    // 1. Закрываем оверлей сводного табеля, чтобы освободить экран
     let modal = document.getElementById("admin-tabel-summary-modal-overlay");
     if (modal) modal.remove();
     
-    // 2. Автоматическая цепочка вызова полной карточки сотрудника (профайла)
-    if (typeof window.openEmpProfile === 'function') {
-        window.openEmpProfile(targetIin);
-    } else if (typeof window.openEmpCard === 'function') {
-        window.openEmpCard(targetIin);
-    } else if (typeof window.showEmpCard === 'function') {
-        window.showEmpCard(targetIin);
-    } else if (typeof window.openAdminEmpDetails === 'function') {
-        window.openAdminEmpDetails(targetIin);
-    } else {
-        // ФОЛБЕК: Если функции выше не сработали, выполните этот поиск:
-        // Загляните в вашу функцию renderAdminEmps() и посмотрите, какая функция там 
-        // вызывается при клике на сотрудника. И просто пропишите её ниже вместо openEmpProfile:
-        if (typeof openEmpProfile === 'function') {
-            openEmpProfile(targetIin);
+    let detectedFuncName = "";
+    
+    // МЕТОД 1: Сканируем текстовый код функции renderAdminEmps на наличие обработчиков клика
+    if (typeof window.renderAdminEmps === 'function') {
+        let code = window.renderAdminEmps.toString();
+        // Ищем регулярным выражением строку вида onclick="имяФункции(..."
+        let match = code.match(/onclick\s*=\s*["']?([a-zA-Z0-9_]+)\(/);
+        if (match && typeof window[match[1]] === 'function') {
+            detectedFuncName = match[1];
         } else {
-            showToast("Функция карточки не найдена. Проверить имя в app.js", true);
+            // Запасной поиск любой функции внутри, куда передается переменная iin
+            let altMatch = code.match(/([a-zA-Z0-9_]+)\([^)]*iin[^)]*\)/);
+            if (altMatch && typeof window[altMatch[1]] === 'function' && altMatch[1] !== 'renderAdminEmps') {
+                detectedFuncName = altMatch[1];
+            }
         }
     }
+    
+    // МЕТОД 2: Если метод 1 не определил, проверяем onclick у уже отрендеренных элементов в списке сотрудников
+    if (!detectedFuncName) {
+        let empList = document.getElementById("admin-emp-list");
+        if (empList && empList.children.length > 0) {
+            for (let child of empList.children) {
+                let onclickStr = child.getAttribute("onclick") || "";
+                let match = onclickStr.match(/^([a-zA-Z0-9_]+)\(/);
+                if (match && typeof window[match[1]] === 'function') {
+                    detectedFuncName = match[1];
+                    break;
+                }
+                // Проверяем вложенные теги внутри карточки сотрудника
+                let internalClick = child.innerHTML.match(/onclick=["']?([a-zA-Z0-9_]+)\(/);
+                if (internalClick && typeof window[internalClick[1]] === 'function') {
+                    detectedFuncName = internalClick[1];
+                    break;
+                }
+            }
+        }
+    }
+    
+    // 2. Запуск обнаруженной функции полной карточки
+    if (detectedFuncName && typeof window[detectedFuncName] === 'function') {
+        window[detectedFuncName](targetIin);
+        return;
+    }
+    
+    // МЕТОД 3: Последний резервный перебор всех возможных системных имен
+    let fallbacks = ['openEmpProfile', 'openEmpCard', 'showEmpProfile', 'openEmployeeProfile', 'viewEmployeeProfile', 'openAdminEmpDetails', 'openEmpDetails', 'showEmpDetails'];
+    for (let name of fallbacks) {
+        if (typeof window[name] === 'function') {
+            window[name](targetIin);
+            return;
+        }
+    }
+    
+    // Если вообще ничего в коде не нашлось
+    showToast("Не удалось определить функцию профиля. Проверьте onclick в renderAdminEmps", true);
 };
