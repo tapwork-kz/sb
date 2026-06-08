@@ -4011,7 +4011,7 @@ window.openAdminPointsSummary = function() {
     window.renderAdminPointsSummaryData();
 };
 
-// ИСПРАВЛЕНО: Сводный расчет баллов с выводом всех 4 параметров (Нач, Исп, Ост, Штрф) и строгой сортировкой по отделам/алфавиту
+// ИСПРАВЛЕНО: Бухгалтерский расчет остатка баллов методом отката от живого баланса user_details с защитой от NaN и правильной сортировкой
 window.renderAdminPointsSummaryData = function() {
     let navContainer = document.getElementById("admin-points-nav-container");
     let scrollArea = document.getElementById("admin-points-scroll-area");
@@ -4048,29 +4048,23 @@ window.renderAdminPointsSummaryData = function() {
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
     
-    // Вспомогательная функция для определения приоритета веса отдела
     function getDeptPriority(deptName) {
         let d = String(deptName || "").toLowerCase();
         if (d.includes("цифра")) return 1;
         if (d.includes("мбт")) return 2;
         if (d.includes("кбт")) return 3;
-        return 4; // Все остальные отделы
+        return 4;
     }
 
-    // ИСПРАВЛЕНО: Двухуровневая сортировка: Сначала по весу отделов (Цифра->МБТ->КБТ->Другие), затем по алфавиту внутри
     validEmps.sort((a, b) => {
         let pA = getDeptPriority(a.dept);
         let pB = getDeptPriority(b.dept);
         if (pA !== pB) return pA - pB;
-        
-        // Если оба попали в категорию "остальные", сортируем сначала по названию самого отдела
         if (pA === 4) {
             let deptStrA = String(a.dept || "");
             let deptStrB = String(b.dept || "");
             if (deptStrA !== deptStrB) return deptStrA.localeCompare(deptStrB);
         }
-        
-        // Внутренняя сортировка по алфавиту ФИО
         return String(a.name || "").localeCompare(String(b.name || ""));
     });
     
@@ -4078,34 +4072,29 @@ window.renderAdminPointsSummaryData = function() {
     let totalPointsInMonthCount = 0;
     
     validEmps.forEach(e => {
-        let totalEarned = 0; // Строго за выбранный месяц
-        let totalUsed = 0;   // Строго за выбранный месяц
-        let totalFines = 0;  // Строго за выбранный месяц
+        let totalEarned = 0; // Нач. за выбранный месяц
+        let totalUsed = 0;   // Исп. за выбранный месяц
+        let totalFines = 0;  // Штрф. за выбранный месяц
         
-        // 1. ИСПРАВЛЕНО: Извлекаем ТЕКУЩИЙ реальный живой баланс из user_details как абсолютно верную точку отсчета
-        let rawLiveRem = 0;
+        // 1. ИСПРАВЛЕНО: Вытаскиваем текущую живую точку баланса из user_details как железный якорь
+        let rawPoints = 0;
         if (e.user_details) {
-            let ud = e.user_details;
-            if (Array.isArray(ud) && ud[0]) ud = ud[0];
-            rawLiveRem = (ud.points !== undefined && ud.points !== null && String(ud.points).trim() !== '') ? ud.points : (ud.pts || 0);
+            let ud = Array.isArray(e.user_details) ? e.user_details[0] : e.user_details;
+            if (ud) rawPoints = (ud.points !== undefined && ud.points !== null && String(ud.points).trim() !== '') ? ud.points : (ud.pts || 0);
         } else {
-            rawLiveRem = (e.points !== undefined && e.points !== null && String(e.points).trim() !== '') ? e.points : (e.pts || 0);
+            rawPoints = (e.points !== undefined && e.points !== null && String(e.points).trim() !== '') ? e.points : (e.pts || 0);
         }
-        let liveRem = parseFloat(String(rawLiveRem).replace(/\s/g, '').replace(',', '.')) || 0;
-        
-        // Инициализируем остаток текущим живым значением, от него будем "отматывать" историю назад
-        let totalRem = liveRem;
+        let currentLiveBalance = parseFloat(String(rawPoints).replace(/\s/g, '').replace(',', '.')) || 0;
         
         let history = e.ptsHistory || [];
         history.forEach(p => {
             if (!p || !p.date || typeof p.date !== 'string') return;
             
             let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
-            
             let isFine = p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета");
             let isEarned = p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || parseFloat(p.val) > 0;
             
-            // Сбор статистики начисления/списания/штрафов за конкретно выбранный месяц
+            // Накапливаем данные строго за выбранный месяц
             if (p.date.includes(targetMonthStr)) {
                 if (isFine) {
                     totalFines += pVal;
@@ -4116,27 +4105,25 @@ window.renderAdminPointsSummaryData = function() {
                 }
             }
             
-            // 2. ИСПРАВЛЕНО: Алгоритм реверсивного восстановления баланса на конец выбранного месяца
+            // 2. ИСПРАВЛЕНО: Математическая машина времени (откат изменений назад)
             let parts = p.date.split('.');
             if (parts.length === 3) {
                 let pMonth = parseInt(parts[1], 10) - 1;
                 let pYear = parseInt(parts[2], 10);
                 
-                // Если транзакция произошла ПОЗЖЕ (в будущем) относительно выбранного на стрелках месяца,
-                // мы её аннулируем, чтобы узнать, какой баланс лежал в кошельке на конец того месяца.
+                // Если транзакция из будущего по отношению к выбранному месяцу, убираем её влияние на баланс
                 if (pYear > year || (pYear === year && pMonth > month)) {
                     if (isEarned) {
-                        totalRem -= pVal; // Убираем начисление, которого тогда еще не было
+                        currentLiveBalance -= pVal; // Будущее начисление отнимаем
                     } else {
-                        totalRem += pVal; // Возвращаем баллы за штраф или покупку, которые тогда еще не списались
+                        currentLiveBalance += pVal; // Будущее списание возвращаем назад
                     }
                 }
             }
         });
         
-        if (totalRem < 0) totalRem = 0;
+        let totalRem = currentLiveBalance < 0 ? 0 : currentLiveBalance;
         
-        // Отображаем сотрудника, если у него есть баланс или были движения в этом месяце
         if (totalEarned > 0 || totalUsed > 0 || totalFines > 0 || totalRem > 0) {
             totalPointsInMonthCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
