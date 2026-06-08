@@ -2907,7 +2907,7 @@ window.renderAdminFinesSummaryData = function() {
             let ptsText = totalPts > 0 ? `-${totalPts} б.` : `0 б.`;
             
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px; cursor:pointer; -webkit-tap-highlight-color:transparent;" onclick="window.handleAdminTabelRowClick('${e.iin}', 'fines');">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
@@ -4153,7 +4153,7 @@ window.renderAdminPointsSummaryData = function() {
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
             
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:2px; cursor:pointer; -webkit-tap-highlight-color:transparent;" onclick="window.handleAdminPointsRowClick('${e.iin}');">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:2px; cursor:pointer; -webkit-tap-highlight-color:transparent;" onclick="window.handleAdminTabelRowClick('${e.iin}', 'points');">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
@@ -4431,25 +4431,33 @@ window.onAdminTabelSummaryMonthPickerChange = function(value) {
     window.renderAdminTabelSummaryData();
 };
 
-// ИСПРАВЛЕНО: Умный автоматический сканер для открытия ПОЛНОЙ карточки сотрудника прямо из табеля
-window.handleAdminTabelRowClick = function(targetIin) {
+// ИСПРАВЛЕНО: Универсальный автоматический сканер для перехода в ПОЛНУЮ карточку сотрудника из любого сводного отчета
+window.handleAdminTabelRowClick = function(targetIin, tabType) {
     if (!targetIin) return;
     
-    // 1. Закрываем оверлей сводного табеля, чтобы освободить экран
-    let modal = document.getElementById("admin-tabel-summary-modal-overlay");
-    if (modal) modal.remove();
+    // 1. Закрываем оверлей абсолютно любого открытого административного отчета
+    const modalIds = [
+        "admin-tabel-summary-modal-overlay",
+        "admin-points-summary-modal-overlay",
+        "admin-fines-summary-modal-overlay",
+        "admin-fine-summary-modal-overlay",
+        "admin-overtime-summary-modal-overlay",
+        "admin-overtimes-summary-modal-overlay"
+    ];
+    modalIds.forEach(id => {
+        let modal = document.getElementById(id);
+        if (modal) modal.remove();
+    });
     
     let detectedFuncName = "";
     
     // МЕТОД 1: Сканируем текстовый код функции renderAdminEmps на наличие обработчиков клика
     if (typeof window.renderAdminEmps === 'function') {
         let code = window.renderAdminEmps.toString();
-        // Ищем регулярным выражением строку вида onclick="имяФункции(..."
         let match = code.match(/onclick\s*=\s*["']?([a-zA-Z0-9_]+)\(/);
         if (match && typeof window[match[1]] === 'function') {
             detectedFuncName = match[1];
         } else {
-            // Запасной поиск любой функции внутри, куда передается переменная iin
             let altMatch = code.match(/([a-zA-Z0-9_]+)\([^)]*iin[^)]*\)/);
             if (altMatch && typeof window[altMatch[1]] === 'function' && altMatch[1] !== 'renderAdminEmps') {
                 detectedFuncName = altMatch[1];
@@ -4457,7 +4465,7 @@ window.handleAdminTabelRowClick = function(targetIin) {
         }
     }
     
-    // МЕТОД 2: Если метод 1 не определил, проверяем onclick у уже отрендеренных элементов в списке сотрудников
+    // МЕТОД 2: Если метод 1 не определил, проверяем уже отрендеренные элементы в списке сотрудников
     if (!detectedFuncName) {
         let empList = document.getElementById("admin-emp-list");
         if (empList && empList.children.length > 0) {
@@ -4468,7 +4476,6 @@ window.handleAdminTabelRowClick = function(targetIin) {
                     detectedFuncName = match[1];
                     break;
                 }
-                // Проверяем вложенные теги внутри карточки сотрудника
                 let internalClick = child.innerHTML.match(/onclick=["']?([a-zA-Z0-9_]+)\(/);
                 if (internalClick && typeof window[internalClick[1]] === 'function') {
                     detectedFuncName = internalClick[1];
@@ -4478,94 +4485,51 @@ window.handleAdminTabelRowClick = function(targetIin) {
         }
     }
     
-    // 2. Запуск обнаруженной функции полной карточки
+    // МЕТОД 3: Последний резервный перебор всех возможных системных имен
+    if (!detectedFuncName) {
+        let fallbacks = ['openEmpProfile', 'openEmpCard', 'showEmpProfile', 'openEmployeeProfile', 'viewEmployeeProfile', 'openAdminEmpDetails', 'openEmpDetails', 'showEmpDetails'];
+        for (let name of fallbacks) {
+            if (typeof window[name] === 'function') {
+                detectedFuncName = name;
+                break;
+            }
+        }
+    }
+    
+    // 2. Запуск обнаруженной функции полной карточки с последующим переходом на нужную вкладку
     if (detectedFuncName && typeof window[detectedFuncName] === 'function') {
         window[detectedFuncName](targetIin);
+        
+        // Если передан тип вкладки, дожидаемся рендера карточки (150мс) и кликаем нужный подраздел
+        if (tabType) {
+            setTimeout(() => {
+                let tabs = document.querySelectorAll("button, div, span, a");
+                let searchWords = [];
+                
+                // Настраиваем ключевые слова для поиска вкладок
+                if (tabType === 'tabel') searchWords = ['табель'];
+                if (tabType === 'points') searchWords = ['балл'];
+                if (tabType === 'fines') searchWords = ['нарушен', 'штраф'];
+                if (tabType === 'overtime') searchWords = ['переработ', 'смен'];
+                
+                for (let tab of tabs) {
+                    let txt = tab.innerText.toLowerCase();
+                    // Ищем совпадение по тексту, исключая кнопки самих сводок администратора
+                    let isMatch = searchWords.some(word => txt.includes(word)) && !txt.includes("сводка") && txt.length < 20;
+                    if (isMatch) {
+                        tab.click();
+                        break;
+                    }
+                }
+            }, 150);
+        }
         return;
     }
     
-    // МЕТОД 3: Последний резервный перебор всех возможных системных имен
-    let fallbacks = ['openEmpProfile', 'openEmpCard', 'showEmpProfile', 'openEmployeeProfile', 'viewEmployeeProfile', 'openAdminEmpDetails', 'openEmpDetails', 'showEmpDetails'];
-    for (let name of fallbacks) {
-        if (typeof window[name] === 'function') {
-            window[name](targetIin);
-            return;
-        }
-    }
-    
     // Если вообще ничего в коде не нашлось
-    showToast("Не удалось определить функцию профиля. Проверьте onclick в renderAdminEmps", true);
-};
-
-// ИСПРАВЛЕНО: Единый навигатор, открывающий стандартную карточку сотрудника из раздела Сотрудники
-window.navigateToEmployeeStandardCard = function(targetIin, tabKeywords) {
-    // 1. Пытаемся найти уже отрендеренный элемент сотрудника в списке вкладки "Сотрудники" и кликнуть на него
-    let empList = document.getElementById("admin-emp-list");
-    let clickedViaDom = false;
-    
-    if (empList && empList.children.length > 0) {
-        for (let child of empList.children) {
-            let onclickText = child.getAttribute("onclick") || child.innerHTML || "";
-            if (onclickText.includes(targetIin)) {
-                child.click();
-                clickedViaDom = true;
-                break;
-            }
-        }
+    if (typeof showToast === 'function') {
+        showToast("Не удалось определить функцию профиля. Проверьте onclick в renderAdminEmps", true);
+    } else {
+        alert("Не удалось определить функцию профиля.");
     }
-    
-    // 2. Если элемент в DOM не найден (например, вкладка не была открыта), извлекаем функцию из renderAdminEmps
-    if (!clickedViaDom && typeof window.renderAdminEmps === 'function') {
-        let code = window.renderAdminEmps.toString();
-        let match = code.match(/onclick\s*=\s*["']?([a-zA-Z0-9_]+)\(/);
-        if (match && typeof window[match[1]] === 'function') {
-            window[match[1]](targetIin);
-            clickedViaDom = true;
-        }
-    }
-    
-    // 3. Если автоматика не помогла, перебираем жесткие фолбеки стандартных имен карточек
-    if (!clickedViaDom) {
-        let fallbacks = ['openEmpProfile', 'openEmpCard', 'showEmpCard', 'openAdminEmpDetails'];
-        for (let name of fallbacks) {
-            if (typeof window[name] === 'function') {
-                window[name](targetIin);
-                clickedViaDom = true;
-                break;
-            }
-        }
-    }
-    
-    // 4. После открытия карточки переключаем внутренний таб (Баллы / Нарушения / Табель)
-    if (tabKeywords) {
-        setTimeout(() => {
-            let tabs = document.querySelectorAll("button, div, span, a");
-            for (let tab of tabs) {
-                let txt = tab.innerText.toLowerCase();
-                if (txt.includes(tabKeywords) && !txt.includes("сводка") && txt.length < 20) {
-                    tab.click();
-                    break;
-                }
-            }
-        }, 180);
-    }
-};
-
-// ИСПРАВЛЕНО: Прямые обработчики кликов для всех трех сводных таблиц
-window.handleAdminTabelRowClick = function(targetIin) {
-    let modal = document.getElementById("admin-tabel-summary-modal-overlay");
-    if (modal) modal.remove();
-    window.navigateToEmployeeStandardCard(targetIin, "табель");
-};
-
-window.handleAdminPointsRowClick = function(targetIin) {
-    let modal = document.getElementById("admin-points-summary-modal-overlay");
-    if (modal) modal.remove();
-    window.navigateToEmployeeStandardCard(targetIin, "балл");
-};
-
-window.handleAdminFinesRowClick = function(targetIin) {
-    let modal = document.getElementById("admin-fines-summary-modal-overlay") || document.getElementById("admin-fine-summary-modal-overlay");
-    if (modal) modal.remove();
-    window.navigateToEmployeeStandardCard(targetIin, "нарушен");
 };
