@@ -107,6 +107,13 @@
         <div id="menu-list">
           <button onclick="openForm('sc')">Продажа СЦ / Дефект</button><button onclick="openForm('tradein')">Продажа Trade-In</button><button onclick="openForm('points')">Баллы мотивации</button><button onclick="openForm('swap')" class="btn-orange">Рабочая смена</button>
           <div id="hot-check-card" class="card hidden" style="margin-top: 15px;"></div>
+          <div id="cashier-metrics-card" class="card hidden" style="margin-top: 15px; padding: 12px; text-align: left;">
+              <h3 style="margin: 0 0 12px 0; font-size: 15px; color: var(--text-color); display: flex; align-items: center; gap: 6px;">
+                  <span class="material-symbols-rounded" style="color: #9b59b6; font-size: 20px;">point_of_sale</span>
+                  Кассовые показатели
+              </h3>
+              <div id="cashier-metrics-dynamic-area"></div>
+          </div>
         </div>
         <div id="form-sc" class="card form-dark hidden" style="padding: 0; background: transparent; border: none; box-shadow: none;">
            <div class="sticky-header glass" style="margin-top:0; padding-bottom: 10px;">
