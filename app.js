@@ -2577,6 +2577,10 @@ window.toggleAdminPlusMenu = function() {
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminTabelSummary();">
+                <span class="material-symbols-rounded" style="color:#3498db; font-size:18px;">calendar_view_month</span>
+                <span>Табель</span>
+            </div>
             <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminPointsSummary();">
                 <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">workspace_premium</span>
                 <span>Баллы мотивации</span>
@@ -4166,4 +4170,216 @@ window.onPointsSummaryMonthPickerChange = function(value) {
     window.currentPointsSummaryYear = parseInt(parts[0], 10);
     window.currentPointsSummaryMonth = parseInt(parts[1], 10) - 1;
     window.renderAdminPointsSummaryData();
+};
+
+// ИСПРАВЛЕНО: Открытие модального окна сводного административного табеля
+window.openAdminTabelSummary = function() {
+    let existingModal = document.getElementById("admin-tabel-summary-modal-overlay");
+    if (existingModal) existingModal.remove();
+    
+    if (!window.currentAdminTabelSummaryMonth || !window.currentAdminTabelSummaryYear) {
+        let d = new Date();
+        window.currentAdminTabelSummaryMonth = d.getMonth();
+        window.currentAdminTabelSummaryYear = d.getFullYear();
+    }
+    
+    let modal = document.createElement("div");
+    modal.id = "admin-tabel-summary-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:380px; background:var(--card-bg); padding:14px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; max-height:85vh; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+            <h3 style="margin:0 0 12px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
+              <span class="material-symbols-rounded" style="color:#3498db; font-size:18px;">calendar_view_month</span>
+              Сводный табель посещаемости
+            </h3>
+            
+            <div style="display:flex; background:var(--bg-color); padding:2px; border-radius:8px; margin-bottom:12px; border:1px solid var(--border-color); box-sizing:border-box; width:100%;">
+                <button id="tab-at-sellers" type="button" style="flex:1; border:none; padding:6px; font-size:11px; font-weight:bold; border-radius:6px; cursor:pointer; background:var(--card-bg); color:var(--text-color); box-shadow:0 1px 3px rgba(0,0,0,0.1); -webkit-tap-highlight-color:transparent;" onclick="window.switchAdminTabelCategoryTab('sellers')">Продавцы</button>
+                <button id="tab-at-staff" type="button" style="flex:1; border:none; padding:6px; font-size:11px; font-weight:bold; border-radius:6px; cursor:pointer; background:none; color:gray; -webkit-tap-highlight-color:transparent;" onclick="window.switchAdminTabelCategoryTab('staff')">АУП / Персонал</button>
+            </div>
+            
+            <input type="hidden" id="at-current-category" value="sellers">
+            <div id="admin-tabel-nav-container"></div>
+            <div id="admin-tabel-scroll-area" style="flex:1; overflow-y:auto; margin-bottom:12px; padding-right:2px;"></div>
+            
+            <button class="btn-gray" onclick="document.getElementById('admin-tabel-summary-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px; width:100%;">Закрыть</button>
+        </div>
+    `;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+    
+    window.renderAdminTabelSummaryData();
+};
+
+// Переключатель вкладок категорий (Продавцы vs АУП)
+window.switchAdminTabelCategoryTab = function(category) {
+    let btnSellers = document.getElementById("tab-at-sellers");
+    let btnStaff = document.getElementById("tab-at-staff");
+    let categoryInput = document.getElementById("at-current-category");
+    
+    if (!btnSellers || !btnStaff || !categoryInput) return;
+    categoryInput.value = category;
+    
+    if (category === 'sellers') {
+        btnSellers.style.background = "var(--card-bg)";
+        btnSellers.style.color = "var(--text-color)";
+        btnSellers.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+        btnStaff.style.background = "none";
+        btnStaff.style.color = "gray";
+        btnStaff.style.boxShadow = "none";
+    } else {
+        btnStaff.style.background = "var(--card-bg)";
+        btnStaff.style.color = "var(--text-color)";
+        btnStaff.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+        btnSellers.style.background = "none";
+        btnSellers.style.color = "gray";
+        btnSellers.style.boxShadow = "none";
+    }
+    window.renderAdminTabelSummaryData();
+};
+
+// Асинхронный расчет и отрисовка показателей посещаемости
+window.renderAdminTabelSummaryData = async function() {
+    let navContainer = document.getElementById("admin-tabel-nav-container");
+    let scrollArea = document.getElementById("admin-tabel-scroll-area");
+    if (!navContainer || !scrollArea) return;
+    
+    let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    let year = window.currentAdminTabelSummaryYear;
+    let month = window.currentAdminTabelSummaryMonth;
+    let currentCategory = document.getElementById("at-current-category").value;
+    
+    let navHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustAdminTabelSummaryMonth(-1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
+        </button>
+        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
+                ${monthNames[month]} ${year}
+            </span>
+            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
+                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
+                   onchange="window.onAdminTabelSummaryMonthPickerChange(this.value)">
+        </div>
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustAdminTabelSummaryMonth(1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
+        </button>
+    </div>`;
+    navContainer.innerHTML = navHtml;
+    
+    scrollArea.innerHTML = `<div style="text-align:center; color:gray; font-size:12px; padding:20px 0;">Загрузка выписки табеля...</div>`;
+    
+    let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
+    let lastDay = new Date(year, month + 1, 0).getDate();
+    let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+    
+    let statsMap = {};
+    try {
+        let { data: list, error } = await supabaseClient
+            .from('emp_attendance_days')
+            .select('*')
+            .gte('date', startDateStr)
+            .lte('date', endDateStr);
+            
+        if (!error && list) {
+            list.forEach(row => {
+                let iin = row.iin;
+                if (!statsMap[iin]) {
+                    statsMap[iin] = { BS: 0, BL: 0, PR: 0, OT: 0, US: 0, plan: 0, fact: 0 };
+                }
+                let st = String(row.status || "").toUpperCase();
+                if (st === 'БС') statsMap[iin].BS++;
+                if (st === 'БЛ') statsMap[iin].BL++;
+                if (st === 'ПР') statsMap[iin].PR++;
+                if (st === 'ОТ') statsMap[iin].OT++;
+                if (st === 'УС') statsMap[iin].US++;
+                if (st === 'РД') statsMap[iin].fact++;
+                
+                // Математическая калькуляция плана рабочих дней: РД + любые пропуски по графику
+                if (['РД', 'БС', 'БЛ', 'ПР', 'ОТ'].includes(st)) {
+                    statsMap[iin].plan++;
+                }
+            });
+        }
+    } catch(e) { console.error("Ошибка загрузки табеля:", e); }
+    
+    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
+    let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+    
+    // Сортировка как в разделе Сотрудники (Цифра -> МБТ -> КБТ -> Другие, внутри по алфавиту)
+    function getDeptPriority(deptName) {
+        let d = String(deptName || "").toLowerCase();
+        if (d.includes("цифра")) return 1;
+        if (d.includes("мбт")) return 2;
+        if (d.includes("кбт")) return 3;
+        return 4;
+    }
+    validEmps.sort((a, b) => {
+        let pA = getDeptPriority(a.dept); let pB = getDeptPriority(b.dept);
+        if (pA !== pB) return pA - pB;
+        return String(a.name || "").localeCompare(String(b.name || ""));
+    });
+    
+    // Разделение по категориям под-вкладок (Продавцы vs АУП)
+    let filteredEmps = validEmps.filter(e => {
+        let role = String(e.role || "").toLowerCase();
+        let dept = String(e.dept || "").toLowerCase();
+        let isSeller = dept.includes("цифра") || dept.includes("мбт") || dept.includes("кбт") || role.includes("продавец") || role.includes("промоутер");
+        return currentCategory === 'sellers' ? isSeller : !isSeller;
+    });
+    
+    let listHtml = "";
+    filteredEmps.forEach(e => {
+        let s = statsMap[e.iin] || { BS: 0, BL: 0, PR: 0, OT: 0, US: 0, plan: 0, fact: 0 };
+        let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
+        
+        listHtml += `
+        <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+            <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                ${e.name}${deptStr}
+            </div>
+            <div style="font-size:11px; color:gray; display:flex; gap:6px; flex-wrap:wrap; align-items:center; line-height:1.2;">
+                <span>РД: <b style="color:var(--text-color);">Пл:${s.plan}/Фт:${s.fact}</b></span>
+                <span style="color:var(--border-color);">|</span>
+                <span>УС: <b style="color:#f39c12;">${s.US}</b></span>
+                <span style="color:var(--border-color);">|</span>
+                <span>БЛ: <b style="color:#e67e22;">${s.BL}</b></span>
+                <span style="color:var(--border-color);">|</span>
+                <span>ОТ: <b style="color:#27ae60;">${s.OT}</b></span>
+                <span style="color:var(--border-color);">|</span>
+                <span>БС: <b style="color:#95a5a6;">${s.BS}</b></span>
+                <span style="color:var(--border-color);">|</span>
+                <span>ПР: <b style="color:${s.PR > 0 ? '#e74c3c' : 'gray'}; font-weight:${s.PR > 0 ? '800' : 'normal'};">${s.PR}</b></span>
+            </div>
+        </div>`;
+    });
+    
+    if (filteredEmps.length === 0) {
+        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Сотрудников в этой категории не найдено</p>`;
+    }
+    scrollArea.innerHTML = listHtml;
+};
+
+// Навигация по месяцам стрелками
+window.adjustAdminTabelSummaryMonth = function(delta) {
+    window.currentAdminTabelSummaryMonth += delta;
+    if (window.currentAdminTabelSummaryMonth > 11) {
+        window.currentAdminTabelSummaryMonth = 0;
+        window.currentAdminTabelSummaryYear += 1;
+    } else if (window.currentAdminTabelSummaryMonth < 0) {
+        window.currentAdminTabelSummaryMonth = 11;
+        window.currentAdminTabelSummaryYear -= 1;
+    }
+    window.renderAdminTabelSummaryData();
+};
+
+// Выбор месяца через скрытый календарный пикер
+window.onAdminTabelSummaryMonthPickerChange = function(value) {
+    if (!value) return;
+    let parts = value.split('-');
+    window.currentAdminTabelSummaryYear = parseInt(parts[0], 10);
+    window.currentAdminTabelSummaryMonth = parseInt(parts[1], 10) - 1;
+    window.renderAdminTabelSummaryData();
 };
