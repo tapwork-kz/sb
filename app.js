@@ -4011,7 +4011,7 @@ window.openAdminPointsSummary = function() {
     window.renderAdminPointsSummaryData();
 };
 
-// ИСПРАВЛЕНО: Сводный расчет баллов по сетке Нач/Исп/Ост/Штрф с двухэтапной сортировкой по Отделам + Алфавиту
+// ИСПРАВЛЕНО: Сводный расчет баллов с выводом всех 4 параметров (Нач, Исп, Ост, Штрф) и строгой сортировкой по отделам/алфавиту
 window.renderAdminPointsSummaryData = function() {
     let navContainer = document.getElementById("admin-points-nav-container");
     let scrollArea = document.getElementById("admin-points-scroll-area");
@@ -4048,16 +4048,30 @@ window.renderAdminPointsSummaryData = function() {
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
     
-    // ИСПРАВЛЕНО: Сортировка сначала по Названию отдела, а затем по Алфавиту внутри отдела
+    // Вспомогательная функция для определения приоритета веса отдела
+    function getDeptPriority(deptName) {
+        let d = String(deptName || "").toLowerCase();
+        if (d.includes("цифра")) return 1;
+        if (d.includes("мбт")) return 2;
+        if (d.includes("кбт")) return 3;
+        return 4; // Все остальные отделы
+    }
+
+    // ИСПРАВЛЕНО: Двухуровневая сортировка: Сначала по весу отделов (Цифра->МБТ->КБТ->Другие), затем по алфавиту внутри
     validEmps.sort((a, b) => {
-        let deptA = String(a.dept || "").toLowerCase();
-        let deptB = String(b.dept || "").toLowerCase();
-        if (deptA !== deptB) {
-            return deptA.localeCompare(deptB);
+        let pA = getDeptPriority(a.dept);
+        let pB = getDeptPriority(b.dept);
+        if (pA !== pB) return pA - pB;
+        
+        // Если оба попали в категорию "остальные", сортируем сначала по названию самого отдела
+        if (pA === 4) {
+            let deptStrA = String(a.dept || "");
+            let deptStrB = String(b.dept || "");
+            if (deptStrA !== deptStrB) return deptStrA.localeCompare(deptStrB);
         }
-        let nameA = String(a.name || "").toLowerCase();
-        let nameB = String(b.name || "").toLowerCase();
-        return nameA.localeCompare(nameB);
+        
+        // Внутренняя сортировка по алфавиту ФИО
+        return String(a.name || "").localeCompare(String(b.name || ""));
     });
     
     let listHtml = "";
@@ -4068,17 +4082,19 @@ window.renderAdminPointsSummaryData = function() {
         let totalUsed = 0;
         let totalFines = 0;
         
+        // Читаем текущий живой остаток баллов сотрудника
+        let totalRem = parseFloat(e.points || e.pts || 0);
+        
         let history = e.ptsHistory || [];
         history.forEach(p => {
             if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
                 let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
-                let reasonLow = String(p.reason || "").toLowerCase();
-                let typeLow = String(p.type || "").toLowerCase();
                 
-                // Разносим баллы строго по 3 категориям истории за месяц
-                if (typeLow.includes("штраф") || reasonLow.includes("штраф") || reasonLow.includes("отсутствие отчета")) {
+                let isFine = p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета");
+                
+                if (isFine) {
                     totalFines += pVal;
-                } else if (typeLow.includes("начисл") || p.type === "Начисление" || parseFloat(p.val) > 0) {
+                } else if (p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || parseFloat(p.val) > 0) {
                     totalEarned += pVal;
                 } else {
                     totalUsed += pVal;
@@ -4086,43 +4102,28 @@ window.renderAdminPointsSummaryData = function() {
             }
         });
         
-        // Остаток (Текущий баланс сотрудника из базы данных, либо расчетный за месяц)
-        let totalRemaining = e.points !== undefined ? parseFloat(e.points) : (e.pts !== undefined ? parseFloat(e.pts) : (totalEarned - totalUsed - totalFines));
-        if (isNaN(totalRemaining)) totalRemaining = 0;
-
-        if (totalEarned > 0 || totalUsed > 0 || totalFines > 0 || totalRemaining > 0) {
+        // Отображаем сотрудника, если у него есть баланс или были движения в этом месяце
+        if (totalEarned > 0 || totalUsed > 0 || totalFines > 0 || totalRem > 0) {
             totalPointsInMonthCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
             
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:6px;">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:2px;">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
-                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; text-align:center; background:var(--bg-color); padding:6px; border-radius:8px; box-sizing:border-box; width:100%;">
-                    <div>
-                        <div style="font-size:8px; color:gray; margin-bottom:2px;">Нач.</div>
-                        <div style="font-size:12px; font-weight:bold; color:${totalEarned > 0 ? '#2ecc71' : 'var(--text-color)'}; opacity:${totalEarned > 0 ? '1' : '0.4'};">${totalEarned > 0 ? '+' : ''}${totalEarned}</div>
-                    </div>
-                    <div>
-                        <div style="font-size:8px; color:gray; margin-bottom:2px;">Исп.</div>
-                        <div style="font-size:12px; font-weight:bold; color:${totalUsed > 0 ? '#e67e22' : 'var(--text-color)'}; opacity:${totalUsed > 0 ? '1' : '0.4'};">${totalUsed > 0 ? '-' : ''}${totalUsed}</div>
-                    </div>
-                    <div>
-                        <div style="font-size:8px; color:gray; margin-bottom:2px;">Ост.</div>
-                        <div style="font-size:12px; font-weight:bold; color:#27ae60;">${totalRemaining}</div>
-                    </div>
-                    <div>
-                        <div style="font-size:8px; color:gray; margin-bottom:2px;">Штрф.</div>
-                        <div style="font-size:12px; font-weight:bold; color:${totalFines > 0 ? '#e74c3c' : 'var(--text-color)'}; opacity:${totalFines > 0 ? '1' : '0.4'};">${totalFines > 0 ? '-' : ''}${totalFines}</div>
-                    </div>
+                <div style="font-size:11px; color:gray; display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                    <span>Нач: <b style="color:${totalEarned > 0 ? '#2ecc71' : 'gray'};">+${totalEarned}</b></span>
+                    <span>Исп: <b style="color:${totalUsed > 0 ? '#e67e22' : 'gray'};">-${totalUsed}</b></span>
+                    <span>Штрф: <b style="color:${totalFines > 0 ? '#e74c3c' : 'gray'};">-${totalFines}</b></span>
+                    <span>Ост: <b style="color:#27ae60;">${totalRem}</b></span>
                 </div>
             </div>`;
         }
     });
     
     if (totalPointsInMonthCount === 0) {
-        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Движений по баллам за этот месяц не найдено</p>`;
+        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Движений по баллам не найдено</p>`;
     }
     
     scrollArea.innerHTML = listHtml;
