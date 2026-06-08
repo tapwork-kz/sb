@@ -4359,7 +4359,7 @@ window.renderAdminTabelSummaryData = async function() {
         let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
         
         listHtml += `
-        <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+        <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px; cursor:pointer; -webkit-tap-highlight-color:transparent;" onclick="window.handleAdminTabelRowClick('${e.iin}');">
             <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                 ${e.name}${deptStr}
             </div>
@@ -4405,4 +4405,26 @@ window.onAdminTabelSummaryMonthPickerChange = function(value) {
     window.currentAdminTabelSummaryYear = parseInt(parts[0], 10);
     window.currentAdminTabelSummaryMonth = parseInt(parts[1], 10) - 1;
     window.renderAdminTabelSummaryData();
+};
+
+// ИСПРАВЛЕНО: Функция-обработчик клика по сотруднику из административного табеля
+window.handleAdminTabelRowClick = function(targetIin) {
+    if (!targetIin) return;
+    
+    // 1. Закрываем текущее модальное окно сводного табеля, чтобы оно не перекрывало карточку
+    let modal = document.getElementById("admin-tabel-summary-modal-overlay");
+    if (modal) modal.remove();
+    
+    // 2. Вызываем штатное открытие карточки/деталей сотрудника по его IIN.
+    // Скрипт автоматически выберет рабочую функцию вашей админ-панели:
+    if (typeof window.openDetails === 'function') {
+        window.openDetails('tabel', targetIin);
+    } else if (typeof window.openEmpDetails === 'function') {
+        window.openEmpDetails(targetIin);
+    } else if (typeof window.showEmpDetails === 'function') {
+        window.showEmpDetails(targetIin);
+    } else {
+        // Фолбек: если используется стандартный вызов через общую шину личного кабинета
+        if (typeof openDetails === 'function') openDetails('tabel', targetIin);
+    }
 };
