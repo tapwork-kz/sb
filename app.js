@@ -4011,7 +4011,7 @@ window.openAdminPointsSummary = function() {
     window.renderAdminPointsSummaryData();
 };
 
-// ИСПРАВЛЕНО: Асинхронный расчет начисленных и использованных баллов из ptsHistory за выбранный месяц
+// ИСПРАВЛЕНО: Сводный расчет баллов по сетке Нач/Исп/Ост/Штрф с двухэтапной сортировкой по Отделам + Алфавиту
 window.renderAdminPointsSummaryData = function() {
     let navContainer = document.getElementById("admin-points-nav-container");
     let scrollArea = document.getElementById("admin-points-scroll-area");
@@ -4047,7 +4047,18 @@ window.renderAdminPointsSummaryData = function() {
     
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
-    validEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    
+    // ИСПРАВЛЕНО: Сортировка сначала по Названию отдела, а затем по Алфавиту внутри отдела
+    validEmps.sort((a, b) => {
+        let deptA = String(a.dept || "").toLowerCase();
+        let deptB = String(b.dept || "").toLowerCase();
+        if (deptA !== deptB) {
+            return deptA.localeCompare(deptB);
+        }
+        let nameA = String(a.name || "").toLowerCase();
+        let nameB = String(b.name || "").toLowerCase();
+        return nameA.localeCompare(nameB);
+    });
     
     let listHtml = "";
     let totalPointsInMonthCount = 0;
@@ -4055,14 +4066,19 @@ window.renderAdminPointsSummaryData = function() {
     validEmps.forEach(e => {
         let totalEarned = 0;
         let totalUsed = 0;
+        let totalFines = 0;
         
         let history = e.ptsHistory || [];
         history.forEach(p => {
             if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
                 let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
+                let reasonLow = String(p.reason || "").toLowerCase();
+                let typeLow = String(p.type || "").toLowerCase();
                 
-                // Классифицируем запись на начисление или списание/использование
-                if (p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || parseFloat(p.val) > 0) {
+                // Разносим баллы строго по 3 категориям истории за месяц
+                if (typeLow.includes("штраф") || reasonLow.includes("штраф") || reasonLow.includes("отсутствие отчета")) {
+                    totalFines += pVal;
+                } else if (typeLow.includes("начисл") || p.type === "Начисление" || parseFloat(p.val) > 0) {
                     totalEarned += pVal;
                 } else {
                     totalUsed += pVal;
@@ -4070,18 +4086,36 @@ window.renderAdminPointsSummaryData = function() {
             }
         });
         
-        if (totalEarned > 0 || totalUsed > 0) {
+        // Остаток (Текущий баланс сотрудника из базы данных, либо расчетный за месяц)
+        let totalRemaining = e.points !== undefined ? parseFloat(e.points) : (e.pts !== undefined ? parseFloat(e.pts) : (totalEarned - totalUsed - totalFines));
+        if (isNaN(totalRemaining)) totalRemaining = 0;
+
+        if (totalEarned > 0 || totalUsed > 0 || totalFines > 0 || totalRemaining > 0) {
             totalPointsInMonthCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
             
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:6px;">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
-                <div style="font-size:11px; color:gray; display:flex; gap:12px; align-items:center;">
-                    <span>Начислено: <b style="color:${totalEarned > 0 ? '#2ecc71' : 'gray'};">+${totalEarned} б.</b></span>
-                    <span>Использовано: <b style="color:${totalUsed > 0 ? '#e67e22' : 'gray'};">-${totalUsed} б.</b></span>
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:6px; text-align:center; background:var(--bg-color); padding:6px; border-radius:8px; box-sizing:border-box; width:100%;">
+                    <div>
+                        <div style="font-size:8px; color:gray; margin-bottom:2px;">Нач.</div>
+                        <div style="font-size:12px; font-weight:bold; color:${totalEarned > 0 ? '#2ecc71' : 'var(--text-color)'}; opacity:${totalEarned > 0 ? '1' : '0.4'};">${totalEarned > 0 ? '+' : ''}${totalEarned}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:8px; color:gray; margin-bottom:2px;">Исп.</div>
+                        <div style="font-size:12px; font-weight:bold; color:${totalUsed > 0 ? '#e67e22' : 'var(--text-color)'}; opacity:${totalUsed > 0 ? '1' : '0.4'};">${totalUsed > 0 ? '-' : ''}${totalUsed}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:8px; color:gray; margin-bottom:2px;">Ост.</div>
+                        <div style="font-size:12px; font-weight:bold; color:#27ae60;">${totalRemaining}</div>
+                    </div>
+                    <div>
+                        <div style="font-size:8px; color:gray; margin-bottom:2px;">Штрф.</div>
+                        <div style="font-size:12px; font-weight:bold; color:${totalFines > 0 ? '#e74c3c' : 'var(--text-color)'}; opacity:${totalFines > 0 ? '1' : '0.4'};">${totalFines > 0 ? '-' : ''}${totalFines}</div>
+                    </div>
                 </div>
             </div>`;
         }
