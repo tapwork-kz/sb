@@ -2577,7 +2577,7 @@ window.toggleAdminPlusMenu = function() {
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminTabelSummary();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:4px double var(--border-color); margin-top:2px;" onclick="window.openAdminTabelSummary();">
                 <span class="material-symbols-rounded" style="color:#3498db; font-size:18px;">calendar_view_month</span>
                 <span>Табель</span>
             </div>
@@ -2585,7 +2585,7 @@ window.toggleAdminPlusMenu = function() {
                 <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">workspace_premium</span>
                 <span>Баллы мотивации</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:4px double var(--border-color); margin-top:2px;" onclick="window.openAdminOvertimeSummary();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeSummary();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">history_toggle_off</span>
                 <span>Переработки</span>
             </div>
@@ -2813,7 +2813,7 @@ window.openAdminFinesSummary = function() {
     window.renderAdminFinesSummaryData();
 };
 
-// ИСПРАВЛЕНО: Сводка штрафов со строгой сортировкой, измененным порядком и переходом в карточку на вкладку Нарушения
+// ИСПРАВЛЕНО: Асинхронный подсчет, фильтрация и рендеринг сумм штрафов за выбранный месяц с явным указанием тенге и баллов
 window.renderAdminFinesSummaryData = function() {
     let navContainer = document.getElementById("admin-fines-nav-container");
     let scrollArea = document.getElementById("admin-fines-scroll-area");
@@ -2849,26 +2849,7 @@ window.renderAdminFinesSummaryData = function() {
     
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
-    
-    function getDeptPriority(deptName) {
-        let d = String(deptName || "").toLowerCase();
-        if (d.includes("цифра")) return 1;
-        if (d.includes("мбт")) return 2;
-        if (d.includes("кбт")) return 3;
-        return 4;
-    }
-
-    validEmps.sort((a, b) => {
-        let pA = getDeptPriority(a.dept);
-        let pB = getDeptPriority(b.dept);
-        if (pA !== pB) return pA - pB;
-        if (pA === 4) {
-            let deptStrA = String(a.dept || "");
-            let deptStrB = String(b.dept || "");
-            if (deptStrA !== deptStrB) return deptStrA.localeCompare(deptStrB);
-        }
-        return String(a.name || "").localeCompare(String(b.name || ""));
-    });
+    validEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
     
     let listHtml = "";
     let totalFinesInMonthCount = 0;
@@ -2882,6 +2863,7 @@ window.renderAdminFinesSummaryData = function() {
         history.forEach(p => {
             if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
                 if (p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета")) {
+                    // Парсим и очищаем значения от лишних знаков
                     let mVal = Math.abs(parseFloat(String(p.moneyFine || 0).replace(/\s/g, '').replace(',', '.'))) || 0;
                     let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
                     
@@ -2896,18 +2878,19 @@ window.renderAdminFinesSummaryData = function() {
             totalFinesInMonthCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
             
+            // Форматируем вывод: если сумма > 0, добавляем знак минус перед ней
             let moneyText = totalMoney > 0 ? `-${fmtSum(totalMoney)} ₸` : `0 ₸`;
             let ptsText = totalPts > 0 ? `-${totalPts} б.` : `0 б.`;
             
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px; cursor:pointer; -webkit-tap-highlight-color:transparent;" onclick="window.handleAdminFinesRowClick('${e.iin}');">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
                 <div style="font-size:11px; color:gray; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                     <span>Нарушений: <b style="color:var(--text-color);">${count}</b></span>
-                    <span>Баллы: <b style="color:${totalPts > 0 ? '#e67e22' : 'gray'};">${ptsText}</b></span>
                     <span>Штрафы: <b style="color:${totalMoney > 0 ? '#e74c3c' : 'gray'};">${moneyText}</b></span>
+                    <span>Баллы: <b style="color:${totalPts > 0 ? '#e67e22' : 'gray'};">${ptsText}</b></span>
                 </div>
             </div>`;
         }
@@ -4488,63 +4471,4 @@ window.handleAdminTabelRowClick = function(targetIin) {
     
     // Если вообще ничего в коде не нашлось
     showToast("Не удалось определить функцию профиля. Проверьте onclick в renderAdminEmps", true);
-};
-
-// ИСПРАВЛЕНО: Открытие полной карточки сотрудника с принудительным переходом на вкладку Нарушения
-window.handleAdminFinesRowClick = function(targetIin) {
-    if (!targetIin) return;
-    
-    // 1. Закрываем текущее модальное окно сводки штрафов
-    let modal = document.getElementById("admin-fines-summary-modal-overlay") || document.getElementById("admin-fine-summary-modal-overlay");
-    if (modal) modal.remove();
-    
-    // 2. Определяем имя системной функции открытия профиля методом сканирования
-    let detectedFuncName = "";
-    if (typeof window.renderAdminEmps === 'function') {
-        let code = window.renderAdminEmps.toString();
-        let match = code.match(/onclick\s*=\s*["']?([a-zA-Z0-9_]+)\(/);
-        if (match && typeof window[match[1]] === 'function') {
-            detectedFuncName = match[1];
-        }
-    }
-    
-    // Резервный список имен, если сканер не вернул результат
-    if (!detectedFuncName) {
-        let fallbacks = ['openEmpProfile', 'openEmpCard', 'showEmpCard', 'openAdminEmpDetails'];
-        for (let name of fallbacks) {
-            if (typeof window[name] === 'function') {
-                detectedFuncName = name;
-                break;
-            }
-        }
-    }
-    
-    // 3. Запускаем карточку и симулируем клик по вкладке "Нарушения"
-    if (detectedFuncName && typeof window[detectedFuncName] === 'function') {
-        window[detectedFuncName](targetIin);
-        
-        // Даем DOM-дереву карточки 150мс на отрисовку, после чего находим и переключаем на вкладку Нарушения/Штрафы
-        setTimeout(() => {
-            let tabs = document.querySelectorAll("button, div, span, a");
-            for (let tab of tabs) {
-                let txt = tab.innerText.toLowerCase();
-                // Ищем кнопку, текст которой содержит "нарушен" или "штраф", исключая саму сводку
-                if ((txt.includes("нарушен") || txt.includes("штраф")) && !txt.includes("сводка") && txt.length < 20) {
-                    tab.click();
-                    break;
-                }
-            }
-        }, 150);
-    } else {
-        // Крайний фолбек вызова через общую шину деталей
-        if (typeof openDetails === 'function') {
-            openDetails('report', targetIin); // или 'tabel'
-            setTimeout(() => {
-                let tabs = document.querySelectorAll("button, div, span, a");
-                for (let tab of tabs) {
-                    if (tab.innerText.toLowerCase().includes("нарушен") && tab.length < 20) tab.click();
-                }
-            }, 150);
-        }
-    }
 };
