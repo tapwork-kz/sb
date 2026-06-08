@@ -4082,8 +4082,23 @@ window.renderAdminPointsSummaryData = function() {
         let totalUsed = 0;
         let totalFines = 0;
         
-        // ИСПРАВЛЕНО: Безопасное чтение остатка с очисткой пробелов/запятых и гарантированной защитой от NaN
-        let rawRem = (e.points !== undefined && e.points !== null && String(e.points).trim() !== '') ? e.points : (e.pts || 0);
+        // ИСПРАВЛЕНО: Приоритетное извлечение реального остатка баллов из вложенной структуры user_details
+        let rawRem = 0;
+        if (e.user_details) {
+            let ud = e.user_details;
+            // Если Supabase вернул связь в виде массива из одного элемента, берем первый элемент
+            if (Array.isArray(ud) && ud[0]) ud = ud[0];
+            
+            rawRem = (ud.points !== undefined && ud.points !== null && String(ud.points).trim() !== '') 
+                ? ud.points 
+                : (ud.pts !== undefined && ud.pts !== null ? ud.pts : 0);
+        } else {
+            // Резервный фолбек на случай отсутствия связи
+            rawRem = (e.points !== undefined && e.points !== null && String(e.points).trim() !== '') 
+                ? e.points 
+                : (e.pts || 0);
+        }
+        // Парсим очищенное значение с защитой от NaN
         let totalRem = parseFloat(String(rawRem).replace(/\s/g, '').replace(',', '.')) || 0;
         
         let history = e.ptsHistory || [];
