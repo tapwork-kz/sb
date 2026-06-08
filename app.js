@@ -4011,7 +4011,7 @@ window.openAdminPointsSummary = function() {
     window.renderAdminPointsSummaryData();
 };
 
-// ИСПРАВЛЕНО: Бухгалтерский расчет остатка баллов методом отката от живого баланса user_details с защитой от NaN и правильной сортировкой
+// ИСПРАВЛЕНО: Чистый накопительный расчет остатка (Forward Cumulative) с начала времен на основе ptsHistory
 window.renderAdminPointsSummaryData = function() {
     let navContainer = document.getElementById("admin-points-nav-container");
     let scrollArea = document.getElementById("admin-points-scroll-area");
@@ -4075,26 +4075,20 @@ window.renderAdminPointsSummaryData = function() {
         let totalEarned = 0; // Нач. за выбранный месяц
         let totalUsed = 0;   // Исп. за выбранный месяц
         let totalFines = 0;  // Штрф. за выбранный месяц
-        
-        // 1. ИСПРАВЛЕНО: Вытаскиваем текущую живую точку баланса из user_details как железный якорь
-        let rawPoints = 0;
-        if (e.user_details) {
-            let ud = Array.isArray(e.user_details) ? e.user_details[0] : e.user_details;
-            if (ud) rawPoints = (ud.points !== undefined && ud.points !== null && String(ud.points).trim() !== '') ? ud.points : (ud.pts || 0);
-        } else {
-            rawPoints = (e.points !== undefined && e.points !== null && String(e.points).trim() !== '') ? e.points : (e.pts || 0);
-        }
-        let currentLiveBalance = parseFloat(String(rawPoints).replace(/\s/g, '').replace(',', '.')) || 0;
+        let totalRem = 0;    // Математический остаток на конец выбранного месяца
         
         let history = e.ptsHistory || [];
         history.forEach(p => {
             if (!p || !p.date || typeof p.date !== 'string') return;
             
+            // Парсим числовое значение транзакции
             let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
-            let isFine = p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета");
-            let isEarned = p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || parseFloat(p.val) > 0;
             
-            // Накапливаем данные строго за выбранный месяц
+            // Жесткие маркеры классификации типов
+            let isFine = p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета");
+            let isEarned = p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || (p.type !== "Штраф" && p.type !== "Списание" && p.type !== "Использование" && parseFloat(p.val) > 0);
+            
+            // 1. Сбор метрик строго внутри выбранного месяца
             if (p.date.includes(targetMonthStr)) {
                 if (isFine) {
                     totalFines += pVal;
@@ -4105,25 +4099,27 @@ window.renderAdminPointsSummaryData = function() {
                 }
             }
             
-            // 2. ИСПРАВЛЕНО: Математическая машина времени (откат изменений назад)
+            // 2. ИСПРАВЛЕНО: Накопительный итог от самого начала до конца выбранного месяца включительно
             let parts = p.date.split('.');
             if (parts.length === 3) {
                 let pMonth = parseInt(parts[1], 10) - 1;
                 let pYear = parseInt(parts[2], 10);
                 
-                // Если транзакция из будущего по отношению к выбранному месяцу, убираем её влияние на баланс
-                if (pYear > year || (pYear === year && pMonth > month)) {
+                // Если транзакция была в целевом месяце или в любом периоде ДО него
+                if (pYear < year || (pYear === year && pMonth <= month)) {
                     if (isEarned) {
-                        currentLiveBalance -= pVal; // Будущее начисление отнимаем
+                        totalRem += pVal;  // Начисления плюсуют остаток
                     } else {
-                        currentLiveBalance += pVal; // Будущее списание возвращаем назад
+                        totalRem -= pVal;  // И использование, и штрафы минусуют остаток
                     }
                 }
             }
         });
         
-        let totalRem = currentLiveBalance < 0 ? 0 : currentLiveBalance;
+        // Защита от ухода остатка в минус
+        if (totalRem < 0) totalRem = 0;
         
+        // Показываем строку, если были движения или есть ненулевой остаток за период
         if (totalEarned > 0 || totalUsed > 0 || totalFines > 0 || totalRem > 0) {
             totalPointsInMonthCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
