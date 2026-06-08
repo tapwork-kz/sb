@@ -3820,7 +3820,7 @@ window.openAdminOvertimeSummary = function() {
     window.renderAdminOvertimeSummaryData();
 };
 
-// ИСПРАВЛЕНО: Асинхронный подсчет отработанных дней и часов усилений (УС) за выбранный месяц
+// ИСПРАВЛЕНО: Сводный отчет по переработкам с детальным указанием конкретных дней и часов по каждому сотруднику
 window.renderAdminOvertimeSummaryData = async function() {
     let navContainer = document.getElementById("admin-overtime-nav-container");
     let scrollArea = document.getElementById("admin-overtime-scroll-area");
@@ -3853,7 +3853,7 @@ window.renderAdminOvertimeSummaryData = async function() {
     `;
     navContainer.innerHTML = navHtml;
     
-    scrollArea.innerHTML = `<div style="text-align:center; color:gray; font-size:12px; padding:20px 0;">Загрузка данных переработок...</div>`;
+    scrollArea.innerHTML = `<div style="text-align:center; color:gray; font-size:12px; padding:30px 0;">Загрузка данных из табеля...</div>`;
     
     let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
     let lastDay = new Date(year, month + 1, 0).getDate();
@@ -3861,22 +3861,36 @@ window.renderAdminOvertimeSummaryData = async function() {
     
     let ovMap = {};
     try {
-        // Подтягиваем посуточные записи за выбранный месяц со статусом УС (Усиление/Переработка)
+        // Загружаем ВСЕ дни табеля за месяц, чтобы исключить пропуски из-за регистра букв
         let { data: attList, error } = await supabaseClient
             .from('emp_attendance_days')
-            .select('*')
+            .select('iin, date, status, hours')
             .gte('date', startDateStr)
-            .lte('date', endDateStr)
-            .eq('status', 'УС');
+            .lte('date', endDateStr);
             
         if (!error && attList) {
             attList.forEach(row => {
-                let iin = row.iin;
-                if (!ovMap[iin]) {
-                    ovMap[iin] = { days: 0, hours: 0 };
+                let statusUpper = String(row.status || "").toUpperCase().trim();
+                let hrs = parseFloat(row.hours || 0);
+                
+                // Переработкой считается статус УС или день, где часов больше стандартной смены (10ч)
+                if (statusUpper === 'УС' || statusUpper === 'РД' && hrs > 10 || statusUpper === 'УСИЛЕНИЕ') {
+                    let iin = row.iin;
+                    if (!ovMap[iin]) {
+                        ovMap[iin] = { days: 0, totalHours: 0, details: [] };
+                    }
+                    
+                    // Форматируем дату из YYYY-MM-DD в компактную DD.MM
+                    let dayPart = row.date;
+                    if (dayPart && dayPart.includes('-')) {
+                        let bits = dayPart.split('-');
+                        dayPart = `${bits[2]}.${bits[1]}`;
+                    }
+                    
+                    ovMap[iin].days += 1;
+                    ovMap[iin].totalHours += hrs;
+                    ovMap[iin].details.push({ dateStr: dayPart, hours: hrs });
                 }
-                ovMap[iin].days += 1;
-                ovMap[iin].hours += parseFloat(row.hours || 0);
             });
         }
     } catch (e) { console.error("Ошибка загрузки сводки переработок:", e); }
@@ -3893,21 +3907,32 @@ window.renderAdminOvertimeSummaryData = async function() {
         if (ovData && ovData.days > 0) {
             totalOvertimesCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
+            
+            // Сортируем дни переработок сотрудника по календарному порядку
+            ovData.details.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
+            
+            // Формируем красивую строку детального перечисления дней и часов
+            let daysBreakdown = ovData.details.map(d => `${d.dateStr} (<b style="color:var(--text-color);">${d.hours}ч</b>)`).join(', ');
+            
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+            <div style="padding:12px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:6px;">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
                 <div style="font-size:11px; color:gray; display:flex; gap:12px; align-items:center;">
                     <span>Дней усиления: <b style="color:var(--text-color);">${ovData.days}</b></span>
-                    <span>Всего переработано: <b style="color:#f39c12;">${ovData.hours} ч.</b></span>
+                    <span>Всего часов: <b style="color:#f39c12; font-size:12px;">${ovData.totalHours} ч.</b></span>
+                </div>
+                <div style="font-size:11px; color:gray; background:var(--bg-color); padding:6px 8px; border-radius:6px; line-height:1.4; border:1px solid var(--border-color);">
+                    <span style="color:gray; display:block; margin-bottom:2px; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:0.3px;">Даты и часы переработок:</span>
+                    <span style="color:#f39c12; word-break:break-word;">${daysBreakdown}</span>
                 </div>
             </div>`;
         }
     });
     
     if (totalOvertimesCount === 0) {
-        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Переработок за этот месяц не зафиксировано</p>`;
+        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Переработок за этот месяц не найдено</p>`;
     }
     
     scrollArea.innerHTML = listHtml;
