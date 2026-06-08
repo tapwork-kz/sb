@@ -2813,7 +2813,7 @@ window.openAdminFinesSummary = function() {
     window.renderAdminFinesSummaryData();
 };
 
-// ИСПРАВЛЕНО: Сводка штрафов со строгой сортировкой по отделам (Цифра, МБТ, КБТ) и измененным порядком (Баллы перед Штрафами)
+// ИСПРАВЛЕНО: Сводка штрафов со строгой сортировкой, измененным порядком и переходом в карточку на вкладку Нарушения
 window.renderAdminFinesSummaryData = function() {
     let navContainer = document.getElementById("admin-fines-nav-container");
     let scrollArea = document.getElementById("admin-fines-scroll-area");
@@ -2850,7 +2850,6 @@ window.renderAdminFinesSummaryData = function() {
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
     
-    // Вспомогательная функция для определения веса отделов сотрудников
     function getDeptPriority(deptName) {
         let d = String(deptName || "").toLowerCase();
         if (d.includes("цифра")) return 1;
@@ -2859,7 +2858,6 @@ window.renderAdminFinesSummaryData = function() {
         return 4;
     }
 
-    // ИСПРАВЛЕНО: Двухуровневая сортировка: Сначала по весу отделов (Цифра->МБТ->КБТ), затем алфавитно
     validEmps.sort((a, b) => {
         let pA = getDeptPriority(a.dept);
         let pB = getDeptPriority(b.dept);
@@ -2902,7 +2900,7 @@ window.renderAdminFinesSummaryData = function() {
             let ptsText = totalPts > 0 ? `-${totalPts} б.` : `0 б.`;
             
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px; cursor:pointer; -webkit-tap-highlight-color:transparent;" onclick="window.handleAdminFinesRowClick('${e.iin}');">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
@@ -4490,4 +4488,63 @@ window.handleAdminTabelRowClick = function(targetIin) {
     
     // Если вообще ничего в коде не нашлось
     showToast("Не удалось определить функцию профиля. Проверьте onclick в renderAdminEmps", true);
+};
+
+// ИСПРАВЛЕНО: Открытие полной карточки сотрудника с принудительным переходом на вкладку Нарушения
+window.handleAdminFinesRowClick = function(targetIin) {
+    if (!targetIin) return;
+    
+    // 1. Закрываем текущее модальное окно сводки штрафов
+    let modal = document.getElementById("admin-fines-summary-modal-overlay") || document.getElementById("admin-fine-summary-modal-overlay");
+    if (modal) modal.remove();
+    
+    // 2. Определяем имя системной функции открытия профиля методом сканирования
+    let detectedFuncName = "";
+    if (typeof window.renderAdminEmps === 'function') {
+        let code = window.renderAdminEmps.toString();
+        let match = code.match(/onclick\s*=\s*["']?([a-zA-Z0-9_]+)\(/);
+        if (match && typeof window[match[1]] === 'function') {
+            detectedFuncName = match[1];
+        }
+    }
+    
+    // Резервный список имен, если сканер не вернул результат
+    if (!detectedFuncName) {
+        let fallbacks = ['openEmpProfile', 'openEmpCard', 'showEmpCard', 'openAdminEmpDetails'];
+        for (let name of fallbacks) {
+            if (typeof window[name] === 'function') {
+                detectedFuncName = name;
+                break;
+            }
+        }
+    }
+    
+    // 3. Запускаем карточку и симулируем клик по вкладке "Нарушения"
+    if (detectedFuncName && typeof window[detectedFuncName] === 'function') {
+        window[detectedFuncName](targetIin);
+        
+        // Даем DOM-дереву карточки 150мс на отрисовку, после чего находим и переключаем на вкладку Нарушения/Штрафы
+        setTimeout(() => {
+            let tabs = document.querySelectorAll("button, div, span, a");
+            for (let tab of tabs) {
+                let txt = tab.innerText.toLowerCase();
+                // Ищем кнопку, текст которой содержит "нарушен" или "штраф", исключая саму сводку
+                if ((txt.includes("нарушен") || txt.includes("штраф")) && !txt.includes("сводка") && txt.length < 20) {
+                    tab.click();
+                    break;
+                }
+            }
+        }, 150);
+    } else {
+        // Крайний фолбек вызова через общую шину деталей
+        if (typeof openDetails === 'function') {
+            openDetails('report', targetIin); // или 'tabel'
+            setTimeout(() => {
+                let tabs = document.querySelectorAll("button, div, span, a");
+                for (let tab of tabs) {
+                    if (tab.innerText.toLowerCase().includes("нарушен") && tab.length < 20) tab.click();
+                }
+            }, 150);
+        }
+    }
 };
