@@ -4238,7 +4238,7 @@ window.switchAdminTabelCategoryTab = function(category) {
     window.renderAdminTabelSummaryData();
 };
 
-// Асинхронный расчет и отрисовка показателей посещаемости
+// ИСПРАВЛЕНО: Админ-табель с жесткой фильтрацией должностей, иерархической сортировкой АУП и цветовой разметкой цифр
 window.renderAdminTabelSummaryData = async function() {
     let navContainer = document.getElementById("admin-tabel-nav-container");
     let scrollArea = document.getElementById("admin-tabel-scroll-area");
@@ -4297,7 +4297,6 @@ window.renderAdminTabelSummaryData = async function() {
                 if (st === 'УС') statsMap[iin].US++;
                 if (st === 'РД') statsMap[iin].fact++;
                 
-                // Математическая калькуляция плана рабочих дней: РД + любые пропуски по графику
                 if (['РД', 'БС', 'БЛ', 'ПР', 'ОТ'].includes(st)) {
                     statsMap[iin].plan++;
                 }
@@ -4308,7 +4307,7 @@ window.renderAdminTabelSummaryData = async function() {
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
     
-    // Сортировка как в разделе Сотрудники (Цифра -> МБТ -> КБТ -> Другие, внутри по алфавиту)
+    // Вспомогательные веса для приоритета отделов продавцов
     function getDeptPriority(deptName) {
         let d = String(deptName || "").toLowerCase();
         if (d.includes("цифра")) return 1;
@@ -4316,19 +4315,43 @@ window.renderAdminTabelSummaryData = async function() {
         if (d.includes("кбт")) return 3;
         return 4;
     }
-    validEmps.sort((a, b) => {
-        let pA = getDeptPriority(a.dept); let pB = getDeptPriority(b.dept);
-        if (pA !== pB) return pA - pB;
-        return String(a.name || "").localeCompare(String(b.name || ""));
-    });
+
+    // ИСПРАВЛЕНО: Веса должностей АУП для строгой сортировки по иерархии руководства и персонала
+    function getAupRolePriority(roleName) {
+        let r = String(roleName || "").toLowerCase();
+        if (r.includes("директор") || r.includes("управляющий")) return 1;
+        if (r.includes("супервайзер")) return 2;
+        if (r.includes("старший кассир")) return 3;
+        if (r.includes("кассир") && !r.includes("старший")) return 4;
+        if (r.includes("заведующий")) return 5;
+        if (r.includes("инфо-консультант")) return 6;
+        if (r.includes("грузчик")) return 7;
+        return 8; // Резервный шаг для неучтенных позиций
+    }
     
-    // Разделение по категориям под-вкладок (Продавцы vs АУП)
-    let filteredEmps = validEmps.filter(e => {
-        let role = String(e.role || "").toLowerCase();
-        let dept = String(e.dept || "").toLowerCase();
-        let isSeller = dept.includes("цифра") || dept.includes("мбт") || dept.includes("кбт") || role.includes("продавец") || role.includes("промоутер");
-        return currentCategory === 'sellers' ? isSeller : !isSeller;
-    });
+    // ИСПРАВЛЕНО: Разделение потоков с жесткой фильтрацией должностей
+    let filteredEmps = [];
+    if (currentCategory === 'sellers') {
+        // Показываем ТОЛЬКО Продавцов-консультантов, остальные должности не пропускаем
+        filteredEmps = validEmps.filter(e => String(e.role || "").toLowerCase().includes("продавец-консультант"));
+        
+        // Сортировка продавцов: Цифра -> МБТ -> КБТ, внутри по алфавиту
+        filteredEmps.sort((a, b) => {
+            let pA = getDeptPriority(a.dept); let pB = getDeptPriority(b.dept);
+            if (pA !== pB) return pA - pB;
+            return String(a.name || "").localeCompare(String(b.name || ""));
+        });
+    } else {
+        // В АУП уходят все остальные сотрудники (не являющиеся рядовыми продавцами-консультантами)
+        filteredEmps = validEmps.filter(e => !String(e.role || "").toLowerCase().includes("продавец-консультант"));
+        
+        // Сортировка АУП: Директор -> Супервайзер -> Ст. кассир -> кассир -> заведующий -> инфо -> грузчик, внутри по алфавиту
+        filteredEmps.sort((a, b) => {
+            let rA = getAupRolePriority(a.role); let rB = getAupRolePriority(b.role);
+            if (rA !== rB) return rA - rB;
+            return String(a.name || "").localeCompare(String(b.name || ""));
+        });
+    }
     
     let listHtml = "";
     filteredEmps.forEach(e => {
@@ -4341,17 +4364,17 @@ window.renderAdminTabelSummaryData = async function() {
                 ${e.name}${deptStr}
             </div>
             <div style="font-size:11px; color:gray; display:flex; gap:6px; flex-wrap:wrap; align-items:center; line-height:1.2;">
-                <span>РД: <b style="color:var(--text-color);">Пл:${s.plan}/Фт:${s.fact}</b></span>
+                <span>РД: <b style="color:var(--text-color);">${s.fact} / ${s.plan}</b></span>
                 <span style="color:var(--border-color);">|</span>
-                <span>УС: <b style="color:#f39c12;">${s.US}</b></span>
+                <span>УС: <b style="color:#9b59b6;">${s.US}</b></span>
                 <span style="color:var(--border-color);">|</span>
                 <span>БЛ: <b style="color:#e67e22;">${s.BL}</b></span>
                 <span style="color:var(--border-color);">|</span>
                 <span>ОТ: <b style="color:#27ae60;">${s.OT}</b></span>
                 <span style="color:var(--border-color);">|</span>
-                <span>БС: <b style="color:#95a5a6;">${s.BS}</b></span>
+                <span>БС: <b style="color:#f1c40f;">${s.BS}</b></span>
                 <span style="color:var(--border-color);">|</span>
-                <span>ПР: <b style="color:${s.PR > 0 ? '#e74c3c' : 'gray'}; font-weight:${s.PR > 0 ? '800' : 'normal'};">${s.PR}</b></span>
+                <span>ПР: <b style="color:#e74c3c;">${s.PR}</b></span>
             </div>
         </div>`;
     });
