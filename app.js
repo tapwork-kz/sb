@@ -4153,7 +4153,7 @@ window.renderAdminPointsSummaryData = function() {
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
             
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:2px;">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:2px; cursor:pointer; -webkit-tap-highlight-color:transparent;" onclick="window.handleAdminPointsRowClick('${e.iin}');">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
@@ -4495,4 +4495,80 @@ window.handleAdminTabelRowClick = function(targetIin) {
     
     // Если вообще ничего в коде не нашлось
     showToast("Не удалось определить функцию профиля. Проверьте onclick в renderAdminEmps", true);
+};
+
+// ИСПРАВЛЕНО: Клик из сводки БАЛЛОВ -> Открытие карточки -> Автопереход на вкладку "Баллы"
+window.handleAdminPointsRowClick = function(targetIin) {
+    if (!targetIin) return;
+    
+    let modal = document.getElementById("admin-points-summary-modal-overlay");
+    if (modal) modal.remove();
+    
+    let detectedFuncName = "";
+    if (typeof window.renderAdminEmps === 'function') {
+        let code = window.renderAdminEmps.toString();
+        let match = code.match(/onclick\s*=\s*["']?([a-zA-Z0-9_]+)\(/);
+        if (match && typeof window[match[1]] === 'function') detectedFuncName = match[1];
+    }
+    
+    if (!detectedFuncName) {
+        let fallbacks = ['openEmpProfile', 'openEmpCard', 'showEmpCard', 'openAdminEmpDetails'];
+        for (let name of fallbacks) {
+            if (typeof window[name] === 'function') { detectedFuncName = name; break; }
+        }
+    }
+    
+    if (detectedFuncName && typeof window[detectedFuncName] === 'function') {
+        window[detectedFuncName](targetIin);
+        
+        // Симулируем клик по внутренней вкладке "Баллы"
+        setTimeout(() => {
+            let tabs = document.querySelectorAll("button, div, span, a");
+            for (let tab of tabs) {
+                let txt = tab.innerText.toLowerCase();
+                if (txt.includes("балл") && !txt.includes("сводка") && txt.length < 20) {
+                    tab.click();
+                    break;
+                }
+            }
+        }, 150);
+    }
+};
+
+// ИСПРАВЛЕНО: Клик из сводки ШТРАФОВ -> Открытие карточки -> Автопереход на вкладку "Нарушения"
+window.handleAdminFinesRowClick = function(targetIin) {
+    if (!targetIin) return;
+    
+    let modal = document.getElementById("admin-fines-summary-modal-overlay") || document.getElementById("admin-fine-summary-modal-overlay");
+    if (modal) modal.remove();
+    
+    let detectedFuncName = "";
+    if (typeof window.renderAdminEmps === 'function') {
+        let code = window.renderAdminEmps.toString();
+        let match = code.match(/onclick\s*=\s*["']?([a-zA-Z0-9_]+)\(/);
+        if (match && typeof window[match[1]] === 'function') detectedFuncName = match[1];
+    }
+    
+    if (!detectedFuncName) {
+        let fallbacks = ['openEmpProfile', 'openEmpCard', 'showEmpCard', 'openAdminEmpDetails'];
+        for (let name of fallbacks) {
+            if (typeof window[name] === 'function') { detectedFuncName = name; break; }
+        }
+    }
+    
+    if (detectedFuncName && typeof window[detectedFuncName] === 'function') {
+        window[detectedFuncName](targetIin);
+        
+        // Симулируем клик по внутренней вкладке "Нарушения / Штрафы"
+        setTimeout(() => {
+            let tabs = document.querySelectorAll("button, div, span, a");
+            for (let tab of tabs) {
+                let txt = tab.innerText.toLowerCase();
+                if ((txt.includes("нарушен") || txt.includes("штраф")) && !txt.includes("сводка") && txt.length < 20) {
+                    tab.click();
+                    break;
+                }
+            }
+        }, 150);
+    }
 };
