@@ -2533,87 +2533,7 @@ window.onMyRepMonthPickerChange = function(value) {
 };
 
 // ИСПРАВЛЕНО: Возвращена логика выпадающего списка административного плюса и стили вознаграждений
-window.toggleAdminPlusMenu = function() {
-    let menu = document.getElementById("admin-plus-dropdown-menu");
-    if (menu) {
-        menu.remove();
-        return;
-    }
-    
-    if (!document.getElementById("reward-history-styler")) {
-        let style = document.createElement("style");
-        style.id = "reward-history-styler";
-        style.innerHTML = `
-            .req-item-reward { border-left-color: #2ecc71 !important; background: rgba(46, 204, 113, 0.04) !important; }
-            .reward-prefix { background: #2ecc71; color: white; font-size: 9px; font-weight: 800; padding: 2px 6px; border-radius: 4px; text-transform: uppercase; margin-right: 6px; display: inline-block; vertical-align: middle; }
-        `;
-        document.head.appendChild(style);
-    }
-    
-    menu = document.createElement("div");
-    menu.id = "admin-plus-dropdown-menu";
-    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
-    menu.innerHTML = `
-        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
-            <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
-            <span>Начисление мотиваций</span>
-        </div>
-        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
-            <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
-            <span>Заявка в отпуск</span>
-        </div>
-        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
-            <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
-            <span>Штрафы</span>
-        </div>
-    `;
-    
-    document.body.appendChild(menu);
-    setTimeout(() => {
-        let closeFn = () => {
-            let m = document.getElementById("admin-plus-dropdown-menu");
-            if(m) m.remove();
-            document.removeEventListener("click", closeFn);
-        };
-        document.addEventListener("click", closeFn);
-    }, 50);
-};
-
-// ИСПРАВЛЕНО: Функция открытия модального окна сводной ведомости штрафов по всем сотрудникам
-window.openAdminFinesSummary = function() {
-    let existingModal = document.getElementById("admin-fines-summary-modal-overlay");
-    if (existingModal) existingModal.remove();
-    
-    if (!window.currentFineSummaryMonth || !window.currentFineSummaryYear) {
-        let d = new Date();
-        window.currentFineSummaryMonth = d.getMonth();
-        window.currentFineSummaryYear = d.getFullYear();
-    }
-    
-    let modal = document.createElement("div");
-    modal.id = "admin-fines-summary-modal-overlay";
-    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
-    modal.innerHTML = `
-        <div class="card" style="width:100%; max-width:360px; background:var(--card-bg); padding:14px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; max-height:80vh; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
-            <h3 style="margin:0 0 12px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
-              <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
-              Сводка по штрафам
-            </h3>
-            
-            <div id="admin-fines-nav-container"></div>
-            
-            <div id="admin-fines-scroll-area" style="flex:1; overflow-y:auto; margin-bottom:12px; padding-right:2px;"></div>
-            
-            <button class="btn-gray" onclick="document.getElementById('admin-fines-summary-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px; width:100%;">Закрыть</button>
-        </div>
-    `;
-    modal.onclick = () => modal.remove();
-    document.body.appendChild(modal);
-    
-    window.renderAdminFinesSummaryData();
-};
-
-// ИСПРАВЛЕНО: Асинхронный подсчет, фильтрация и рендеринг сумм штрафов за выбранный месяц
+// ИСПРАВЛЕНО: Асинхронный подсчет, фильтрация и рендеринг сумм штрафов за выбранный месяц с явным указанием тенге и баллов
 window.renderAdminFinesSummaryData = function() {
     let navContainer = document.getElementById("admin-fines-nav-container");
     let scrollArea = document.getElementById("admin-fines-scroll-area");
@@ -2663,8 +2583,10 @@ window.renderAdminFinesSummaryData = function() {
         history.forEach(p => {
             if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
                 if (p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета")) {
-                    let mVal = Math.abs(parseFloat(String(p.moneyFine || 0).replace(',', '.'))) || 0;
-                    let pVal = Math.abs(parseFloat(String(p.val || 0).replace(',', '.'))) || 0;
+                    // Парсим и очищаем значения от лишних знаков
+                    let mVal = Math.abs(parseFloat(String(p.moneyFine || 0).replace(/\s/g, '').replace(',', '.'))) || 0;
+                    let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
+                    
                     totalMoney += mVal;
                     totalPts += pVal;
                     count++;
@@ -2675,15 +2597,20 @@ window.renderAdminFinesSummaryData = function() {
         if (count > 0) {
             totalFinesInMonthCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
+            
+            // Форматируем вывод: если сумма > 0, добавляем знак минус перед ней
+            let moneyText = totalMoney > 0 ? `-${fmtSum(totalMoney)} ₸` : `0 ₸`;
+            let ptsText = totalPts > 0 ? `-${totalPts} б.` : `0 б.`;
+            
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
-                <div style="flex:1; min-width:0; padding-right:8px;">
-                    <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${e.name}${deptStr}</div>
-                    <div style="font-size:11px; color:gray; margin-top:2px;">Количество нарушений: <b>${count}</b></div>
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+                <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    ${e.name}${deptStr}
                 </div>
-                <div style="text-align:right; flex-shrink:0;">
-                    ${totalMoney > 0 ? `<div style="font-size:12px; font-weight:bold; color:#e74c3c;">-${fmtSum(totalMoney)} ₸</div>` : ''}
-                    ${totalPts > 0 ? `<div style="font-size:11px; font-weight:500; color:#e67e22;">-${totalPts} б.</div>` : ''}
+                <div style="font-size:11px; color:gray; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <span>Нарушений: <b style="color:var(--text-color);">${count}</b></span>
+                    <span>Штрафы: <b style="color:${totalMoney > 0 ? '#e74c3c' : 'gray'};">${moneyText}</b></span>
+                    <span>Баллы: <b style="color:${totalPts > 0 ? '#e67e22' : 'gray'};">${ptsText}</b></span>
                 </div>
             </div>`;
         }
@@ -2694,28 +2621,6 @@ window.renderAdminFinesSummaryData = function() {
     }
     
     scrollArea.innerHTML = listHtml;
-};
-
-// Переключение месяцев стрелками в сводке штрафов
-window.adjustFineSummaryMonth = function(delta) {
-    window.currentFineSummaryMonth += delta;
-    if (window.currentFineSummaryMonth > 11) {
-        window.currentFineSummaryMonth = 0;
-        window.currentFineSummaryYear += 1;
-    } else if (window.currentFineSummaryMonth < 0) {
-        window.currentFineSummaryMonth = 11;
-        window.currentFineSummaryYear -= 1;
-    }
-    window.renderAdminFinesSummaryData();
-};
-
-// Переключение месяцев через встроенный пикер в сводке штрафов
-window.onFineSummaryMonthPickerChange = function(value) {
-    if (!value) return;
-    let parts = value.split('-');
-    window.currentFineSummaryYear = parseInt(parts[0], 10);
-    window.currentFineSummaryMonth = parseInt(parts[1], 10) - 1;
-    window.renderAdminFinesSummaryData();
 };
 
 // ИСПРАВЛЕНО: Возвращена отрисовка модального окна заявки в отпуск для интерфейса руководителя
