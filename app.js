@@ -3409,7 +3409,29 @@ function openForm(type) {
       else { noticeBox.innerHTML = `<div style="display:flex; align-items:center; justify-content:center; gap:6px;"><span class="material-symbols-rounded" style="font-size:18px; color:#e74c3c;">local_fire_department</span> <span>Вы можете использовать: <b style="font-size:16px;">${document.getElementById("pt-rem").innerText}</b> баллов</span></div>`; noticeBox.style = "background: rgba(41, 128, 185, 0.1); color: #2980b9; padding: 12px; border-radius: 12px; font-size: 13px; text-align: center; margin-bottom: 12px; border: 1px dashed var(--btn-color); box-shadow: 0 2px 8px rgba(0,0,0,0.03);"; document.getElementById("fp-action").classList.remove("hidden"); document.getElementById("fp-time").classList.remove("hidden"); document.getElementById("fp-date").classList.remove("hidden"); document.getElementById("fp-date-label").classList.remove("hidden"); document.getElementById("fp-submit-btn").disabled = false; document.getElementById("fp-submit-btn").style.background = "var(--btn-color)"; } 
       document.getElementById("form-points").classList.remove("hidden"); document.getElementById("form-points").classList.add("slide-up-fade"); 
   }
-  if(type === 'swap') { const select = document.getElementById("fs-target"); select.innerHTML = '<option value="" disabled selected>Выберите сменщика</option>' + globalSellers.map(s => `<option value="${s.iin}">${s.name}</option>`).join(""); document.getElementById("fs-extra").classList.add("hidden"); document.getElementById("form-swap").classList.remove("hidden"); document.getElementById("form-swap").classList.add("slide-up-fade"); }
+  if(type === 'swap') { 
+      const select = document.getElementById("fs-target"); 
+      select.innerHTML = '<option value="" disabled selected>Выберите сменщика</option>' + globalSellers.map(s => `<option value="${s.iin}">${s.name}</option>`).join(""); 
+      document.getElementById("fs-extra").classList.add("hidden"); 
+      
+      // ИСПРАВЛЕНО: Проверяем, если зашел Кассир — показываем ему встроенный блок переработок и выставляем сегодняшнюю дату
+      let roleLow = String(appState.role || "").toLowerCase();
+      let isCashier = roleLow.includes("кассир") && !roleLow.includes("старший кассир");
+      let coBlock = document.getElementById("cashier-overtime-block");
+      if (coBlock) {
+          if (isCashier) {
+              coBlock.classList.remove("hidden");
+              let todayIso = new Date().toISOString().split('T')[0];
+              if(document.getElementById("co-hours-date")) document.getElementById("co-hours-date").value = todayIso;
+              if(document.getElementById("co-days-date")) document.getElementById("co-days-date").value = todayIso;
+          } else {
+              coBlock.classList.add("hidden");
+          }
+      }
+      
+      document.getElementById("form-swap").classList.remove("hidden"); 
+      document.getElementById("form-swap").classList.add("slide-up-fade"); 
+  }
   let scroller = document.getElementById("scrollable-body"); if (scroller) scroller.scrollTop = 0;
 }
 
@@ -3666,3 +3688,96 @@ window.addEventListener('load', () => {
         }, 1000); // Даем 1 секунду на полную отрисовку интерфейса и переключаем экран
     }
 });
+
+// ИСПРАВЛЕНО: Функция переключения внутренних вкладок переработки кассира (Часы / Дни)
+window.switchCashierOvertimeTab = function(type) {
+    let btnHours = document.getElementById("tab-co-hours");
+    let btnDays = document.getElementById("tab-co-days");
+    let blockHours = document.getElementById("block-co-hours");
+    let blockDays = document.getElementById("block-co-days");
+    let typeInput = document.getElementById("co-current-type");
+    
+    if (!btnHours || !btnDays || !blockHours || !blockDays || !typeInput) return;
+    typeInput.value = type;
+    
+    if (type === 'hours') {
+        btnHours.style.background = "var(--card-bg)";
+        btnHours.style.color = "var(--text-color)";
+        btnHours.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+        btnDays.style.background = "none";
+        btnDays.style.color = "gray";
+        btnDays.style.boxShadow = "none";
+        blockHours.style.display = "block";
+        blockDays.style.display = "none";
+    } else {
+        btnDays.style.background = "var(--card-bg)";
+        btnDays.style.color = "var(--text-color)";
+        btnDays.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+        btnHours.style.background = "none";
+        btnHours.style.color = "gray";
+        btnHours.style.boxShadow = "none";
+        blockHours.style.display = "none";
+        blockDays.style.display = "block";
+    }
+};
+
+// ИСПРАВЛЕНО: Функция автоматического сбора данных и отправки заявки овертайма от имени Кассира
+window.submitCashierOvertimeForm = async function() {
+    let typeInput = document.getElementById("co-current-type");
+    let commentInput = document.getElementById("co-comment");
+    if (!typeInput || !commentInput) return;
+    
+    let comment = commentInput.value.trim();
+    if (!comment) {
+        showToast("Укажите причину переработки!", true);
+        return;
+    }
+    
+    let type = typeInput.value;
+    let targetIin = appState.iin; // Принудительно отправляем ИИН текущей сессии кассира
+    let reqType = "Переработка";
+    let details = "";
+    let meta = { target_iin: targetIin, comment: comment };
+    
+    if (type === 'hours') {
+        let d = document.getElementById("co-hours-date").value;
+        let from = document.getElementById("co-hours-from").value;
+        let to = document.getElementById("co-hours-to").value;
+        if (!d || !from || !to) {
+            showToast("Заполните дату и время переработки!", true);
+            return;
+        }
+        let p = d.split('-');
+        let formattedDate = `${p[2]}.${p[1]}.${p[0]}`;
+        reqType = "Переработка (часы)";
+        details = `Переработка по часам\nДата: ${formattedDate}\nВремя: с ${from} до ${to}\nПричина: ${comment}`;
+        meta.date = formattedDate; meta.from_time = from; meta.to_time = to; meta.overtime_kind = "hours";
+    } else {
+        let d = document.getElementById("co-days-date").value;
+        if (!d) {
+            showToast("Укажите день переработки!", true);
+            return;
+        }
+        let p = d.split('-');
+        let formattedDate = `${p[2]}.${p[1]}.${p[0]}`;
+        reqType = "Переработка (дни)";
+        details = `Переработка по дням\nДата: ${formattedDate}\nПричина: ${comment}`;
+        meta.date = formattedDate; meta.overtime_kind = "days";
+    }
+    
+    showToast("Отправка заявки...", false, 9999);
+    let res = await callBackend("submitRequest", {
+        type: reqType,
+        details: details,
+        targetIin: targetIin,
+        metadata: JSON.stringify(meta)
+    });
+    
+    if (res && res.success) {
+        showToast("Заявка на переработку отправлена руководителям!", false);
+        commentInput.value = "";
+        closeForm();
+    } else {
+        showToast("Ошибка отправки: " + (res?.error || "неизвестно"), true);
+    }
+};
