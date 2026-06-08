@@ -2562,6 +2562,10 @@ window.toggleAdminPlusMenu = function() {
             <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
             <span>Заявка в отпуск</span>
         </div>
+        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeForm();">
+            <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
+            <span>Подать на переработку</span>
+        </div>
         <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
             <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
             <span>Штрафы</span>
@@ -2577,6 +2581,184 @@ window.toggleAdminPlusMenu = function() {
         };
         document.addEventListener("click", closeFn);
     }, 50);
+};
+
+// ИСПРАВЛЕНО: Функция генерации модального окна подачи переработки с двумя независимыми блоками
+window.openAdminOvertimeForm = function() {
+    let existingModal = document.getElementById("admin-overtime-modal-overlay");
+    if (existingModal) existingModal.remove();
+    
+    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
+    let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+    validEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    
+    let empOptions = validEmps.map(e => `<option value="${e.iin}">${e.name} (${e.dept || '—'})</option>`).join('');
+    
+    let modal = document.createElement("div");
+    modal.id = "admin-overtime-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:360px; background:var(--card-bg); padding:16px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+            <h3 style="margin:0 0 14px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
+              <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
+              Заявка на переработку
+            </h3>
+            
+            <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Сотрудник</label>
+            <select id="ov-emp-select" style="width:100%; padding:10px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:14px; font-size:13px; font-weight:bold; box-sizing:border-box;">
+                ${empOptions}
+            </select>
+            
+            <div style="display:flex; background:var(--bg-color); padding:2px; border-radius:8px; margin-bottom:14px; border:1px solid var(--border-color);">
+                <button id="tab-ov-hours" style="flex:1; border:none; padding:7px; font-size:12px; font-weight:bold; border-radius:6px; cursor:pointer; background:var(--card-bg); color:var(--text-color); box-shadow:0 1px 3px rgba(0,0,0,0.1); -webkit-tap-highlight-color:transparent;" onclick="window.switchOvertimeTab('hours')">По часам</button>
+                <button id="tab-ov-days" style="flex:1; border:none; padding:7px; font-size:12px; font-weight:bold; border-radius:6px; cursor:pointer; background:none; color:gray; -webkit-tap-highlight-color:transparent;" onclick="window.switchOvertimeTab('days')">По дням</button>
+            </div>
+            
+            <input type="hidden" id="ov-current-type" value="hours">
+            
+            <div id="block-ov-hours" style="display:block;">
+                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Дата переработки</label>
+                <input type="date" id="ov-hours-date" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:12px; font-size:13px; box-sizing:border-box;">
+                
+                <div style="display:flex; gap:10px; margin-bottom:12px;">
+                    <div style="flex:1;">
+                        <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время с</label>
+                        <input type="time" id="ov-hours-from" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); font-size:13px; box-sizing:border-box;">
+                    </div>
+                    <div style="flex:1;">
+                        <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время до</label>
+                        <input type="time" id="ov-hours-to" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); font-size:13px; box-sizing:border-box;">
+                    </div>
+                </div>
+            </div>
+            
+            <div id="block-ov-days" style="display:none;">
+                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">День переработки</label>
+                <input type="date" id="ov-days-date" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:12px; font-size:13px; box-sizing:border-box;">
+            </div>
+            
+            <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Причина переработки</label>
+            <textarea id="ov-comment" placeholder="Опишите причину..." style="width:100%; height:60px; padding:10px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); font-size:13px; margin-bottom:16px; resize:none; font-family:inherit; box-sizing:border-box;"></textarea>
+            
+            <div style="display:flex; gap:10px;">
+                <button class="btn-gray" onclick="document.getElementById('admin-overtime-modal-overlay').remove();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px;">Отмена</button>
+                <button class="btn-primary" onclick="window.submitAdminOvertimeForm();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px; background:#f39c12; border-color:#f39c12;">Отправить</button>
+            </div>
+        </div>
+    `;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+    
+    let todayIso = new Date().toISOString().split('T')[0];
+    document.getElementById("ov-hours-date").value = todayIso;
+    document.getElementById("ov-days-date").value = todayIso;
+};
+
+// ИСПРАВЛЕНО: Интерактивный переключатель вкладок внутри формы переработок
+window.switchOvertimeTab = function(type) {
+    let btnHours = document.getElementById("tab-ov-hours");
+    let btnDays = document.getElementById("tab-ov-days");
+    let blockHours = document.getElementById("block-ov-hours");
+    let blockDays = document.getElementById("block-ov-days");
+    let typeInput = document.getElementById("ov-current-type");
+    
+    if (!btnHours || !btnDays || !blockHours || !blockDays || !typeInput) return;
+    typeInput.value = type;
+    
+    if (type === 'hours') {
+        btnHours.style.background = "var(--card-bg)";
+        btnHours.style.color = "var(--text-color)";
+        btnHours.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+        btnDays.style.background = "none";
+        btnDays.style.color = "gray";
+        btnDays.style.boxShadow = "none";
+        blockHours.style.display = "block";
+        blockDays.style.display = "none";
+    } else {
+        btnDays.style.background = "var(--card-bg)";
+        btnDays.style.color = "var(--text-color)";
+        btnDays.style.boxShadow = "0 1px 3px rgba(0,0,0,0.1)";
+        btnHours.style.background = "none";
+        btnHours.style.color = "gray";
+        btnHours.style.boxShadow = "none";
+        blockHours.style.display = "none";
+        blockDays.style.display = "block";
+    }
+};
+
+// ИСПРАВЛЕНО: Сбор данных, валидация полей и отправка заявки в БД
+window.submitAdminOvertimeForm = async function() {
+    let empSelect = document.getElementById("ov-emp-select");
+    let typeInput = document.getElementById("ov-current-type");
+    let commentInput = document.getElementById("ov-comment");
+    
+    if (!empSelect || !typeInput || !commentInput) return;
+    
+    let targetIin = empSelect.value;
+    let type = typeInput.value;
+    let comment = commentInput.value.trim();
+    
+    if (!comment) {
+        showToast("Укажите причину переработки!", true);
+        return;
+    }
+    
+    let reqType = "Переработка";
+    let details = "";
+    let meta = { target_iin: targetIin, comment: comment };
+    
+    if (type === 'hours') {
+        let d = document.getElementById("ov-hours-date").value;
+        let from = document.getElementById("ov-hours-from").value;
+        let to = document.getElementById("ov-hours-to").value;
+        
+        if (!d || !from || !to) {
+            showToast("Заполните дату и время переработки!", true);
+            return;
+        }
+        
+        let p = d.split('-');
+        let formattedDate = `${p[2]}.${p[1]}.${p[0]}`;
+        
+        reqType = "Переработка (часы)";
+        details = `Переработка по часам\nДата: ${formattedDate}\nВремя: с ${from} до ${to}\nПричина: ${comment}`;
+        meta.date = formattedDate;
+        meta.from_time = from;
+        meta.to_time = to;
+        meta.overtime_kind = "hours";
+    } else {
+        let d = document.getElementById("ov-days-date").value;
+        if (!d) {
+            showToast("Укажите день переработки!", true);
+            return;
+        }
+        
+        let p = d.split('-');
+        let formattedDate = `${p[2]}.${p[1]}.${p[0]}`;
+        
+        reqType = "Переработка (дни)";
+        details = `Переработка по дням\nДата: ${formattedDate}\nПричина: ${comment}`;
+        meta.date = formattedDate;
+        meta.overtime_kind = "days";
+    }
+    
+    showToast("Отправка заявки...", false, 9999);
+    
+    let res = await callBackend("submitRequest", {
+        type: reqType,
+        details: details,
+        targetIin: targetIin,
+        metadata: JSON.stringify(meta)
+    });
+    
+    if (res && res.success) {
+        showToast("Заявка на переработку отправлена!", false);
+        let overlay = document.getElementById("admin-overtime-modal-overlay");
+        if (overlay) overlay.remove();
+        if (typeof loadDashboard === 'function') loadDashboard(true);
+    } else {
+        showToast("Ошибка отправки: " + (res?.error || "неизвестно"), true);
+    }
 };
 
 // ИСПРАВЛЕНО: Функция открытия модального окна сводной ведомости штрафов по всем сотрудникам
