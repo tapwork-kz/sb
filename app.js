@@ -2559,35 +2559,35 @@ window.toggleAdminPlusMenu = function() {
     
     menu = document.createElement("div");
     menu.id = "admin-plus-dropdown-menu";
-    // ИСПРАВЛЕНО: Изменен border-radius на 0px для создания абсолютно прямых углов у контейнера списка
-    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:0px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
+    // ИСПРАВЛЕНО: Вернули основное скругление контейнера на border-radius: 12px
+    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
     
     let menuHtml = "";
     if (isOnlyDirOrSup) {
         menuHtml = `
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:12px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
                 <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
                 <span>Начисление мотиваций</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
                 <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
                 <span>Заявка в отпуск</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeForm();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeForm();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:4px double var(--border-color); margin-top:2px;" onclick="window.openAdminOvertimeSummary();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:4px double var(--border-color); margin-top:2px;" onclick="window.openAdminOvertimeSummary();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">history_toggle_off</span>
                 <span>Переработки</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
                 <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
                 <span>Штрафы</span>
             </div>`;
     } else {
         menuHtml = `
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminOvertimeForm();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminOvertimeForm();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>`;
