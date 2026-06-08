@@ -2562,6 +2562,10 @@ window.toggleAdminPlusMenu = function() {
             <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
             <span>Заявка в отпуск</span>
         </div>
+        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
+            <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
+            <span>Штрафы</span>
+        </div>
     `;
     
     document.body.appendChild(menu);
@@ -2573,6 +2577,145 @@ window.toggleAdminPlusMenu = function() {
         };
         document.addEventListener("click", closeFn);
     }, 50);
+};
+
+// ИСПРАВЛЕНО: Функция открытия модального окна сводной ведомости штрафов по всем сотрудникам
+window.openAdminFinesSummary = function() {
+    let existingModal = document.getElementById("admin-fines-summary-modal-overlay");
+    if (existingModal) existingModal.remove();
+    
+    if (!window.currentFineSummaryMonth || !window.currentFineSummaryYear) {
+        let d = new Date();
+        window.currentFineSummaryMonth = d.getMonth();
+        window.currentFineSummaryYear = d.getFullYear();
+    }
+    
+    let modal = document.createElement("div");
+    modal.id = "admin-fines-summary-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:360px; background:var(--card-bg); padding:14px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; max-height:80vh; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+            <h3 style="margin:0 0 12px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
+              <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
+              Сводка по штрафам
+            </h3>
+            
+            <div id="admin-fines-nav-container"></div>
+            
+            <div id="admin-fines-scroll-area" style="flex:1; overflow-y:auto; margin-bottom:12px; padding-right:2px;"></div>
+            
+            <button class="btn-gray" onclick="document.getElementById('admin-fines-summary-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px; width:100%;">Закрыть</button>
+        </div>
+    `;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+    
+    window.renderAdminFinesSummaryData();
+};
+
+// ИСПРАВЛЕНО: Асинхронный подсчет, фильтрация и рендеринг сумм штрафов за выбранный месяц
+window.renderAdminFinesSummaryData = function() {
+    let navContainer = document.getElementById("admin-fines-nav-container");
+    let scrollArea = document.getElementById("admin-fines-scroll-area");
+    if (!navContainer || !scrollArea) return;
+    
+    let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    let year = window.currentFineSummaryYear;
+    let month = window.currentFineSummaryMonth;
+    let targetMonthStr = ("0" + (month + 1)).slice(-2) + "." + year;
+    
+    let navHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustFineSummaryMonth(-1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
+        </button>
+        
+        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
+                ${monthNames[month]} ${year}
+            </span>
+            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
+                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
+                   onchange="window.onFineSummaryMonthPickerChange(this.value)">
+        </div>
+        
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustFineSummaryMonth(1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
+        </button>
+    </div>
+    `;
+    navContainer.innerHTML = navHtml;
+    
+    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
+    let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+    validEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    
+    let listHtml = "";
+    let totalFinesInMonthCount = 0;
+    
+    validEmps.forEach(e => {
+        let totalMoney = 0;
+        let totalPts = 0;
+        let count = 0;
+        
+        let history = e.ptsHistory || [];
+        history.forEach(p => {
+            if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
+                if (p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета")) {
+                    let mVal = Math.abs(parseFloat(String(p.moneyFine || 0).replace(',', '.'))) || 0;
+                    let pVal = Math.abs(parseFloat(String(p.val || 0).replace(',', '.'))) || 0;
+                    totalMoney += mVal;
+                    totalPts += pVal;
+                    count++;
+                }
+            }
+        });
+        
+        if (count > 0) {
+            totalFinesInMonthCount++;
+            let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
+            listHtml += `
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; justify-content:space-between; align-items:center;">
+                <div style="flex:1; min-width:0; padding-right:8px;">
+                    <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${e.name}${deptStr}</div>
+                    <div style="font-size:11px; color:gray; margin-top:2px;">Количество нарушений: <b>${count}</b></div>
+                </div>
+                <div style="text-align:right; flex-shrink:0;">
+                    ${totalMoney > 0 ? `<div style="font-size:12px; font-weight:bold; color:#e74c3c;">-${fmtSum(totalMoney)} ₸</div>` : ''}
+                    ${totalPts > 0 ? `<div style="font-size:11px; font-weight:500; color:#e67e22;">-${totalPts} б.</div>` : ''}
+                </div>
+            </div>`;
+        }
+    });
+    
+    if (totalFinesInMonthCount === 0) {
+        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Штрафов за этот месяц не найдено</p>`;
+    }
+    
+    scrollArea.innerHTML = listHtml;
+};
+
+// Переключение месяцев стрелками в сводке штрафов
+window.adjustFineSummaryMonth = function(delta) {
+    window.currentFineSummaryMonth += delta;
+    if (window.currentFineSummaryMonth > 11) {
+        window.currentFineSummaryMonth = 0;
+        window.currentFineSummaryYear += 1;
+    } else if (window.currentFineSummaryMonth < 0) {
+        window.currentFineSummaryMonth = 11;
+        window.currentFineSummaryYear -= 1;
+    }
+    window.renderAdminFinesSummaryData();
+};
+
+// Переключение месяцев через встроенный пикер в сводке штрафов
+window.onFineSummaryMonthPickerChange = function(value) {
+    if (!value) return;
+    let parts = value.split('-');
+    window.currentFineSummaryYear = parseInt(parts[0], 10);
+    window.currentFineSummaryMonth = parseInt(parts[1], 10) - 1;
+    window.renderAdminFinesSummaryData();
 };
 
 // ИСПРАВЛЕНО: Возвращена отрисовка модального окна заявки в отпуск для интерфейса руководителя
