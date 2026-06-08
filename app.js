@@ -3820,7 +3820,7 @@ window.openAdminOvertimeSummary = function() {
     window.renderAdminOvertimeSummaryData();
 };
 
-// ИСПРАВЛЕНО: Сводный отчет по переработкам с детальным указанием конкретных дней и часов по каждому сотруднику
+// ИСПРАВЛЕНО: Сводный подсчет поданных переработок из таблицы requests (дни и часы) с калькулятором разницы времени
 window.renderAdminOvertimeSummaryData = async function() {
     let navContainer = document.getElementById("admin-overtime-nav-container");
     let scrollArea = document.getElementById("admin-overtime-scroll-area");
@@ -3829,6 +3829,9 @@ window.renderAdminOvertimeSummaryData = async function() {
     let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
     let year = window.currentOvertimeSummaryYear;
     let month = window.currentOvertimeSummaryMonth;
+    
+    // Суффикс для поиска даты внутри строки метаданных ".ММ.ГГГГ"
+    let targetMonthSuffix = "." + ("0" + (month + 1)).slice(-2) + "." + year;
     
     let navHtml = `
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
@@ -3853,47 +3856,56 @@ window.renderAdminOvertimeSummaryData = async function() {
     `;
     navContainer.innerHTML = navHtml;
     
-    scrollArea.innerHTML = `<div style="text-align:center; color:gray; font-size:12px; padding:30px 0;">Загрузка данных из табеля...</div>`;
-    
-    let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
-    let lastDay = new Date(year, month + 1, 0).getDate();
-    let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
+    scrollArea.innerHTML = `<div style="text-align:center; color:gray; font-size:12px; padding:20px 0;">Загрузка данных переработок...</div>`;
     
     let ovMap = {};
+    
+    // Вспомогательная функция для расчета разницы между часами (например, "21:00" и "23:35")
+    function getHoursDifference(fromStr, toStr) {
+        if (!fromStr || !toStr) return 0;
+        let [fH, fM] = fromStr.split(':').map(Number);
+        let [tH, tM] = toStr.split(':').map(Number);
+        let startMin = fH * 60 + fM;
+        let endMin = tH * 60 + tM;
+        if (endMin < startMin) endMin += 24 * 60; // Если перевалило за полночь
+        return (endMin - startMin) / 60;
+    }
+
     try {
-        // Загружаем ВСЕ дни табеля за месяц, чтобы исключить пропуски из-за регистра букв
-        let { data: attList, error } = await supabaseClient
-            .from('emp_attendance_days')
-            .select('iin, date, status, hours')
-            .gte('date', startDateStr)
-            .lte('date', endDateStr);
+        // ИСПРАВЛЕНО: Тянем данные напрямую из таблицы requests по нужным типам переработок
+        let { data: reqList, error } = await supabaseClient
+            .from('requests')
+            .select('*')
+            .in('type', ['Переработка (дни)', 'Переработка (часы)']);
             
-        if (!error && attList) {
-            attList.forEach(row => {
-                let statusUpper = String(row.status || "").toUpperCase().trim();
-                let hrs = parseFloat(row.hours || 0);
+        if (!error && reqList) {
+            reqList.forEach(row => {
+                let meta = {};
+                try {
+                    meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata || {});
+                } catch(e) {}
                 
-                // Переработкой считается статус УС или день, где часов больше стандартной смены (10ч)
-                if (statusUpper === 'УС' || statusUpper === 'РД' && hrs > 10 || statusUpper === 'УСИЛЕНИЕ') {
-                    let iin = row.iin;
+                let dateStr = meta.date || ""; // Формат "DD.MM.YYYY"
+                
+                // Проверяем, относится ли заявка к выбранному в календаре месяцу и году
+                if (dateStr.includes(targetMonthSuffix)) {
+                    let iin = row.target_iin || meta.target_iin;
+                    if (!iin) return;
+                    
                     if (!ovMap[iin]) {
-                        ovMap[iin] = { days: 0, totalHours: 0, details: [] };
+                        ovMap[iin] = { days: 0, totalHours: 0 };
                     }
                     
-                    // Форматируем дату из YYYY-MM-DD в компактную DD.MM
-                    let dayPart = row.date;
-                    if (dayPart && dayPart.includes('-')) {
-                        let bits = dayPart.split('-');
-                        dayPart = `${bits[2]}.${bits[1]}`;
+                    if (row.type === "Переработка (дни)") {
+                        ovMap[iin].days += 1;
+                    } else if (row.type === "Переработка (часы)") {
+                        let diff = getHoursDifference(meta.from_time, meta.to_time);
+                        ovMap[iin].totalHours += diff;
                     }
-                    
-                    ovMap[iin].days += 1;
-                    ovMap[iin].totalHours += hrs;
-                    ovMap[iin].details.push({ dateStr: dayPart, hours: hrs });
                 }
             });
         }
-    } catch (e) { console.error("Ошибка загрузки сводки переработок:", e); }
+    } catch (e) { console.error("Ошибка загрузки сводки переработок из requests:", e); }
     
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
@@ -3902,30 +3914,28 @@ window.renderAdminOvertimeSummaryData = async function() {
     let listHtml = "";
     let totalOvertimesCount = 0;
     
+    // Красивое форматирование итоговых накопленных дробных часов в формат "Х ч. Y мин."
+    function formatHoursResult(h) {
+        if (h <= 0) return "0 ч.";
+        let hrs = Math.floor(h);
+        let mins = Math.round((h % 1) * 60);
+        return mins > 0 ? `${hrs} ч. ${mins} мин.` : `${hrs} ч.`;
+    }
+
     validEmps.forEach(e => {
         let ovData = ovMap[e.iin];
-        if (ovData && ovData.days > 0) {
+        if (ovData && (ovData.days > 0 || ovData.totalHours > 0)) {
             totalOvertimesCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
             
-            // Сортируем дни переработок сотрудника по календарному порядку
-            ovData.details.sort((a, b) => a.dateStr.localeCompare(b.dateStr));
-            
-            // Формируем красивую строку детального перечисления дней и часов
-            let daysBreakdown = ovData.details.map(d => `${d.dateStr} (<b style="color:var(--text-color);">${d.hours}ч</b>)`).join(', ');
-            
             listHtml += `
-            <div style="padding:12px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:6px;">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
                 <div style="font-size:11px; color:gray; display:flex; gap:12px; align-items:center;">
-                    <span>Дней усиления: <b style="color:var(--text-color);">${ovData.days}</b></span>
-                    <span>Всего часов: <b style="color:#f39c12; font-size:12px;">${ovData.totalHours} ч.</b></span>
-                </div>
-                <div style="font-size:11px; color:gray; background:var(--bg-color); padding:6px 8px; border-radius:6px; line-height:1.4; border:1px solid var(--border-color);">
-                    <span style="color:gray; display:block; margin-bottom:2px; font-size:10px; font-weight:bold; text-transform:uppercase; letter-spacing:0.3px;">Даты и часы переработок:</span>
-                    <span style="color:#f39c12; word-break:break-word;">${daysBreakdown}</span>
+                    <span>По дням: <b style="color:var(--text-color);">${ovData.days} дн.</b></span>
+                    <span>По часам: <b style="color:#f39c12;">${formatHoursResult(ovData.totalHours)}</b></span>
                 </div>
             </div>`;
         }
