@@ -2557,6 +2557,11 @@ window.toggleAdminPlusMenu = function() {
     let roleLow = String(appState.role || "").toLowerCase();
     let isOnlyDirOrSup = roleLow.includes("директор") || roleLow.includes("управляющий") || roleLow.includes("супервайзер");
     
+    menu = document.createElement("div");
+    menu.id = "admin-plus-dropdown-menu";
+    // Внешняя карточка имеет скругление 12px
+    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
+    
     let menuHtml = "";
     if (isOnlyDirOrSup) {
         menuHtml = `
