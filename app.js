@@ -777,7 +777,8 @@ async function callBackend(actionName, payloadData = {}) {
       } else {
           mySellers = adminEmployees.filter(e => e.dept === userData.dept && !String(e.role).toLowerCase().includes("кассир") && e.iin !== appState.iin && String(e.login_status).toUpperCase() !== 'FALSE').map(e => ({ iin: e.iin, name: e.name }));
       }
-      return { authorized: true, role: userData.role, name: userData.full_name, dept: userData.dept, isPromoter: userData.role.toLowerCase().includes("промоутер"), scItems: finalScItems, adminScItems: finalScItems, adminPlan: localData.adminPlan || null, tradeInModels: tradeInList, hotChecks: localData.hotChecks || [], promoLists: localData.promoLists || [], info: localData.info, userHistory: userHistory, userInbox: userInbox, adminInbox: adminInbox, adminHistory: adminHistory, adminEmployees: adminEmployees, sellers: mySellers, vacations: globalVacations };
+      // ИСПРАВЛЕНО: Добавили пересылку todayKpiData, чтобы фронтенд видел cashier_metrics
+      return { authorized: true, role: userData.role, name: userData.full_name, dept: userData.dept, isPromoter: userData.role.toLowerCase().includes("промоутер"), scItems: finalScItems, adminScItems: finalScItems, adminPlan: localData.adminPlan || null, tradeInModels: tradeInList, hotChecks: localData.hotChecks || [], promoLists: localData.promoLists || [], info: localData.info, userHistory: userHistory, userInbox: userInbox, adminInbox: adminInbox, adminHistory: adminHistory, adminEmployees: adminEmployees, sellers: mySellers, vacations: globalVacations, todayKpiData: kpiDataRaw[0] };
     }
   } catch (error) { return { success: false, error: error.message }; }
 }
@@ -1527,6 +1528,11 @@ function renderDashboardData(data, isSilent = false) {
   let countSc = monthSc.filter(p => p && (p.source === "СЦ" || p.source === "СЦ/Дефект" || p.source === "Продажа СЦ/Дефект")).length; 
   let countFocus = monthSc.filter(p => p && (p.source !== "СЦ" && p.source !== "СЦ/Дефект" && p.source !== "Продажа СЦ/Дефект")).length; 
   let scEl = document.getElementById("info-sc-val"); if(scEl) { scEl.innerText = `${countSc} | ${countFocus}`; if (countSc + countFocus > 0) scEl.style.color = "#27ae60"; else scEl.style.color = "#e74c3c"; }
+
+  // ИСПРАВЛЕНО: Автоматический вызов отрисовки кассовых кнопок при каждом обновлении дашборда
+  if (typeof window.checkAndRenderCashierMetrics === 'function') {
+      window.checkAndRenderCashierMetrics(appState.role, data.todayKpiData);
+  }
 
   let hcCard = document.getElementById("hot-check-card");
   if (hcCard) {
@@ -4506,5 +4512,159 @@ window.handleAdminTabelRowClick = function(targetIin) {
     // Если вообще ничего в коде не нашлось
     if (typeof showToast === 'function') {
         showToast("Не удалось определить функцию профиля. Проверьте onclick в renderAdminEmps", true);
+    }
+};
+
+// ИСПРАВЛЕНО: Отправка заявки по нажатию кассовой кнопки в общую таблицу запросов без уведомления в TG
+window.submitCashierMetricRequest = async function(subheading, itemName, pts, kpi) {
+    // Всплывающее нативное подтверждение, чтобы избежать случайных нажатий на мобилках
+    if (!confirm(`Отправить запрос на подтверждение: "${subheading} — ${itemName}"?`)) return;
+    
+    // Безопасно вытаскиваем данные текущего вошедшего пользователя из глобальной сессии вашего приложения
+    let userIin = window.currentUserIin || (window.currentUserData ? window.currentUserData.iin : "");
+    let userName = window.currentUserData ? window.currentUserData.name : "Кассир";
+    
+    if (!userIin) {
+        if (typeof showToast === 'function') showToast("Ошибка авторизации. Перезайдите в приложение", true);
+        return;
+    }
+    
+    let todayStr = new Date().toLocaleDateString('ru-RU');
+    
+    // Формируем упакованные метаданные для админки
+    let requestPayload = {
+        iin: userIin,
+        name: userName,
+        type: "Кассовая метрика",
+        status: "pending", // Ждет одобрения Директора/Супервайзера
+        created_at: new Date().toISOString(),
+        metadata: {
+            subheading: subheading,
+            item_name: itemName,
+            pts_to_award: pts,
+            kpi_to_award: kpi,
+            display_date: todayStr
+        }
+    };
+    
+    try {
+        let { error } = await supabaseClient
+            .from('requests')
+            .insert([requestPayload]);
+            
+        if (error) throw error;
+        
+        if (typeof showToast === 'function') {
+            showToast("Заявка успешно отправлена руководству!");
+        } else {
+            alert("Заявка успешно отправлена руководству!");
+        }
+    } catch(err) {
+        console.error("Ошибка отправки кассовой метрики:", err);
+        if (typeof showToast === 'function') showToast("Не удалось отправить запрос в базу", true);
+    }
+};
+
+// ИСПРАВЛЕНО: Рендеринг блока кассира на основе загруженных параметров КФ (sheet_kpi_params) за сегодня
+window.checkAndRenderCashierMetrics = function(currentUserRole, todayKpiData) {
+    const card = document.getElementById("cashier-metrics-card");
+    const container = document.getElementById("cashier-metrics-dynamic-area");
+    if (!card || !container) return;
+    
+    // Блок строго изолирован только для точной должности "Кассир"
+    if (String(currentUserRole).toLowerCase() !== 'кассир' || !todayKpiData || !todayKpiData.data) {
+        card.classList.add("hidden");
+        return;
+    }
+    
+    let htmlContent = "";
+    let hasAnyData = false;
+    
+    // Проходим по всем строкам параметров КФ полученных за сегодня
+    todayKpiData.data.forEach(row => {
+        let blocks = row.cashier_metrics || [];
+        if (blocks.length === 0) return;
+        
+        hasAnyData = true;
+        
+        blocks.forEach(block => {
+            htmlContent += `
+            <div style="margin-bottom: 14px;">
+                <div style="font-size: 12px; font-weight: bold; color: gray; margin-bottom: 6px; padding-left: 2px;">
+                    ${block.subheading}
+                </div>
+                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(22%, 1fr)); gap: 6px; width: 100%; box-sizing: border-box;">
+            `;
+            
+            block.items.forEach(item => {
+                let badgeText = "";
+                if (item.pts > 0 && item.kpi !== "0%") {
+                    badgeText = `+${item.pts}б / ${item.kpi}`;
+                } else if (item.pts > 0) {
+                    badgeText = `+${item.pts}б`;
+                } else {
+                    badgeText = item.kpi;
+                }
+                
+                htmlContent += `
+                <button type="button" 
+                        onclick="window.submitCashierMetricRequest('${block.subheading}', '${item.name}', ${item.pts}, '${item.kpi}')"
+                        style="position: relative; padding: 10px 4px; font-size: 11px; font-weight: bold; border-radius: 8px; border: 1px solid var(--border-color); background: var(--inner-bg); color: var(--text-color); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-height: 52px; transition: all 0.2s; -webkit-tap-highlight-color: transparent;">
+                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center;">${item.name}</span>
+                    <span style="font-size: 8px; background: rgba(155, 89, 182, 0.15); color: #9b59b6; padding: 1px 4px; border-radius: 4px; white-space: nowrap;">${badgeText}</span>
+                </button>
+                `;
+            });
+            
+            htmlContent += `</div></div>`;
+        });
+    });
+    
+    if (hasAnyData) {
+        container.innerHTML = htmlContent;
+        card.classList.remove("hidden");
+    } else {
+        card.classList.add("hidden");
+    }
+};
+
+// ИСПРАВЛЕНО: Отправка кассовой заявки руководству на одобрение/отклонение в requests
+window.submitCashierMetricRequest = async function(subheading, itemName, pts, kpi) {
+    if (!confirm(`Отправить запрос на подтверждение: "${subheading} — ${itemName}"?`)) return;
+    
+    let userIin = appState.iin;
+    let userName = window.currentUserData ? window.currentUserData.name : "Кассир";
+    
+    if (!userIin) {
+        showToast("Ошибка авторизации. Перезайдите в приложение", true);
+        return;
+    }
+    
+    let todayStr = new Date().toLocaleDateString('ru-RU');
+    
+    let requestPayload = {
+        author_iin: userIin,
+        type: "Кассовая метрика",
+        details: `Кассовая метрика: ${subheading} — ${itemName}\nНачисление: Баллы [${pts}], КФ.Эфф [${kpi}]`,
+        status: "pending",
+        created_at: new Date().toISOString(),
+        metadata: {
+            subheading: subheading,
+            item_name: itemName,
+            pts_to_award: pts,
+            kpi_to_award: kpi,
+            date: todayStr
+        }
+    };
+    
+    showToast("Отправка запроса...", false, 9999);
+    try {
+        let { error } = await supabaseClient.from('requests').insert([requestPayload]);
+        if (error) throw error;
+        showToast("Заявка успешно отправлена руководству!");
+        loadDashboard(true);
+    } catch(err) {
+        console.error(err);
+        showToast("Не удалось отправить запрос", true);
     }
 };
