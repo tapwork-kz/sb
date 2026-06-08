@@ -1143,12 +1143,13 @@ function renderDashboardData(data, isSilent = false) {
 
   if (isSeniorCashier) isCashier = false; 
 
-  // ИСПРАВЛЕНО: Кнопка плюс теперь видна только для должностей Директор, Супервайзер и прижата вплотную к стенке вкладок (margin-right: 2px)
+  // ИСПРАВЛЕНО: Кнопка плюс теперь открыта и для Заведующих, Инфо, Старших кассиров и Грузчиков
   let mainTabs = document.getElementById("main-tabs");
   let admPlus = document.getElementById("nav-adm-plus-btn");
   let isOnlyDirOrSup = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("супервайзер");
+  let isAllowedPlusMenu = isOnlyDirOrSup || isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik;
   
-  if (isOnlyDirOrSup) {
+  if (isAllowedPlusMenu) {
       if (!admPlus && mainTabs) {
           admPlus = document.createElement("div");
           admPlus.id = "nav-adm-plus-btn";
@@ -2550,28 +2551,42 @@ window.toggleAdminPlusMenu = function() {
         document.head.appendChild(style);
     }
     
+    let roleLow = String(appState.role || "").toLowerCase();
+    let isOnlyDirOrSup = roleLow.includes("директор") || roleLow.includes("управляющий") || roleLow.includes("супервайзер");
+    
     menu = document.createElement("div");
     menu.id = "admin-plus-dropdown-menu";
     menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
-    menu.innerHTML = `
-        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
-            <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
-            <span>Начисление мотиваций</span>
-        </div>
-        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
-            <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
-            <span>Заявка в отпуск</span>
-        </div>
-        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeForm();">
-            <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
-            <span>Подать на переработку</span>
-        </div>
-        <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
-            <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
-            <span>Штрафы</span>
-        </div>
-    `;
     
+    let menuHtml = "";
+    if (isOnlyDirOrSup) {
+        menuHtml = `
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
+                <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
+                <span>Начисление мотиваций</span>
+            </div>
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
+                <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
+                <span>Заявка в отпуск</span>
+            </div>
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeForm();">
+                <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
+                <span>Подать на переработку</span>
+            </div>
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
+                <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
+                <span>Штрафы</span>
+            </div>`;
+    } else {
+        // Заведующий складом, Инфо-консультант, Старший кассир, Грузчик видят СТРОГО только переработку
+        menuHtml = `
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminOvertimeForm();">
+                <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
+                <span>Подать на переработку</span>
+            </div>`;
+    }
+    
+    menu.innerHTML = menuHtml;
     document.body.appendChild(menu);
     setTimeout(() => {
         let closeFn = () => {
@@ -2583,66 +2598,55 @@ window.toggleAdminPlusMenu = function() {
     }, 50);
 };
 
-// ИСПРАВЛЕНО: Функция генерации модального окна подачи переработки с двумя независимыми блоками
+// ИСПРАВЛЕНО: Безопасное модальное окно переработок без выхода за рамки, с отчетливо выделенным временем и без выбора сотрудника
 window.openAdminOvertimeForm = function() {
     let existingModal = document.getElementById("admin-overtime-modal-overlay");
     if (existingModal) existingModal.remove();
-    
-    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
-    let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
-    validEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    
-    let empOptions = validEmps.map(e => `<option value="${e.iin}">${e.name} (${e.dept || '—'})</option>`).join('');
     
     let modal = document.createElement("div");
     modal.id = "admin-overtime-modal-overlay";
     modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
     modal.innerHTML = `
-        <div class="card" style="width:100%; max-width:360px; background:var(--card-bg); padding:16px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+        <div class="card" style="width:100%; max-width:340px; background:var(--card-bg); padding:16px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; box-sizing:border-box; overflow:hidden; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
             <h3 style="margin:0 0 14px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
               <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
               Заявка на переработку
             </h3>
             
-            <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Сотрудник</label>
-            <select id="ov-emp-select" style="width:100%; padding:10px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:14px; font-size:13px; font-weight:bold; box-sizing:border-box;">
-                ${empOptions}
-            </select>
-            
-            <div style="display:flex; background:var(--bg-color); padding:2px; border-radius:8px; margin-bottom:14px; border:1px solid var(--border-color);">
+            <div style="display:flex; background:var(--bg-color); padding:2px; border-radius:8px; margin-bottom:14px; border:1px solid var(--border-color); box-sizing:border-box; width:100%;">
                 <button id="tab-ov-hours" style="flex:1; border:none; padding:7px; font-size:12px; font-weight:bold; border-radius:6px; cursor:pointer; background:var(--card-bg); color:var(--text-color); box-shadow:0 1px 3px rgba(0,0,0,0.1); -webkit-tap-highlight-color:transparent;" onclick="window.switchOvertimeTab('hours')">По часам</button>
                 <button id="tab-ov-days" style="flex:1; border:none; padding:7px; font-size:12px; font-weight:bold; border-radius:6px; cursor:pointer; background:none; color:gray; -webkit-tap-highlight-color:transparent;" onclick="window.switchOvertimeTab('days')">По дням</button>
             </div>
             
             <input type="hidden" id="ov-current-type" value="hours">
             
-            <div id="block-ov-hours" style="display:block;">
+            <div id="block-ov-hours" style="display:block; width:100%; box-sizing:border-box;">
                 <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Дата переработки</label>
-                <input type="date" id="ov-hours-date" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:12px; font-size:13px; box-sizing:border-box;">
+                <input type="date" id="ov-hours-date" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:12px; font-size:13px; box-sizing:border-box; display:block; max-width:100%;">
                 
-                <div style="display:flex; gap:10px; margin-bottom:12px;">
-                    <div style="flex:1;">
+                <div style="display:flex; gap:10px; margin-bottom:12px; width:100%; box-sizing:border-box;">
+                    <div style="flex:1; min-width:0;">
                         <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время с</label>
-                        <input type="time" id="ov-hours-from" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); font-size:13px; box-sizing:border-box;">
+                        <input type="time" id="ov-hours-from" style="width:100%; padding:9px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:13px; font-weight:bold; box-sizing:border-box; display:block; text-align:center;">
                     </div>
-                    <div style="flex:1;">
+                    <div style="flex:1; min-width:0;">
                         <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время до</label>
-                        <input type="time" id="ov-hours-to" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); font-size:13px; box-sizing:border-box;">
+                        <input type="time" id="ov-hours-to" style="width:100%; padding:9px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:13px; font-weight:bold; box-sizing:border-box; display:block; text-align:center;">
                     </div>
                 </div>
             </div>
             
-            <div id="block-ov-days" style="display:none;">
+            <div id="block-ov-days" style="display:none; width:100%; box-sizing:border-box;">
                 <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">День переработки</label>
-                <input type="date" id="ov-days-date" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:12px; font-size:13px; box-sizing:border-box;">
+                <input type="date" id="ov-days-date" style="width:100%; padding:9px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:12px; font-size:13px; box-sizing:border-box; display:block; max-width:100%;">
             </div>
             
             <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Причина переработки</label>
-            <textarea id="ov-comment" placeholder="Опишите причину..." style="width:100%; height:60px; padding:10px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); font-size:13px; margin-bottom:16px; resize:none; font-family:inherit; box-sizing:border-box;"></textarea>
+            <textarea id="ov-comment" placeholder="Опишите причину..." style="width:100%; height:60px; padding:10px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); font-size:13px; margin-bottom:16px; resize:none; font-family:inherit; box-sizing:border-box; display:block; max-width:100%;"></textarea>
             
-            <div style="display:flex; gap:10px;">
-                <button class="btn-gray" onclick="document.getElementById('admin-overtime-modal-overlay').remove();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px;">Отмена</button>
-                <button class="btn-primary" onclick="window.submitAdminOvertimeForm();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px; background:#f39c12; border-color:#f39c12;">Отправить</button>
+            <div style="display:flex; gap:10px; width:100%; box-sizing:border-box;">
+                <button class="btn-gray" onclick="document.getElementById('admin-overtime-modal-overlay').remove();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px; box-sizing:border-box;">Отмена</button>
+                <button class="btn-primary" onclick="window.submitAdminOvertimeForm();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px; background:#f39c12; border-color:#f39c12; box-sizing:border-box;">Отправить</button>
             </div>
         </div>
     `;
@@ -2654,7 +2658,7 @@ window.openAdminOvertimeForm = function() {
     document.getElementById("ov-days-date").value = todayIso;
 };
 
-// ИСПРАВЛЕНО: Интерактивный переключатель вкладок внутри формы переработок
+// Интерактивный переключатель вкладок внутри формы переработок
 window.switchOvertimeTab = function(type) {
     let btnHours = document.getElementById("tab-ov-hours");
     let btnDays = document.getElementById("tab-ov-days");
@@ -2686,15 +2690,14 @@ window.switchOvertimeTab = function(type) {
     }
 };
 
-// ИСПРАВЛЕНО: Сбор данных, валидация полей и отправка заявки в БД
+// ИСПРАВЛЕНО: Заявка подается автоматически от имени самого авторизованного пользователя (appState.iin)
 window.submitAdminOvertimeForm = async function() {
-    let empSelect = document.getElementById("ov-emp-select");
     let typeInput = document.getElementById("ov-current-type");
     let commentInput = document.getElementById("ov-comment");
     
-    if (!empSelect || !typeInput || !commentInput) return;
+    if (!typeInput || !commentInput) return;
     
-    let targetIin = empSelect.value;
+    let targetIin = appState.iin; // ИСПРАВЛЕНО: Принудительно берется ИИН текущего пользователя
     let type = typeInput.value;
     let comment = commentInput.value.trim();
     
