@@ -2401,10 +2401,10 @@ async function renderEmpReportsData(iin) {
         </button>
         
         <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
-            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
-            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
-                ${monthNames[window.currentCalMonth]} ${window.currentCalYear}
-            </span>
+    <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+    <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
+        ${monthNames[month]} ${year}
+    </span>
             <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
                    style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
                    onchange="window.onRepMonthPickerChange(this.value, '${iin}')">
