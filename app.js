@@ -4082,8 +4082,9 @@ window.renderAdminPointsSummaryData = function() {
         let totalUsed = 0;
         let totalFines = 0;
         
-        // Читаем текущий живой остаток баллов сотрудника
-        let totalRem = parseFloat(e.points || e.pts || 0);
+        // ИСПРАВЛЕНО: Безопасное чтение остатка с очисткой пробелов/запятых и гарантированной защитой от NaN
+        let rawRem = (e.points !== undefined && e.points !== null && String(e.points).trim() !== '') ? e.points : (e.pts || 0);
+        let totalRem = parseFloat(String(rawRem).replace(/\s/g, '').replace(',', '.')) || 0;
         
         let history = e.ptsHistory || [];
         history.forEach(p => {
