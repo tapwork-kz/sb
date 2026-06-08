@@ -63,7 +63,27 @@
         <div class="info-wrapper">
           <div class="scrollable-blocks" id="scroll-container">
             <div class="info-box" onclick="openDetails('sc')"><div class="info-box-title">СЦ | Фокус</div><div class="info-box-value" id="info-sc-val">- | -</div></div>
-            <div class="info-box pts-box" onclick="openDetails('points')"><div class="info-box-title">Мои баллы</div><div class="pts-grid" style="display:flex; gap:3px; margin-top:4px; width:100%; justify-content:space-between;"><div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1;"><div style="font-size:8px; color:gray;">Нач.</div><div style="font-size:12px; font-weight:bold; color:#4d4d4d;" id="pt-acc">-</div></div><div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1;"><div style="font-size:8px; color:gray;">Исп.</div><div style="font-size:12px; font-weight:bold; color:#4d4d4d;" id="pt-use">-</div></div><div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1; background:rgba(41, 128, 185, 0.1);"><div style="font-size:8px; color:gray;">Ост.</div><div style="font-size:12px; font-weight:bold; color:#27ae60;" id="pt-rem">-</div></div><div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1; background:rgba(231, 76, 60, 0.1);"><div style="font-size:8px; color:gray;">Штрф.</div><div style="font-size:12px; font-weight:bold; color:#e74c3c;" id="pt-fin">-</div></div></div></div>
+            <div class="info-box pts-box" onclick="openDetails('points')">
+    <div class="info-box-title">Мои баллы</div>
+    <div class="pts-grid" style="display:flex; gap:3px; margin-top:4px; width:100%; justify-content:space-between;">
+        <div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1;">
+            <div style="font-size:8px; color:gray;">Нач.</div>
+            <div style="font-size:12px; font-weight:bold; color:var(--text-color); opacity:0.8;" id="pt-acc">-</div>
+        </div>
+        <div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1;">
+            <div style="font-size:8px; color:gray;">Исп.</div>
+            <div style="font-size:12px; font-weight:bold; color:var(--text-color); opacity:0.8;" id="pt-use">-</div>
+        </div>
+        <div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1; background:rgba(41, 128, 185, 0.1);">
+            <div style="font-size:8px; color:gray;">Ост.</div>
+            <div style="font-size:12px; font-weight:bold; color:#27ae60;" id="pt-rem">-</div>
+        </div>
+        <div class="inner-block" style="border-radius:6px; padding:4px 2px; margin-bottom:0; flex:1; background:rgba(231, 76, 60, 0.1);">
+            <div style="font-size:8px; color:gray;">Штрф.</div>
+            <div style="font-size:12px; font-weight:bold; color:#e74c3c;" id="pt-fin">-</div>
+        </div>
+    </div>
+</div>
             <div class="info-box" onclick="openDetails('report')">
     <div class="info-box-title">Мои отчеты</div>
     <div class="info-box-value" style="display: flex; align-items: center; justify-content: center; height: 24px; margin-top: 2px;">
