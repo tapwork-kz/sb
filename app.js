@@ -2189,7 +2189,8 @@ async function renderTabelCalendarData(iin, containerId = "tabel-calendar-contai
         </button>
         
         <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
-            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
                 ${monthNames[month]} ${year}
             </span>
             <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
@@ -2400,8 +2401,9 @@ async function renderEmpReportsData(iin) {
         </button>
         
         <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
-            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">
-                ${monthNames[month]} ${year}
+            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
+                ${monthNames[window.currentCalMonth]} ${window.currentCalYear}
             </span>
             <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
                    style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
@@ -2487,8 +2489,9 @@ async function renderMyPersonalReportsData() {
         </button>
         
         <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
-            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0;">
-                ${monthNames[month]} ${year}
+            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
+                ${monthNames[window.currentCalMonth]} ${window.currentCalYear}
             </span>
             <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
                    style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
@@ -2556,35 +2559,35 @@ window.toggleAdminPlusMenu = function() {
     
     menu = document.createElement("div");
     menu.id = "admin-plus-dropdown-menu";
-    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
+    // ИСПРАВЛЕНО: Изменен border-radius на 0px для создания абсолютно прямых углов у контейнера списка
+    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:0px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
     
     let menuHtml = "";
     if (isOnlyDirOrSup) {
         menuHtml = `
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
                 <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
                 <span>Начисление мотиваций</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminVacationForm();">
                 <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
                 <span>Заявка в отпуск</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeForm();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeForm();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminOvertimeSummary();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:4px double var(--border-color); margin-top:2px;" onclick="window.openAdminOvertimeSummary();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">history_toggle_off</span>
                 <span>Переработки</span>
             </div>
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminFinesSummary();">
                 <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
                 <span>Штрафы</span>
             </div>`;
     } else {
-        // Заведующий складом, Инфо-консультант, Старший кассир, Грузчик видят СТРОГО только переработку
         menuHtml = `
-            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:8px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminOvertimeForm();">
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminOvertimeForm();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>`;
