@@ -2577,6 +2577,10 @@ window.toggleAdminPlusMenu = function() {
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>
+            <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:1px solid var(--border-color);" onclick="window.openAdminPointsSummary();">
+                <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">workspace_premium</span>
+                <span>Баллы мотивации</span>
+            </div>
             <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; border-top:4px double var(--border-color); margin-top:2px;" onclick="window.openAdminOvertimeSummary();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">history_toggle_off</span>
                 <span>Переработки</span>
@@ -3971,4 +3975,143 @@ window.onOvertimeSummaryMonthPickerChange = function(value) {
     window.currentOvertimeSummaryYear = parseInt(parts[0], 10);
     window.currentOvertimeSummaryMonth = parseInt(parts[1], 10) - 1;
     window.renderAdminOvertimeSummaryData();
+};
+
+// ИСПРАВЛЕНО: Функция открытия модального окна сводной ведомости баллов по сотрудникам
+window.openAdminPointsSummary = function() {
+    let existingModal = document.getElementById("admin-points-summary-modal-overlay");
+    if (existingModal) existingModal.remove();
+    
+    if (!window.currentPointsSummaryMonth || !window.currentPointsSummaryYear) {
+        let d = new Date();
+        window.currentPointsSummaryMonth = d.getMonth();
+        window.currentPointsSummaryYear = d.getFullYear();
+    }
+    
+    let modal = document.createElement("div");
+    modal.id = "admin-points-summary-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:360px; background:var(--card-bg); padding:14px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; max-height:80vh; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+            <h3 style="margin:0 0 12px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
+              <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">workspace_premium</span>
+              Сводка по баллам
+            </h3>
+            
+            <div id="admin-points-nav-container"></div>
+            
+            <div id="admin-points-scroll-area" style="flex:1; overflow-y:auto; margin-bottom:12px; padding-right:2px;"></div>
+            
+            <button class="btn-gray" onclick="document.getElementById('admin-points-summary-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px; width:100%;">Закрыть</button>
+        </div>
+    `;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+    
+    window.renderAdminPointsSummaryData();
+};
+
+// ИСПРАВЛЕНО: Асинхронный расчет начисленных и использованных баллов из ptsHistory за выбранный месяц
+window.renderAdminPointsSummaryData = function() {
+    let navContainer = document.getElementById("admin-points-nav-container");
+    let scrollArea = document.getElementById("admin-points-scroll-area");
+    if (!navContainer || !scrollArea) return;
+    
+    let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
+    let year = window.currentPointsSummaryYear;
+    let month = window.currentPointsSummaryMonth;
+    let targetMonthStr = ("0" + (month + 1)).slice(-2) + "." + year;
+    
+    let navHtml = `
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustPointsSummaryMonth(-1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
+        </button>
+        
+        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
+            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
+                ${monthNames[month]} ${year}
+            </span>
+            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
+                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
+                   onchange="window.onPointsSummaryMonthPickerChange(this.value)">
+        </div>
+        
+        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; pointer-events:auto; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustPointsSummaryMonth(1)">
+            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
+        </button>
+    </div>
+    `;
+    navContainer.innerHTML = navHtml;
+    
+    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
+    let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+    validEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    
+    let listHtml = "";
+    let totalPointsInMonthCount = 0;
+    
+    validEmps.forEach(e => {
+        let totalEarned = 0;
+        let totalUsed = 0;
+        
+        let history = e.ptsHistory || [];
+        history.forEach(p => {
+            if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
+                let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
+                
+                // Классифицируем запись на начисление или списание/использование
+                if (p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || parseFloat(p.val) > 0) {
+                    totalEarned += pVal;
+                } else {
+                    totalUsed += pVal;
+                }
+            }
+        });
+        
+        if (totalEarned > 0 || totalUsed > 0) {
+            totalPointsInMonthCount++;
+            let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
+            
+            listHtml += `
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
+                <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                    ${e.name}${deptStr}
+                </div>
+                <div style="font-size:11px; color:gray; display:flex; gap:12px; align-items:center;">
+                    <span>Начислено: <b style="color:${totalEarned > 0 ? '#2ecc71' : 'gray'};">+${totalEarned} б.</b></span>
+                    <span>Использовано: <b style="color:${totalUsed > 0 ? '#e67e22' : 'gray'};">-${totalUsed} б.</b></span>
+                </div>
+            </div>`;
+        }
+    });
+    
+    if (totalPointsInMonthCount === 0) {
+        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Движений по баллам за этот месяц не найдено</p>`;
+    }
+    
+    scrollArea.innerHTML = listHtml;
+};
+
+// Переключение месяцев стрелками
+window.adjustPointsSummaryMonth = function(delta) {
+    window.currentPointsSummaryMonth += delta;
+    if (window.currentPointsSummaryMonth > 11) {
+        window.currentPointsSummaryMonth = 0;
+        window.currentPointsSummaryYear += 1;
+    } else if (window.currentPointsSummaryMonth < 0) {
+        window.currentPointsSummaryMonth = 11;
+        window.currentPointsSummaryYear -= 1;
+    }
+    window.renderAdminPointsSummaryData();
+};
+
+// Переключение месяца через встроенный пикер календаря
+window.onPointsSummaryMonthPickerChange = function(value) {
+    if (!value) return;
+    let parts = value.split('-');
+    window.currentPointsSummaryYear = parseInt(parts[0], 10);
+    window.currentPointsSummaryMonth = parseInt(parts[1], 10) - 1;
+    window.renderAdminPointsSummaryData();
 };
