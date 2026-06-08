@@ -2562,6 +2562,11 @@ window.toggleAdminPlusMenu = function() {
     // Внешняя карточка имеет скругление 12px
     menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
     
+    menu = document.createElement("div");
+    menu.id = "admin-plus-dropdown-menu";
+    // Внешняя карточка имеет скругление 12px
+    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
+    
     let menuHtml = "";
     if (isOnlyDirOrSup) {
         menuHtml = `
@@ -2813,7 +2818,7 @@ window.openAdminFinesSummary = function() {
     window.renderAdminFinesSummaryData();
 };
 
-// ИСПРАВЛЕНО: Асинхронный подсчет, фильтрация и рендеринг сумм штрафов за выбранный месяц с явным указанием тенге и баллов
+// ИСПРАВЛЕНО: Сводка штрафов со строгой сортировкой по отделам (Цифра, МБТ, КБТ) и измененным порядком (Баллы перед Штрафами)
 window.renderAdminFinesSummaryData = function() {
     let navContainer = document.getElementById("admin-fines-nav-container");
     let scrollArea = document.getElementById("admin-fines-scroll-area");
@@ -2849,7 +2854,28 @@ window.renderAdminFinesSummaryData = function() {
     
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
-    validEmps.sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    
+    // Вспомогательная функция для определения веса отделов сотрудников
+    function getDeptPriority(deptName) {
+        let d = String(deptName || "").toLowerCase();
+        if (d.includes("цифра")) return 1;
+        if (d.includes("мбт")) return 2;
+        if (d.includes("кбт")) return 3;
+        return 4;
+    }
+
+    // ИСПРАВЛЕНО: Двухуровневая сортировка: Сначала по весу отделов (Цифра->МБТ->КБТ), затем алфавитно
+    validEmps.sort((a, b) => {
+        let pA = getDeptPriority(a.dept);
+        let pB = getDeptPriority(b.dept);
+        if (pA !== pB) return pA - pB;
+        if (pA === 4) {
+            let deptStrA = String(a.dept || "");
+            let deptStrB = String(b.dept || "");
+            if (deptStrA !== deptStrB) return deptStrA.localeCompare(deptStrB);
+        }
+        return String(a.name || "").localeCompare(String(b.name || ""));
+    });
     
     let listHtml = "";
     let totalFinesInMonthCount = 0;
@@ -2863,7 +2889,6 @@ window.renderAdminFinesSummaryData = function() {
         history.forEach(p => {
             if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
                 if (p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета")) {
-                    // Парсим и очищаем значения от лишних знаков
                     let mVal = Math.abs(parseFloat(String(p.moneyFine || 0).replace(/\s/g, '').replace(',', '.'))) || 0;
                     let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
                     
@@ -2878,7 +2903,6 @@ window.renderAdminFinesSummaryData = function() {
             totalFinesInMonthCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
             
-            // Форматируем вывод: если сумма > 0, добавляем знак минус перед ней
             let moneyText = totalMoney > 0 ? `-${fmtSum(totalMoney)} ₸` : `0 ₸`;
             let ptsText = totalPts > 0 ? `-${totalPts} б.` : `0 б.`;
             
@@ -2889,8 +2913,8 @@ window.renderAdminFinesSummaryData = function() {
                 </div>
                 <div style="font-size:11px; color:gray; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
                     <span>Нарушений: <b style="color:var(--text-color);">${count}</b></span>
-                    <span>Штрафы: <b style="color:${totalMoney > 0 ? '#e74c3c' : 'gray'};">${moneyText}</b></span>
                     <span>Баллы: <b style="color:${totalPts > 0 ? '#e67e22' : 'gray'};">${ptsText}</b></span>
+                    <span>Штрафы: <b style="color:${totalMoney > 0 ? '#e74c3c' : 'gray'};">${moneyText}</b></span>
                 </div>
             </div>`;
         }
