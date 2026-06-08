@@ -4078,45 +4078,52 @@ window.renderAdminPointsSummaryData = function() {
     let totalPointsInMonthCount = 0;
     
     validEmps.forEach(e => {
-        let totalEarned = 0;
-        let totalUsed = 0;
-        let totalFines = 0;
-        
-        // ИСПРАВЛЕНО: Приоритетное извлечение реального остатка баллов из вложенной структуры user_details
-        let rawRem = 0;
-        if (e.user_details) {
-            let ud = e.user_details;
-            // Если Supabase вернул связь в виде массива из одного элемента, берем первый элемент
-            if (Array.isArray(ud) && ud[0]) ud = ud[0];
-            
-            rawRem = (ud.points !== undefined && ud.points !== null && String(ud.points).trim() !== '') 
-                ? ud.points 
-                : (ud.pts !== undefined && ud.pts !== null ? ud.pts : 0);
-        } else {
-            // Резервный фолбек на случай отсутствия связи
-            rawRem = (e.points !== undefined && e.points !== null && String(e.points).trim() !== '') 
-                ? e.points 
-                : (e.pts || 0);
-        }
-        // Парсим очищенное значение с защитой от NaN
-        let totalRem = parseFloat(String(rawRem).replace(/\s/g, '').replace(',', '.')) || 0;
+        let totalEarned = 0; // За выбранный месяц
+        let totalUsed = 0;   // За выбранный месяц
+        let totalFines = 0;  // За выбранный месяц
+        let totalRem = 0;    // Кумулятивный остаток на конец выбранного месяца
         
         let history = e.ptsHistory || [];
         history.forEach(p => {
-            if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
-                let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
-                
-                let isFine = p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета");
-                
+            if (!p || !p.date || typeof p.date !== 'string') return;
+            
+            // Чистим и парсим сумму баллов в транзакции
+            let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
+            
+            // Определяем тип транзакции (Штраф / Начисление / Списание)
+            let isFine = p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета");
+            let isEarned = p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || parseFloat(p.val) > 0;
+            
+            // 1. Расчет показателей строго внутри выбранного месяца
+            if (p.date.includes(targetMonthStr)) {
                 if (isFine) {
                     totalFines += pVal;
-                } else if (p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || parseFloat(p.val) > 0) {
+                } else if (isEarned) {
                     totalEarned += pVal;
                 } else {
                     totalUsed += pVal;
                 }
             }
+            
+            // 2. ИСПРАВЛЕНО: Математический расчет остатка от начала времен до КОНЦА выбранного месяца
+            let parts = p.date.split('.');
+            if (parts.length === 3) {
+                let pMonth = parseInt(parts[1], 10) - 1; // Месяц транзакции (0-11)
+                let pYear = parseInt(parts[2], 10);      // Год транзакции
+                
+                // Если транзакция была в выбранном месяце или в любом месяце ДО него
+                if (pYear < year || (pYear === year && pMonth <= month)) {
+                    if (isEarned) {
+                        totalRem += pVal; // Начисления увеличивают баланс
+                    } else {
+                        totalRem -= pVal; // И использование, и штрафы уменьшают баланс
+                    }
+                }
+            }
         });
+        
+        // Защита: остаток баллов не должен падать ниже нуля
+        if (totalRem < 0) totalRem = 0;
         
         // Отображаем сотрудника, если у него есть баланс или были движения в этом месяце
         if (totalEarned > 0 || totalUsed > 0 || totalFines > 0 || totalRem > 0) {
