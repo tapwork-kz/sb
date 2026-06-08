@@ -2622,23 +2622,23 @@ window.openAdminOvertimeForm = function() {
             
             <div id="block-ov-hours" style="display:block; width:100%; box-sizing:border-box;">
                 <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Дата переработки</label>
-                <input type="date" id="ov-hours-date" style="width:100%; height:34px; padding:0 8px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:10px; font-size:12px; box-sizing:border-box; display:block;">
+                <input type="date" id="ov-hours-date" style="width:100%; height:34px; padding:0 8px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:10px; font-size:11px; box-sizing:border-box; display:block; text-align:center; text-align-last:center;">
                 
-                <div style="display:flex; gap:8px; margin-bottom:10px; width:100%; box-sizing:border-box;">
-                    <div style="flex:1; min-width:0;">
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; width:100%; box-sizing:border-box;">
+                    <div style="min-width:0; width:100%;">
                         <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время с</label>
-                        <input type="time" id="ov-hours-from" style="width:100%; height:34px; padding:0 4px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:12px; font-weight:bold; box-sizing:border-box; display:block; text-align:center;">
+                        <input type="time" id="ov-hours-from" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:block; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
                     </div>
-                    <div style="flex:1; min-width:0;">
+                    <div style="min-width:0; width:100%;">
                         <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время до</label>
-                        <input type="time" id="ov-hours-to" style="width:100%; height:34px; padding:0 4px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:12px; font-weight:bold; box-sizing:border-box; display:block; text-align:center;">
+                        <input type="time" id="ov-hours-to" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:block; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
                     </div>
                 </div>
             </div>
             
             <div id="block-ov-days" style="display:none; width:100%; box-sizing:border-box;">
                 <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">День переработки</label>
-                <input type="date" id="ov-days-date" style="width:100%; height:34px; padding:0 8px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:10px; font-size:12px; box-sizing:border-box; display:block;">
+                <input type="date" id="ov-days-date" style="width:100%; height:34px; padding:0 8px; border-radius:8px; background:var(--bg-color); color:var(--text-color); border:1px solid var(--border-color); margin-bottom:10px; font-size:11px; box-sizing:border-box; display:block; text-align:center; text-align-last:center;">
             </div>
             
             <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Причина переработки</label>
