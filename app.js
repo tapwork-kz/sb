@@ -4565,59 +4565,83 @@ window.submitCashierMetricRequest = async function(subheading, itemName, pts, kp
     }
 };
 
-// ИСПРАВЛЕНО: Рендеринг блока кассира на основе загруженных параметров КФ (sheet_kpi_params) за сегодня
+// ИСПРАВЛЕНО: Бронебойный рендеринг с агрегацией через Map для предотвращения разрыва заголовков и кнопок
 window.checkAndRenderCashierMetrics = function(currentUserRole, todayKpiData) {
     const card = document.getElementById("cashier-metrics-card");
     const container = document.getElementById("cashier-metrics-dynamic-area");
     if (!card || !container) return;
     
-    // Блок строго изолирован только для точной должности "Кассир"
     if (String(currentUserRole).toLowerCase() !== 'кассир' || !todayKpiData || !todayKpiData.data) {
         card.classList.add("hidden");
         return;
     }
     
+    // Используем карту для склеивания распределенных по строкам элементов
+    let mergedBlocks = new Map();
+    
+    todayKpiData.data.forEach(row => {
+        let blocks = row.cashier_metrics || [];
+        blocks.forEach(block => {
+            let sub = (block.subheading || "").trim();
+            if (!sub) return;
+            
+            if (!mergedBlocks.has(sub)) {
+                mergedBlocks.set(sub, { subheading: sub, items: [] });
+            }
+            
+            if (block.items && Array.isArray(block.items)) {
+                let targetBlock = mergedBlocks.get(sub);
+                block.items.forEach(item => {
+                    // Проверяем валидность объекта и защищаем от дублирования кнопок
+                    if (item && item.name) {
+                        if (!targetBlock.items.some(i => i.name === item.name)) {
+                            targetBlock.items.push(item);
+                        }
+                    }
+                });
+            }
+        });
+    });
+    
     let htmlContent = "";
     let hasAnyData = false;
     
-    // Проходим по всем строкам параметров КФ полученных за сегодня
-    todayKpiData.data.forEach(row => {
-        let blocks = row.cashier_metrics || [];
-        if (blocks.length === 0) return;
-        
+    mergedBlocks.forEach(block => {
+        if (block.items.length === 0) return; // Пропускаем пустые категории без кнопок
         hasAnyData = true;
         
-        blocks.forEach(block => {
+        htmlContent += `
+        <div style="margin-bottom: 14px;">
+            <div style="font-size: 12px; font-weight: bold; color: gray; margin-bottom: 6px; padding-left: 2px;">
+                ${block.subheading}
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(22%, 1fr)); gap: 6px; width: 100%; box-sizing: border-box;">
+        `;
+        
+        block.items.forEach(item => {
+            let badgeText = "";
+            let pVal = parseFloat(item.pts) || 0;
+            let kVal = item.kpi || "0%";
+            
+            if (pVal > 0 && kVal !== "0%") {
+                badgeText = `+${pVal}б / ${kVal}`;
+            } else if (pVal > 0) {
+                badgeText = `+${pVal}б`;
+            } else {
+                badgeText = kVal;
+            }
+            
             htmlContent += `
-            <div style="margin-bottom: 14px;">
-                <div style="font-size: 12px; font-weight: bold; color: gray; margin-bottom: 6px; padding-left: 2px;">
-                    ${block.subheading}
-                </div>
-                <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(22%, 1fr)); gap: 6px; width: 100%; box-sizing: border-box;">
+            <button type="button" 
+                    onclick="window.submitCashierMetricRequest('${block.subheading.replace(/'/g, "\\'")}', '${item.name.replace(/'/g, "\\'")}', ${pVal}, '${kVal}')"
+                    style="position: relative; padding: 10px 4px; font-size: 11px; font-weight: bold; border-radius: 8px; border: 1px solid var(--border-color); background: var(--inner-bg); color: var(--text-color); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-height: 52px; transition: all 0.2s; -webkit-tap-highlight-color:transparent;">
+                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center;">${item.name}</span>
+                <span style="font-size: 8px; background: rgba(155, 89, 182, 0.15); color: #9b59b6; padding: 1px 4px; border-radius: 4px; white-space: nowrap;">${badgeText}</span>
+            </button>
             `;
-            
-            block.items.forEach(item => {
-                let badgeText = "";
-                if (item.pts > 0 && item.kpi !== "0%") {
-                    badgeText = `+${item.pts}б / ${item.kpi}`;
-                } else if (item.pts > 0) {
-                    badgeText = `+${item.pts}б`;
-                } else {
-                    badgeText = item.kpi;
-                }
-                
-                htmlContent += `
-                <button type="button" 
-                        onclick="window.submitCashierMetricRequest('${block.subheading}', '${item.name}', ${item.pts}, '${item.kpi}')"
-                        style="position: relative; padding: 10px 4px; font-size: 11px; font-weight: bold; border-radius: 8px; border: 1px solid var(--border-color); background: var(--inner-bg); color: var(--text-color); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-height: 52px; transition: all 0.2s; -webkit-tap-highlight-color: transparent;">
-                    <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center;">${item.name}</span>
-                    <span style="font-size: 8px; background: rgba(155, 89, 182, 0.15); color: #9b59b6; padding: 1px 4px; border-radius: 4px; white-space: nowrap;">${badgeText}</span>
-                </button>
-                `;
-            });
-            
-            htmlContent += `</div></div>`;
         });
+        
+        htmlContent += `</div></div>`;
     });
     
     if (hasAnyData) {
