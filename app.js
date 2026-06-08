@@ -4078,23 +4078,34 @@ window.renderAdminPointsSummaryData = function() {
     let totalPointsInMonthCount = 0;
     
     validEmps.forEach(e => {
-        let totalEarned = 0; // За выбранный месяц
-        let totalUsed = 0;   // За выбранный месяц
-        let totalFines = 0;  // За выбранный месяц
-        let totalRem = 0;    // Кумулятивный остаток на конец выбранного месяца
+        let totalEarned = 0; // Строго за выбранный месяц
+        let totalUsed = 0;   // Строго за выбранный месяц
+        let totalFines = 0;  // Строго за выбранный месяц
+        
+        // 1. ИСПРАВЛЕНО: Извлекаем ТЕКУЩИЙ реальный живой баланс из user_details как абсолютно верную точку отсчета
+        let rawLiveRem = 0;
+        if (e.user_details) {
+            let ud = e.user_details;
+            if (Array.isArray(ud) && ud[0]) ud = ud[0];
+            rawLiveRem = (ud.points !== undefined && ud.points !== null && String(ud.points).trim() !== '') ? ud.points : (ud.pts || 0);
+        } else {
+            rawLiveRem = (e.points !== undefined && e.points !== null && String(e.points).trim() !== '') ? e.points : (e.pts || 0);
+        }
+        let liveRem = parseFloat(String(rawLiveRem).replace(/\s/g, '').replace(',', '.')) || 0;
+        
+        // Инициализируем остаток текущим живым значением, от него будем "отматывать" историю назад
+        let totalRem = liveRem;
         
         let history = e.ptsHistory || [];
         history.forEach(p => {
             if (!p || !p.date || typeof p.date !== 'string') return;
             
-            // Чистим и парсим сумму баллов в транзакции
             let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
             
-            // Определяем тип транзакции (Штраф / Начисление / Списание)
             let isFine = p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета");
             let isEarned = p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || parseFloat(p.val) > 0;
             
-            // 1. Расчет показателей строго внутри выбранного месяца
+            // Сбор статистики начисления/списания/штрафов за конкретно выбранный месяц
             if (p.date.includes(targetMonthStr)) {
                 if (isFine) {
                     totalFines += pVal;
@@ -4105,24 +4116,24 @@ window.renderAdminPointsSummaryData = function() {
                 }
             }
             
-            // 2. ИСПРАВЛЕНО: Математический расчет остатка от начала времен до КОНЦА выбранного месяца
+            // 2. ИСПРАВЛЕНО: Алгоритм реверсивного восстановления баланса на конец выбранного месяца
             let parts = p.date.split('.');
             if (parts.length === 3) {
-                let pMonth = parseInt(parts[1], 10) - 1; // Месяц транзакции (0-11)
-                let pYear = parseInt(parts[2], 10);      // Год транзакции
+                let pMonth = parseInt(parts[1], 10) - 1;
+                let pYear = parseInt(parts[2], 10);
                 
-                // Если транзакция была в выбранном месяце или в любом месяце ДО него
-                if (pYear < year || (pYear === year && pMonth <= month)) {
+                // Если транзакция произошла ПОЗЖЕ (в будущем) относительно выбранного на стрелках месяца,
+                // мы её аннулируем, чтобы узнать, какой баланс лежал в кошельке на конец того месяца.
+                if (pYear > year || (pYear === year && pMonth > month)) {
                     if (isEarned) {
-                        totalRem += pVal; // Начисления увеличивают баланс
+                        totalRem -= pVal; // Убираем начисление, которого тогда еще не было
                     } else {
-                        totalRem -= pVal; // И использование, и штрафы уменьшают баланс
+                        totalRem += pVal; // Возвращаем баллы за штраф или покупку, которые тогда еще не списались
                     }
                 }
             }
         });
         
-        // Защита: остаток баллов не должен падать ниже нуля
         if (totalRem < 0) totalRem = 0;
         
         // Отображаем сотрудника, если у него есть баланс или были движения в этом месяце
