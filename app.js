@@ -2813,7 +2813,7 @@ window.openAdminFinesSummary = function() {
     window.renderAdminFinesSummaryData();
 };
 
-// ИСПРАВЛЕНО: Сводная ведомость штрафов с сортировкой по отделам и измененным порядком (Баллы перед Штрафами)
+// ИСПРАВЛЕНО: Сводка штрафов со строгой сортировкой по отделам (Цифра, МБТ, КБТ) и измененным порядком (Баллы перед Штрафами)
 window.renderAdminFinesSummaryData = function() {
     let navContainer = document.getElementById("admin-fines-nav-container");
     let scrollArea = document.getElementById("admin-fines-scroll-area");
@@ -2850,7 +2850,7 @@ window.renderAdminFinesSummaryData = function() {
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : [];
     let validEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
     
-    // Функция определения веса приоритета отдела
+    // Вспомогательная функция для определения веса отделов сотрудников
     function getDeptPriority(deptName) {
         let d = String(deptName || "").toLowerCase();
         if (d.includes("цифра")) return 1;
@@ -2859,7 +2859,7 @@ window.renderAdminFinesSummaryData = function() {
         return 4;
     }
 
-    // ИСПРАВЛЕНО: Двухуровневая сортировка (Цифра -> МБТ -> КБТ -> Другие, внутри по алфавиту)
+    // ИСПРАВЛЕНО: Двухуровневая сортировка: Сначала по весу отделов (Цифра->МБТ->КБТ), затем алфавитно
     validEmps.sort((a, b) => {
         let pA = getDeptPriority(a.dept);
         let pB = getDeptPriority(b.dept);
@@ -2876,50 +2876,40 @@ window.renderAdminFinesSummaryData = function() {
     let totalFinesInMonthCount = 0;
     
     validEmps.forEach(e => {
-        let totalFines = 0;  // Штрафы за выбранный месяц
-        let totalRem = 0;    // Чистый остаток баллов на конец выбранного месяца (кумулятивно)
+        let totalMoney = 0;
+        let totalPts = 0;
+        let count = 0;
         
         let history = e.ptsHistory || [];
         history.forEach(p => {
-            if (!p || !p.date || typeof p.date !== 'string') return;
-            
-            let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
-            let isFine = p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета");
-            let isEarned = p.type === "Начисление" || String(p.reason).toLowerCase().includes("начисл") || (p.type !== "Штраф" && p.type !== "Списание" && p.type !== "Использование" && parseFloat(p.val) > 0);
-            
-            // Считаем штрафы строго за выбранный месяц
-            if (p.date.includes(targetMonthStr) && isFine) {
-                totalFines += pVal;
-            }
-            
-            // Рассчитываем остаток баллов на конец выбранного месяца
-            let parts = p.date.split('.');
-            if (parts.length === 3) {
-                let pMonth = parseInt(parts[1], 10) - 1;
-                let pYear = parseInt(parts[2], 10);
-                
-                if (pYear < year || (pYear === year && pMonth <= month)) {
-                    if (isEarned) totalRem += pVal;
-                    else totalRem -= pVal;
+            if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
+                if (p.type === "Штраф" || p.type === "Списание" || String(p.reason).toLowerCase().includes("штраф") || String(p.reason).toLowerCase().includes("отсутствие отчета")) {
+                    let mVal = Math.abs(parseFloat(String(p.moneyFine || 0).replace(/\s/g, '').replace(',', '.'))) || 0;
+                    let pVal = Math.abs(parseFloat(String(p.val || 0).replace(/\s/g, '').replace(/[+-]/g, '').replace(',', '.'))) || 0;
+                    
+                    totalMoney += mVal;
+                    totalPts += pVal;
+                    count++;
                 }
             }
         });
         
-        if (totalRem < 0) totalRem = 0;
-        
-        // Выводим строку, если у человека есть баланс или были штрафы в этом месяце
-        if (totalFines > 0 || totalRem > 0) {
+        if (count > 0) {
             totalFinesInMonthCount++;
             let deptStr = e.dept ? ` <span style="color:gray; font-size:11px;">(${e.dept})</span>` : '';
             
+            let moneyText = totalMoney > 0 ? `-${fmtSum(totalMoney)} ₸` : `0 ₸`;
+            let ptsText = totalPts > 0 ? `-${totalPts} б.` : `0 б.`;
+            
             listHtml += `
-            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:2px;">
+            <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${deptStr}
                 </div>
-                <div style="font-size:11px; color:gray; display:flex; gap:12px; align-items:center;">
-                    <span>Баллы: <b style="color:#27ae60;">${totalRem} б.</b></span>
-                    <span>Штрафы: <b style="color:${totalFines > 0 ? '#e74c3c' : 'gray'};">${totalFines} б.</b></span>
+                <div style="font-size:11px; color:gray; display:flex; gap:10px; flex-wrap:wrap; align-items:center;">
+                    <span>Нарушений: <b style="color:var(--text-color);">${count}</b></span>
+                    <span>Баллы: <b style="color:${totalPts > 0 ? '#e67e22' : 'gray'};">${ptsText}</b></span>
+                    <span>Штрафы: <b style="color:${totalMoney > 0 ? '#e74c3c' : 'gray'};">${moneyText}</b></span>
                 </div>
             </div>`;
         }
