@@ -3572,7 +3572,7 @@ function submitVacation() {
     let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
     let details = `С ${formatD(start)} по ${formatD(end)}`; 
     let meta = JSON.stringify({ startDate: start, endDate: end }); 
-    executeSubmit("Отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
+    executeSubmit("Трудовой отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
 }
 function submitHotCheck(typeText, valText, ptsText) { let promptMsg = `Вы подтверждаете продажу: ${typeText}?`; let dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let metaStr = JSON.stringify({ date: dStr, bonus: valText, pts: ptsText }); if (typeof tg !== 'undefined' && tg && tg.showPopup) { try { tg.showPopup({ title: 'Горячий чек', message: promptMsg, buttons: [{id: 'yes', type: 'ok', text: 'Да'}, {type: 'cancel', text: 'Отмена'}] }, function(btnId) { if (btnId === 'yes') executeSubmit("Горячий чек", typeText, null, metaStr); }); } catch(e) { if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); } } else { if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); } }
 
