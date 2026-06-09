@@ -4565,7 +4565,7 @@ window.submitCashierMetricRequest = async function(subheading, itemName, pts, kp
     }
 };
 
-// ИСПРАВЛЕНО: Бронебойный рендеринг с агрегацией через Map для предотвращения разрыва заголовков и кнопок
+// ИСПРАВЛЕНО: Отрисовка кассовых кнопок СТРОГО в визуальном стиле, дизайне и сетке "Горячих чеков"
 window.checkAndRenderCashierMetrics = function(currentUserRole, todayKpiData) {
     const card = document.getElementById("cashier-metrics-card");
     const container = document.getElementById("cashier-metrics-dynamic-area");
@@ -4576,7 +4576,7 @@ window.checkAndRenderCashierMetrics = function(currentUserRole, todayKpiData) {
         return;
     }
     
-    // Используем карту для склеивания распределенных по строкам элементов
+    // Склеиваем блоки, распределенные по строкам листа в единую Map-коллекцию
     let mergedBlocks = new Map();
     
     todayKpiData.data.forEach(row => {
@@ -4592,7 +4592,6 @@ window.checkAndRenderCashierMetrics = function(currentUserRole, todayKpiData) {
             if (block.items && Array.isArray(block.items)) {
                 let targetBlock = mergedBlocks.get(sub);
                 block.items.forEach(item => {
-                    // Проверяем валидность объекта и защищаем от дублирования кнопок
                     if (item && item.name) {
                         if (!targetBlock.items.some(i => i.name === item.name)) {
                             targetBlock.items.push(item);
@@ -4607,41 +4606,51 @@ window.checkAndRenderCashierMetrics = function(currentUserRole, todayKpiData) {
     let hasAnyData = false;
     
     mergedBlocks.forEach(block => {
-        if (block.items.length === 0) return; // Пропускаем пустые категории без кнопок
+        if (block.items.length === 0) return; 
         hasAnyData = true;
         
-        htmlContent += `
-        <div style="margin-bottom: 14px;">
-            <div style="font-size: 12px; font-weight: bold; color: gray; margin-bottom: 6px; padding-left: 2px;">
-                ${block.subheading}
-            </div>
-            <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(22%, 1fr)); gap: 6px; width: 100%; box-sizing: border-box;">
-        `;
+        // Подзаголовок категории (точно как в горячих чеках)
+        htmlContent += `<div style="margin-bottom: 8px; font-size:12px; font-weight:bold; color:gray; border-top: 1px solid var(--border-color); padding-top: 10px; margin-top: 10px;">${block.subheading}</div>`;
         
-        block.items.forEach(item => {
-            let badgeText = "";
-            let pVal = parseFloat(item.pts) || 0;
-            let kVal = item.kpi || "0%";
+        // Разбиваем элементы на строки максимум по 4 кнопки в ряд (копируем логику сетки Горячих Чеков)
+        for (let chunkStart = 0; chunkStart < block.items.length; chunkStart += 4) {
+            let chunk = block.items.slice(chunkStart, chunkStart + 4);
             
-            if (pVal > 0 && kVal !== "0%") {
-                badgeText = `+${pVal}б / ${kVal}`;
-            } else if (pVal > 0) {
-                badgeText = `+${pVal}б`;
-            } else {
-                badgeText = kVal;
-            }
+            htmlContent += `<div style="display: grid; grid-template-columns: repeat(${chunk.length}, 1fr); gap: 6px; margin-bottom: 6px;">`;
             
-            htmlContent += `
-            <button type="button" 
-                    onclick="window.submitCashierMetricRequest('${block.subheading.replace(/'/g, "\\'")}', '${item.name.replace(/'/g, "\\'")}', ${pVal}, '${kVal}')"
-                    style="position: relative; padding: 10px 4px; font-size: 11px; font-weight: bold; border-radius: 8px; border: 1px solid var(--border-color); background: var(--inner-bg); color: var(--text-color); cursor: pointer; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; box-sizing: border-box; min-height: 52px; transition: all 0.2s; -webkit-tap-highlight-color:transparent;">
-                <span style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: 100%; text-align: center;">${item.name}</span>
-                <span style="font-size: 8px; background: rgba(155, 89, 182, 0.15); color: #9b59b6; padding: 1px 4px; border-radius: 4px; white-space: nowrap;">${badgeText}</span>
-            </button>
-            `;
-        });
-        
-        htmlContent += `</div></div>`;
+            chunk.forEach(item => {
+                let combinedName = block.subheading ? `${block.subheading} ${item.name}` : item.name;
+                let badgeHtml = "";
+                
+                let pVal = parseFloat(item.pts) || 0;
+                let kpiBonus = parseFloat(String(item.kpi || "0").replace('%', '').replace(',', '.')) || 0;
+                
+                // ИСПРАВЛЕНО: Формирование бейджей в точном дизайне "Горячих чеков" (синий для %, красный для баллов)
+                if (pVal > 0 || kpiBonus > 0) {
+                    badgeHtml = `<div style="position:absolute; top:-8px; right:-6px; display:flex; gap:2px; z-index: 5;">`;
+                    if (kpiBonus > 0) {
+                        badgeHtml += `<span style="background:#3498db; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${kpiBonus}%</span>`;
+                    }
+                    if (pVal > 0) {
+                        badgeHtml += `<span style="background:#e74c3c; color:white; font-size:9px; font-weight:bold; padding:2px 4px; border-radius:8px; border: 1px solid var(--card-bg); box-shadow: 0 2px 4px rgba(0,0,0,0.2);">+${pVal}</span>`;
+                    }
+                    badgeHtml += `</div>`;
+                }
+                
+                // Рендер обертки кнопки (точно как в Горячих чеках - btn-green и относительное позиционирование)
+                htmlContent += `
+                <div style="position:relative; display:flex; flex:1;">
+                    <button class="btn-green" 
+                            style="padding:10px 4px; font-size:12px; margin:0; width:100%;" 
+                            onclick="window.submitCashierMetricRequest('${block.subheading.replace(/'/g, "\\'")}', '${item.name.replace(/'/g, "\\'")}', ${pVal}, ${kpiBonus})">
+                        ${item.name}
+                    </button>
+                    ${badgeHtml}
+                </div>`;
+            });
+            
+            htmlContent += `</div>`;
+        }
     });
     
     if (hasAnyData) {
@@ -4652,9 +4661,10 @@ window.checkAndRenderCashierMetrics = function(currentUserRole, todayKpiData) {
     }
 };
 
-// ИСПРАВЛЕНО: Отправка кассовой заявки руководству на одобрение/отклонение в requests
+// ИСПРАВЛЕНО: Отправка заявки с хуками метаданных для автоматического начисления КФ/Баллов в админке при одобрении
 window.submitCashierMetricRequest = async function(subheading, itemName, pts, kpi) {
-    if (!confirm(`Отправить запрос на подтверждение: "${subheading} — ${itemName}"?`)) return;
+    let combinedName = subheading ? `${subheading} — ${itemName}` : itemName;
+    if (!confirm(`Вы подтверждаете отправку запроса: "${combinedName}"?`)) return;
     
     let userIin = appState.iin;
     let userName = window.currentUserData ? window.currentUserData.name : "Кассир";
@@ -4666,17 +4676,19 @@ window.submitCashierMetricRequest = async function(subheading, itemName, pts, kp
     
     let todayStr = new Date().toLocaleDateString('ru-RU');
     
+    // Передаем хуки pts и bonus внутрь metadata, чтобы штатная ветка одобрения админа автоматически обработала начисление
     let requestPayload = {
         author_iin: userIin,
         type: "Кассовая метрика",
-        details: `Кассовая метрика: ${subheading} — ${itemName}\nНачисление: Баллы [${pts}], КФ.Эфф [${kpi}]`,
+        details: combinedName,
         status: "pending",
         created_at: new Date().toISOString(),
         metadata: {
             subheading: subheading,
             item_name: itemName,
-            pts_to_award: pts,
-            kpi_to_award: kpi,
+            pts: pts,                 // Системный хук админки для баллов
+            bonus: kpi,               // Системный хук админки для KPI
+            type: "Кассовая метрика", // Системный хук маппинга
             date: todayStr
         }
     };
