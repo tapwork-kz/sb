@@ -803,7 +803,8 @@ async function callBackend(actionName, payloadData = {}) {
       if (currentUserRole.includes("кассир")) {
           mySellers = adminEmployees.filter(e => String(e.role).toLowerCase().includes("кассир") && e.iin !== appState.iin && String(e.login_status).toUpperCase() !== 'FALSE').map(e => ({ iin: e.iin, name: e.name }));
       } else {
-          mySellers = adminEmployees.filter(e => e.dept === userData.dept && !String(e.role).toLowerCase().includes("кассир") && e.iin !== appState.iin && String(e.login_status).toUpperCase() !== 'FALSE').map(e => ({ iin: e.iin, name: e.name }));
+          // ИСПРАВЛЕНО: Логика отдела сохранена, но теперь в список попадают строго те, у кого в должности написано Продавец-консультант
+          mySellers = adminEmployees.filter(e => e.dept === userData.dept && (String(e.role).toLowerCase().includes("продавец-консультант") || String(e.role).toLowerCase().includes("продавец консультант")) && e.iin !== appState.iin && String(e.login_status).toUpperCase() !== 'FALSE').map(e => ({ iin: e.iin, name: e.name }));
       }
       // ИСПРАВЛЕНО: Добавили пересылку todayKpiData, чтобы фронтенд видел cashier_metrics
       return { authorized: true, role: userData.role, name: userData.full_name, dept: userData.dept, isPromoter: userData.role.toLowerCase().includes("промоутер"), scItems: finalScItems, adminScItems: finalScItems, adminPlan: localData.adminPlan || null, tradeInModels: tradeInList, hotChecks: localData.hotChecks || [], promoLists: localData.promoLists || [], info: localData.info, userHistory: userHistory, userInbox: userInbox, adminInbox: adminInbox, adminHistory: adminHistory, adminEmployees: adminEmployees, sellers: mySellers, vacations: globalVacations, todayKpiData: kpiDataRaw[0] };
