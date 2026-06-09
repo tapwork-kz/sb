@@ -276,6 +276,25 @@ async function callBackend(actionName, payloadData = {}) {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
                   if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                  
+                  // ИСПРАВЛЕНО: Добавлен перехват Кассовой метрики СТРОГО между Горячим чеком и Продажами СЦ
+                  else if (reqType === "Кассовая метрика") {
+                      let pts = parseFloat(metaObj.pts) || parseFloat(metaObj.pts_to_award) || 0;
+                      let bonus = parseFloat(metaObj.bonus) || parseFloat(metaObj.kpi_to_award) || 0;
+                      let categoryName = metaObj.subheading || "Касса";
+                      
+                      await supabaseClient.from('user_details').insert([{ 
+                          iin: req.author_iin, 
+                          type: "Кассовая метрика", 
+                          category: categoryName, 
+                          action_text: req.details, 
+                          points_motivation: pts, 
+                          kpi_change: bonus, 
+                          manager_iin: appState.iin 
+                      }]);
+                      newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
+                  }
+                  
                   else if (reqType === "Продажа СЦ/Дефект" || reqType === "Продажа Trade-In" || metaObj.type || reqType === metaObj.type) { 
                       let earnSourceType = (reqType === "Продажа Trade-In") ? "Trade-In" : (metaObj.type || reqType); 
                       // Берем точные значения баллов и KPI из сформированной заявки (или БД)
@@ -713,16 +732,25 @@ async function callBackend(actionName, payloadData = {}) {
 
               if (ptsMotivation !== 0 || ud.type === "Штраф") {
                   let histItem = { date: dateStr, type: ud.type, source: dynamicType, reason: cleanActionText, val: ptsMotivation > 0 ? "+" + ptsMotivation : ptsMotivation, approver: managerName, moneyFine: ud.fine_money || 0, kpiChange: kpiChange };
-                  if (ud.type === "Штраф") { histItem.type = "Штраф"; histItem.source = managerName; } else if (ud.type === "Продажа СЦ/Дефект" || ud.type === "Продажа Trade-In" || ud.type === dynamicType) { histItem.type = "Начисление"; histItem.source = dynamicType; histItem.val = "+" + ptsMotivation; } else if (ud.type === "Использование") { histItem.type = "Использование"; histItem.source = "Мотивация"; } else if (ud.type === "Горячий чек") { 
+                  // ИСПРАВЛЕНО: Явно указали тип "Кассовая метрика" для зачисления баллов в активный баланс кассира
+                  if (ud.type === "Штраф") { histItem.type = "Штраф"; histItem.source = managerName; } else if (ud.type === "Продажа СЦ/Дефект" || ud.type === "Продажа Trade-In" || ud.type === "Кассовая метрика" || ud.type === dynamicType) { histItem.type = "Начисление"; histItem.source = dynamicType; histItem.val = "+" + ptsMotivation; } else if (ud.type === "Использование") { histItem.type = "Использование"; histItem.source = "Мотивация"; } else if (ud.type === "Горячий чек") { 
                       histItem.type = "Начисление"; histItem.source = "Горячий чек"; 
                       let firstWord = String(cleanActionText).split(' ')[0];
                       if(firstWord && firstWord !== "Горячий" && cleanActionText.includes(firstWord + ' ')) { histItem.source = firstWord; }
                       histItem.val = "+" + ptsMotivation; 
                   }
                   if (ud.iin === appState.iin) { myPtsHistory.push(histItem); }
-                  if (empMap[ud.iin]) { empMap[ud.iin].ptsHistory.push(histItem); if (histItem.type === "Начисление") { empMap[ud.iin].pts.acc += ptsMotivation; 
-                  // ИСПРАВЛЕНО: Начисление вознаграждения больше не накручивает счетчик проданных товаров СЦ/Фокус сотрудника в БД
-                  if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; else if (histItem.source !== "Вознаграждение") empMap[ud.iin].sales.sc++; } if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); }
+                  if (empMap[ud.iin]) { 
+                      empMap[ud.iin].ptsHistory.push(histItem); 
+                      if (histItem.type === "Начисление") { 
+                          empMap[ud.iin].pts.acc += ptsMotivation; 
+                          // ИСПРАВЛЕНО: Кассовые показатели прибавляют баллы, но не накручивают счетчики продаж СЦ/Дефектов сотрудника
+                          if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; 
+                          else if (histItem.source !== "Вознаграждение" && ud.type !== "Кассовая метрика") empMap[ud.iin].sales.sc++; 
+                      } 
+                      if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); 
+                      if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); 
+                  }
               }
               if (kpiChange !== 0) {
                   let kName = cleanActionText || ud.type; let kSource = dynamicType;
