@@ -3046,7 +3046,8 @@ window.openAdminPointsForm = function() {
         if (String(e.login_status).toUpperCase() === 'FALSE') return false;
         
         let rLow = String(e.role || "").toLowerCase();
-        return rLow.includes("продавец-консультант") || rLow.includes("продавец консультант");
+        // ИСПРАВЛЕНО: Добавлен кассир в список доступных для начисления
+        return rLow.includes("продавец-консультант") || rLow.includes("продавец консультант") || rLow.includes("кассир");
     });
     
     // Сортировка списка продавцов сначала по отделам (Цифра -> МБТ -> КБТ), а внутри отделов - строго по алфавиту
@@ -3061,9 +3062,13 @@ window.openAdminPointsForm = function() {
         return String(a.name || "").localeCompare(String(b.name || ""), "ru");
     });
     
-    // ИСПРАВЛЕНО: Изменен формат вывода опций выбора: сначала ФИО, затем отдел в скобках
-    let optionsHtml = `<option value="" disabled selected>Выберите продавца</option>` + 
-        sellers.map(s => `<option value="${s.iin}">${s.name} (${s.dept || 'СЦ'})</option>`).join('');
+    // ИСПРАВЛЕНО: Изменен формат на "Выберите сотрудника", а для кассиров без отдела подставляется "Касса"
+    let optionsHtml = `<option value="" disabled selected>Выберите сотрудника</option>` + 
+        sellers.map(s => {
+            let rLow = String(s.role || "").toLowerCase();
+            let defaultDept = rLow.includes("кассир") ? "Касса" : "СЦ";
+            return `<option value="${s.iin}">${s.name} (${s.dept || defaultDept})</option>`;
+        }).join('');
     
     let modal = document.createElement("div");
     modal.id = "admin-points-modal-overlay";
