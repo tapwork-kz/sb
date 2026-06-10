@@ -3046,8 +3046,10 @@ window.openAdminPointsForm = function() {
         if (String(e.login_status).toUpperCase() === 'FALSE') return false;
         
         let rLow = String(e.role || "").toLowerCase();
-        // ИСПРАВЛЕНО: Добавлен кассир в список доступных для начисления
-        return rLow.includes("продавец-консультант") || rLow.includes("продавец консультант") || rLow.includes("кассир");
+        // ИСПРАВЛЕНО: Пропускаем продавцов и только обычных кассиров (без слова "старш")
+        return rLow.includes("продавец-консультант") || 
+               rLow.includes("продавец консультант") || 
+               (rLow.includes("кассир") && !rLow.includes("старш"));
     });
     
     // Сортировка списка продавцов сначала по отделам (Цифра -> МБТ -> КБТ), а внутри отделов - строго по алфавиту
