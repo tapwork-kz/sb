@@ -164,10 +164,20 @@ function generateDatePanelHTML(idPrefix, onChangeFuncName, extraHtml = "") {
     let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); 
     let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0));
     
-    // Формируем блок с баллами (extraHtml), если он есть, отделяя его тонкой линией снизу
     let extraSection = extraHtml ? `<div style="margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid var(--border-color);">${extraHtml}</div>` : "";
     
-    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;">${extraSection}<div class="no-swipe" style="display:flex; gap:6px; align-items:center; justify-content:space-between; width:100%;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; min-width:0; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; height:36px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:13px; letter-spacing:-0.5px; -webkit-appearance:none; appearance:none;"><span style="color:gray; font-weight:bold; font-size:16px; flex-shrink:0; margin:0 2px;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; min-width:0; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0 2px; height:36px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:13px; letter-spacing:-0.5px; -webkit-appearance:none; appearance:none;"><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><div style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none; box-sizing:border-box;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></div></div><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><div style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none; box-sizing:border-box;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_month</span></div></div></div></div>`;
+    // ИСПРАВЛЕНО: Кнопка сотрудника теперь представляет собой ровную иконку 36х36px с идеальным флекс-центрированием
+    let empBtnHtml = "";
+    if (idPrefix === 'admin-hist') {
+        let empActiveStyle = window.currentAdminHistEmpIin ? "background:var(--btn-color); color:white; border-color:var(--btn-color);" : "background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color);";
+        empBtnHtml = `
+        <div id="admin-hist-emp-filter-btn" style="position:relative; width:36px; height:36px; border-radius:8px; display:flex; justify-content:center; align-items:center; ${empActiveStyle} cursor:pointer; flex-shrink:0; box-sizing:border-box;" onclick="window.openAdminHistEmpModal(event)">
+            <span class="material-symbols-rounded" style="font-size:18px; display:flex; align-items:center; justify-content:center; width:100%; height:100%;">person</span>
+        </div>`;
+    }
+    
+    // ИСПРАВЛЕНО: Изменено на justify-content: center и добавлено ограничение max-width: 105px для инпутов, чтобы вся строка встала строго по центру панели
+    return `<div class="inner-block card date-panel-wrapper" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;">${extraSection}<div class="no-swipe" style="display:flex; gap:6px; align-items:center; justify-content:center; width:100%; height:36px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="${idPrefix}-start" value="${defStart}" onchange="${onChangeFuncName}('search')" style="flex:1; max-width:105px; min-width:0; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; display:inline-flex; align-items:center; justify-content:center; text-align:center; text-align-last:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none; appearance:none;"><span style="color:gray; font-weight:bold; font-size:14px; flex-shrink:0; margin:0 2px; display:flex; align-items:center; height:36px; justify-content:center;">-</span><input type="date" id="${idPrefix}-end" value="${defEnd}" onchange="${onChangeFuncName}('search')" style="flex:1; max-width:105px; min-width:0; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; display:inline-flex; align-items:center; justify-content:center; text-align:center; text-align-last:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px; -webkit-appearance:none; appearance:none;"><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center;"><input type="date" onchange="${onChangeFuncName}('single', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><div style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none; box-sizing:border-box;"><span class="material-symbols-rounded" style="font-size:18px; display:flex; align-items:center; justify-content:center;">calendar_today</span></div></div><div style="position:relative; width:36px; height:36px; flex-shrink:0; overflow:hidden; display:flex; align-items:center; justify-content:center;"><input type="month" onchange="${onChangeFuncName}('month', this.value); this.value='';" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><div style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none; box-sizing:border-box;"><span class="material-symbols-rounded" style="font-size:18px; display:flex; align-items:center; justify-content:center;">calendar_month</span></div></div>${empBtnHtml}</div></div>`;
 }
 
 function setPanelDates(type, val, idPrefix, reloadFn) {
@@ -1178,11 +1188,39 @@ function renderDashboardData(data, isSilent = false) {
 
   if (isSeniorCashier) isCashier = false; 
 
-  // ИСПРАВЛЕНО: Кнопка плюс теперь открыта и для Заведующих, Инфо, Старших кассиров и Грузчиков
+  // ИСПРАВЛЕНО: Кнопка плюс теперь принудительно открыта абсолютно для всех (включая Продавцов и Кассиров)
   let mainTabs = document.getElementById("main-tabs");
   let admPlus = document.getElementById("nav-adm-plus-btn");
   let isOnlyDirOrSup = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("супервайзер");
-  let isAllowedPlusMenu = isOnlyDirOrSup || isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik;
+  
+  // Включаем отображение кнопки "+" для всех без исключения
+  let isAllowedPlusMenu = true; 
+
+  if (isAllowedPlusMenu) {
+      // ИСПРАВЛЕНО: Запрещаем блоку ФИО сжиматься или переноситься из-за давления margin-left: auto
+      let userGreetingEl = document.getElementById("user-greeting");
+      if (userGreetingEl) {
+          userGreetingEl.style.whiteSpace = "nowrap";
+          userGreetingEl.style.flexShrink = "0";
+          userGreetingEl.style.margin = "0";
+      }
+
+      if (!admPlus && mainTabs) {
+          admPlus = document.createElement("div");
+          admPlus.id = "nav-adm-plus-btn";
+          
+          // ИСПРАВЛЕНО: Добавлен margin-left: auto; чтобы поглотить пустоту слева и прижать ПЛЮС вплотную к |x|x|x|
+          admPlus.style = "font-size:28px; font-weight:300; color:var(--text-color); opacity:0.4; cursor:pointer; margin-left: auto; margin-right: 6px; display:flex; align-items:center; justify-content:center; width:32px; height:32px; -webkit-tap-highlight-color:transparent; flex-shrink:0;";
+          admPlus.innerHTML = `<span class="material-symbols-rounded" style="font-size:28px;">add</span>`;
+          admPlus.onclick = (e) => { e.stopPropagation(); window.toggleAdminPlusMenu(); };
+          
+          // Оставляем ваше точное исходное расположение СНАРУЖИ (перед блоком вкладок)
+          mainTabs.parentNode.insertBefore(admPlus, mainTabs);
+      }
+      if (admPlus) admPlus.style.display = "flex";
+  } else {
+      if (admPlus) admPlus.style.display = "none";
+  }
   
   if (isAllowedPlusMenu) {
       if (!admPlus && mainTabs) {
@@ -2160,225 +2198,237 @@ function renderEmpDetailTab(tab, iin) {
   content.innerHTML = html;
 }
 
-// АСИНХРОННАЯ ОТРИСОВКА СЕТКИ КАЛЕНДАРЯ ТАБЕЛЯ (УНИВЕРСАЛЬНАЯ)
+// =====================================================================================
+// ОБНОВЛЕННАЯ АСИНХРОННАЯ ОТРИСОВКА СЕТКИ КАЛЕНДАРЯ ТАБЕЛЯ С ПОДДЕРЖКОЙ ПЕРЕРАБОТОК
+// =====================================================================================
 async function renderTabelCalendarData(iin, containerId = "tabel-calendar-container") {
-    let container = document.getElementById(containerId);
-    if (!container) return;
-    
-    let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"];
-    let year = window.currentCalYear;
-    let month = window.currentCalMonth;
-    
-    // Пока идут сетевые запросы, аккуратно показываем статус загрузки внутри целевого контейнера
-    container.innerHTML = `<div style="text-align:center; font-size:12px; padding:20px; color:gray;">Загрузка календаря табеля...</div>`;
-    
-    let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`;
-    let lastDay = new Date(year, month + 1, 0).getDate();
-    let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`;
-    let targetMonthStr = ("0" + (month + 1)).slice(-2) + "." + year;
+  let container = document.getElementById(containerId); if (!container) return;
+  let monthNames = ["Январь", "Февраль", "Март", "Апрель", "Май", "Июнь", "Июль", "Август", "Сентябрь", "Октябрь", "Ноябрь", "Декабрь"]; let year = window.currentCalYear; let month = window.currentCalMonth;
+  
+  // Пока идут сетевые запросы, аккуратно показываем статус загрузки внутри целевого контейнера
+  container.innerHTML = `<div style="text-align:center; font-size:12px; padding:20px; color:gray;">Загрузка календаря табеля...</div>`;
+  let startDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-01`; let lastDay = new Date(year, month + 1, 0).getDate(); let endDateStr = `${year}-${("0" + (month + 1)).slice(-2)}-${("0" + lastDay).slice(-2)}`; let targetMonthStr = ("0" + (month + 1)).slice(-2) + "." + year;
+  
+  // 1. Извлекаем и фильтруем ОДОБРЕННЫЕ переработки для подсветки дней и карточек под календарем
+  let overtimesSource = [];
+  if (typeof window.adminHistoryGlobal !== 'undefined' && window.adminHistoryGlobal && window.adminHistoryGlobal.length > 0) {
+      overtimesSource = window.adminHistoryGlobal;
+  } else {
+      let dashDataStr = localStorage.getItem("dashData_" + (window.appState?.iin || ""));
+      if (dashDataStr) {
+          let pData = JSON.parse(dashDataStr);
+          overtimesSource = (pData.adminHistory || []).concat(pData.userHistory || []);
+      }
+  }
 
-    // ИСПРАВЛЕНО: Заранее собираем и группируем баллы (плюсовые и минусовые) по дням выбранного месяца для бейджей
-    let ptsSourceAll = [];
-    let empMatchForPts = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)) : null;
-    if (empMatchForPts) {
-        ptsSourceAll = empMatchForPts.ptsHistory || [];
-    } else {
-        ptsSourceAll = (typeof myMoneyFinesHistory !== 'undefined') ? window.adminHistoryGlobal || [] : [];
-        if (!ptsSourceAll.length && typeof myDisplayPointsHistory !== 'undefined') ptsSourceAll = myDisplayPointsHistory;
-    }
+  let approvedOvertimes = overtimesSource.filter(r => {
+      if (!r) return false;
+      let isApproved = r.status === "approved" || r.status === "approved_notify_zav" || r.status === "система";
+      let isOvertime = String(r.type).includes("Переработка");
+      let matchesIin = String(r.authorIin || r.author_iin || "").trim() === String(iin).trim() || 
+                       String(r.targetIin || r.target_iin || "").trim() === String(iin).trim();
+      
+      if (!isApproved || !isOvertime || !matchesIin) return false;
+      
+      let metaObj = {};
+      try { metaObj = typeof r.meta === 'string' ? JSON.parse(r.meta) : (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.meta || r.metadata || {})); } catch(e){}
+      let dStr = metaObj.date || r.date || "";
+      return dStr.includes(targetMonthStr);
+  });
 
-    let dailyPoints = {};
-    ptsSourceAll.forEach(p => {
-        if (p && typeof p.date === 'string' && p.date.includes(targetMonthStr)) {
-            let dayNum = parseInt(p.date.split('.')[0], 10);
-            if (!isNaN(dayNum)) {
-                if (!dailyPoints[dayNum]) dailyPoints[dayNum] = { plus: 0, minus: 0 };
-                let valNum = parseFloat(String(p.val).replace('+', '').replace(',', '.')) || 0;
-                if (valNum > 0) {
-                    dailyPoints[dayNum].plus += valNum;
-                } else if (valNum < 0 || p.type === "Штраф" || p.type === "Списание") {
-                    dailyPoints[dayNum].minus += Math.abs(valNum);
-                }
-            }
-        }
-    });
-    
-    let attendanceMap = {};
-    try {
-        if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-            let { data: dbData, error } = await supabaseClient
-                .from('emp_attendance_days')
-                .select('date, status, hours')
-                .eq('iin', iin)
-                .gte('date', startDateStr)
-                .lte('date', endDateStr);
-                
-            if (!error && dbData) {
-                dbData.forEach(row => {
-                    let dayNum = parseInt(row.date.split('-')[2], 10);
-                    attendanceMap[dayNum] = { status: row.status, hours: row.hours };
-                });
-            }
-        }
-    } catch(e) { console.error("Ошибка загрузки дней табеля:", e); }
-    
-    let navHtml = `
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
-        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustCalMonth('${iin}', -1, '${containerId}')">
-            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
-        </button>
-        
-        <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
-            <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
-            <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
-                ${monthNames[month]} ${year}
-            </span>
-            <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" 
-                   style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" 
-                   onchange="window.onCalMonthPickerChange(this.value, '${iin}', '${containerId}')">
-        </div>
-        
-        <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustCalMonth('${iin}', 1, '${containerId}')">
-            <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
-        </button>
-    </div>
-    `;
-    
-    let daysOfWeek = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
-    let weekHeadersHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); text-align:center; font-size:11px; color:gray; font-weight:bold; margin-bottom:6px;">` + 
-        daysOfWeek.map(d => `<div>${d}</div>`).join("") + `</div>`;
-        
-    let firstDayIndex = new Date(year, month, 1).getDay(); 
-    let startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1; 
-    
-    let gridHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:5px;">`;
-    for (let i = 0; i < startOffset; i++) {
-        gridHtml += `<div></div>`;
-    }
-    
-    let statusColors = {
-        'РД': { color: '#27ae60', bg: 'rgba(39, 174, 96, 0.08)' }, 
-        'УС': { color: '#9b59b6', bg: 'rgba(155, 89, 182, 0.08)' }, 
-        'БС': { color: '#f39c12', bg: 'rgba(243, 156, 18, 0.08)' }, 
-        'БЛ': { color: '#e67e22', bg: 'rgba(230, 126, 34, 0.08)' }, 
-        'ПР': { color: '#e74c3c', bg: 'rgba(231, 76, 60, 0.08)' }, 
-        'ОТ': { color: '#f1c40f', bg: 'rgba(241, 196, 15, 0.08)' }, 
-        'В':  { color: '#7f8c8d', bg: 'rgba(127, 140, 141, 0.06)' }  
-    };
-    
-    let summary = { rd: 0, us: 0, bs: 0, bl: 0, pr: 0, ot: 0, v: 0 };
-    
-    for (let day = 1; day <= lastDay; day++) {
-        let dayData = attendanceMap[day];
-        let statusText = dayData ? dayData.status : "";
-        
-        if (statusText) {
-            let st = String(statusText).toUpperCase().trim();
-            if (st === 'РД') summary.rd++;
-            else if (st === 'УС') summary.us++;
-            else if (st === 'БС') summary.bs++;
-            else if (st === 'БЛ') summary.bl++;
-            else if (st === 'ПР') summary.pr++;
-            else if (st === 'ОТ') summary.ot++;
-            else if (st === 'В' || st === 'V') summary.v++;
-        }
-        
-        let displayHours = dayData ? dayData.hours : 0;
-        if (displayHours === 9 || displayHours === 12 || displayHours === 13) {
-            displayHours = 10;
-        }
-        let hoursText = (dayData && displayHours && displayHours > 0) ? `${displayHours}ч` : "";
-        
-        let cellStyle = "background:var(--inner-bg, rgba(150,150,150,0.03)); color:var(--text-color); border:none;";
-        if (statusText && statusColors[statusText]) {
-            cellStyle = `background:${statusColors[statusText].bg}; color:${statusColors[statusText].color}; border:none;`;
-        }
-        
-        // ИСПРАВЛЕНО: Генерируем компактные бейджи баллов на календарные дни (абсолютное позиционирование)
-        let ptsBadgeHtml = "";
-        if (dailyPoints[day]) {
-            let dp = dailyPoints[day];
-            ptsBadgeHtml = `<div style="position:absolute; top:-4px; right:-4px; display:flex; flex-direction:column; gap:1px; z-index:5; pointer-events:none;">`;
-            if (dp.plus > 0) {
-                ptsBadgeHtml += `<span style="background:#27ae60; color:white; font-size:7.5px; font-weight:bold; padding:1px 3px; border-radius:4px; line-height:1; box-shadow:0 1px 2px rgba(0,0,0,0.15);">+${String(dp.plus).replace('.', ',')}</span>`;
-            }
-            if (dp.minus > 0) {
-                ptsBadgeHtml += `<span style="background:#e74c3c; color:white; font-size:7.5px; font-weight:bold; padding:1px 3px; border-radius:4px; line-height:1; box-shadow:0 1px 2px rgba(0,0,0,0.15); text-shadow:none;">-${String(dp.minus).replace('.', ',')}</span>`;
-            }
-            ptsBadgeHtml += `</div>`;
-        }
-        
-        // Добавлено свойство position:relative для корректного отображения наложенных бейджей
-        gridHtml += `
-        <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1; border-radius:50%; box-sizing:border-box; padding:2px; position:relative; ${cellStyle}">
-            ${ptsBadgeHtml}
-            <span style="font-size:9px; font-weight:bold; opacity:0.5; margin-bottom:1px; line-height:1;">${day}</span>
-            <b style="font-size:10px; text-transform:uppercase; letter-spacing:-0.3px; line-height:1;">${statusText || '-'}</b>
-            ${hoursText ? `<span style="font-size:7px; opacity:0.6; margin-top:1px; font-weight:bold; line-height:1;">${hoursText}</span>` : ''}
-        </div>`;
-    }
-    gridHtml += `</div>`;
-    
-    let planRd = lastDay - summary.v;
-    if (planRd < 0) planRd = 0;
-    
-    let summaryHtml = `
-    <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:6px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
-        <div class="tabel-item" style="color:#f39c12; font-size:12px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
-        <div class="tabel-item" style="color:#e67e22; font-size:12px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
-        <div class="tabel-item" style="color:#e74c3c; font-size:12px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
-        <div class="tabel-item" style="color:#f1c40f; font-size:12px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
-        <div class="tabel-item" style="color:#27ae60; font-size:12px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
-        <div class="tabel-item" style="color:#9b59b6; font-size:12px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
-    </div>`;
-    
-    let legendHtml = `
-    <div style="display:grid; grid-template-columns:repeat(3, 1fr); gap:4px; margin-top:10px; font-size:9px; font-weight:bold; text-align:center;">
-        <div style="color:#27ae60; background:rgba(39,174,96,0.05); padding:3px; border-radius:6px;">РД - Рабочий</div>
-        <div style="color:#9b59b6; background:rgba(155,89,182,0.05); padding:3px; border-radius:6px;">УС - Усиление</div>
-        <div style="color:#f39c12; background:rgba(243,156,18,0.05); padding:3px; border-radius:6px;">БС - Личный</div>
-        <div style="color:#e67e22; background:rgba(230,126,34,0.05); padding:3px; border-radius:6px;">БЛ - Больнич.</div>
-        <div style="color:#e74c3c; background:rgba(231, 76, 60, 0.05); padding:3px; border-radius:6px;">ПР - Прогул</div>
-        <div style="color:#f1c40f; background:rgba(241,196,15,0.05); padding:3px; border-radius:6px;">ОТ - Отпуск</div>
-        <div style="color:#7f8c8d; background:rgba(127,140,141,0.05); padding:3px; border-radius:6px;">В - Выходной</div>
-    </div>`;
-    
-    // Динамический сбор, фильтрация и рендеринг нарушений (штрафов и замечаний) строго за выбранный месяц
-    let finesSource = [];
-    let remarksSource = [];
-    
-    let empMatch = (typeof window.adminEmployeesGlobal !== 'undefined' && window.adminEmployeesGlobal) ? window.adminEmployeesGlobal.find(e => String(e.iin).trim() === String(iin).trim()) : null;
-    if (empMatch) {
-        finesSource = (empMatch.ptsHistory || []).filter(p => p.type === "Штраф");
-        remarksSource = empMatch.remarks || [];
-    } else {
-        finesSource = (typeof myMoneyFinesHistory !== 'undefined') ? myMoneyFinesHistory : [];
-        let dashDataStr = localStorage.getItem("dashData_" + (window.appState?.iin || ""));
-        remarksSource = dashDataStr ? (JSON.parse(dashDataStr)?.info?.remarks || []) : [];
-    }
-    
-    let currentFines = finesSource.filter(i => i && typeof i.date === 'string' && i.date.includes(targetMonthStr));
-    currentFines.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
-    
-    let violHtml = `<div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--border-color);">`;
-    if (currentFines.length > 0) {
-        violHtml += `<div class="grid-details-title" style="color:#e74c3c; margin-top:4px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Нарушения</div>` + currentFines.map(i => renderMoneyFineItem(i)).join("");
-    } else {
-        violHtml += `<div style="padding:12px; text-align:center; color:gray; font-size:12px;">. . .</div>`;
-    }
-    
-    let currentRemarks = remarksSource.filter(r => r && typeof r.date === 'string' && r.date.includes(targetMonthStr));
-    currentRemarks.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
-    
-    if (currentRemarks.length > 0) {
-        violHtml += `<div class="grid-details-title" style="color:#f39c12; margin-top:14px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Замечания</div>` + currentRemarks.map(r => {
-            let authorStr = formatRemarkAuthor(r.authorName, r.authorRole);
-            return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px;"><div class="req-title" style="color:#f39c12; font-size:12px;">${authorStr} <span style="float:right; color:gray; font-size:10px;">${r.date}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap;">${formatRemarkText(r.details)}</div></div>`;
-        }).join("");
-    }
-    violHtml += `</div>`;
-    
-    container.innerHTML = navHtml + weekHeadersHtml + gridHtml + summaryHtml + legendHtml + violHtml;
+  // Карта переработок по дням для моментальной подсветки ячеек
+  let overtimeDaysMap = {};
+  approvedOvertimes.forEach(r => {
+      let metaObj = {};
+      try { metaObj = typeof r.meta === 'string' ? JSON.parse(r.meta) : (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.meta || r.metadata || {})); } catch(e){}
+      let dStr = metaObj.date || r.date || "";
+      let dayNum = parseInt(dStr.split('.')[0], 10);
+      if (!isNaN(dayNum)) overtimeDaysMap[dayNum] = r;
+  });
+
+  // Заранее собираем и группируем баллы (плюсовые и минусовые) по дням выбранного месяца для бейджей
+  let ptsSourceAll = [];
+  let empMatchForPts = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)) : null;
+  if (empMatchForPts) { ptsSourceAll = empMatchForPts.ptsHistory || []; } else { ptsSourceAll = (typeof myDisplayPointsHistory !== 'undefined') ? myDisplayPointsHistory : []; }
+  let dailyPoints = {};
+  ptsSourceAll.forEach(i => {
+      if (i && typeof i.date === 'string' && i.date.includes(targetMonthStr)) {
+          let dayNum = parseInt(i.date.split('.')[0], 10); if (isNaN(dayNum)) return; if (!dailyPoints[dayNum]) dailyPoints[dayNum] = { plus: 0, minus: 0 };
+          let valNum = parseFloat(String(i.val).replace('+', '').replace(',', '.').trim()) || 0;
+          if (i.type === "Начисление" || valNum > 0) dailyPoints[dayNum].plus += valNum;
+          else if (i.type === "Штраф" || i.type === "Списание" || valNum < 0) dailyPoints[dayNum].minus += Math.abs(valNum);
+      }
+  });
+
+  let attendanceMap = {};
+  try {
+      if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+          let { data: dbData, error } = await supabaseClient
+              .from('emp_attendance_days')
+              .select('date, status, hours')
+              .eq('iin', iin)
+              .gte('date', startDateStr)
+              .lte('date', endDateStr);
+          if (!error && dbData) {
+              dbData.forEach(row => {
+                  let dayNum = parseInt(row.date.split('-')[2], 10);
+                  attendanceMap[dayNum] = { status: row.status, hours: row.hours };
+              });
+          }
+      }
+  } catch(e) { console.error("Ошибка загрузки дней табеля:", e); }
+
+  let navHtml = `
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:14px; padding:0 4px;" class="no-swipe">
+      <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustCalMonth('${iin}', -1, '${containerId}')">
+          <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_left</span>
+      </button>
+      <div style="position:relative; display:inline-flex; align-items:center; cursor:pointer; margin:0; padding:0; background:none;">
+          <span class="material-symbols-rounded" style="font-size:16px; color:gray; margin-right:5px; display:inline-block; vertical-align:middle;">calendar_month</span>
+          <span style="font-size:14px; font-weight:700; color:var(--text-color); letter-spacing:-0.3px; white-space:nowrap; display:inline-block; margin:0; padding:0; vertical-align:middle;">
+              ${monthNames[month]} ${year}
+          </span>
+          <input type="month" value="${year}-${("0" + (month + 1)).slice(-2)}" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onchange="window.onCalMonthPickerChange(this.value, '${iin}', '${containerId}')">
+      </div>
+      <button style="width:32px; min-width:32px; height:32px; border-radius:50%; border:none; background:none; color:var(--text-color); display:flex; align-items:center; justify-content:center; cursor:pointer; margin:0; padding:0; -webkit-tap-highlight-color:transparent;" onclick="window.adjustCalMonth('${iin}', 1, '${containerId}')">
+          <span class="material-symbols-rounded" style="font-size:22px; font-weight:bold; opacity:0.9;">chevron_right</span>
+      </button>
+  </div>`;
+
+  let daysOfWeek = ["Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"];
+  let weekHeadersHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); text-align:center; font-size:11px; color:gray; font-weight:bold; margin-bottom:6px;">` + daysOfWeek.map(d => `<div>${d}</div>`).join("") + `</div>`;
+  
+  let firstDayIndex = new Date(year, month, 1).getDay();
+  let startOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+  let gridHtml = `<div style="display:grid; grid-template-columns:repeat(7, 1fr); gap:5px;">`;
+  for (let i = 0; i < startOffset; i++) { gridHtml += `<div></div>`; }
+
+  let statusColors = { 'РД': { color: '#27ae60', bg: 'rgba(39, 174, 96, 0.05)' }, 'УС': { color: '#9b59b6', bg: 'rgba(155, 89, 182, 0.05)' }, 'БС': { color: '#f39c12', bg: 'rgba(243, 156, 18, 0.05)' }, 'БЛ': { color: '#e67e22', bg: 'rgba(230, 126, 34, 0.05)' }, 'ПР': { color: '#e74c3c', bg: 'rgba(231, 76, 60, 0.05)' }, 'ОТ': { color: '#f1c40f', bg: 'rgba(241,196,15,0.06)' }, 'В': { color: '#7f8c8d', bg: 'rgba(127,140,141,0.05)' }, 'V': { color: '#7f8c8d', bg: 'rgba(127,140,141,0.05)' } };
+  let summary = { bs: 0, bl: 0, pr: 0, ot: 0, rd: 0, us: 0, v: 0 };
+
+  for (let day = 1; day <= lastDay; day++) {
+      let dayData = attendanceMap[day];
+      let statusText = dayData ? dayData.status : "";
+      if (statusText) {
+          let st = String(statusText).toUpperCase().trim();
+          if (st === 'РД') summary.rd++;
+          else if (st === 'УС') summary.us++;
+          else if (st === 'БС') summary.bs++;
+          else if (st === 'БЛ') summary.bl++;
+          else if (st === 'ПР') summary.pr++;
+          else if (st === 'ОТ') summary.ot++;
+          else if (st === 'В' || st === 'V') summary.v++;
+      }
+      
+      let displayHours = dayData ? dayData.hours : 0;
+      if (displayHours === 9 || displayHours === 12 || displayHours === 13) { displayHours = 10; }
+      let hoursText = (dayData && displayHours && displayHours > 0) ? `${displayHours}ч` : "";
+      
+      let cellStyle = "background:var(--inner-bg, rgba(150,150,150,0.03)); color:var(--text-color); border:none;";
+      if (statusText && statusColors[statusText]) {
+          cellStyle = `background:${statusColors[statusText].bg}; color:${statusColors[statusText].color}; border:none;`;
+      }
+      
+      // ИСПРАВЛЕНО: Приоритетная зеленая обводка и подсвечивание ячейки переработки поверх базового цвета
+      if (overtimeDaysMap[day]) {
+          cellStyle = `background: rgba(39, 174, 96, 0.12) !important; color: #27ae60 !important; border: 1.5px dashed #27ae60 !important;`;
+      }
+
+      let ptsBadgeHtml = "";
+      if (dailyPoints[day]) {
+          let dp = dailyPoints[day];
+          ptsBadgeHtml = `<div style="position:absolute; top:-4px; right:-4px; display:flex; flex-direction:column; gap:1px; z-index:5; pointer-events:none;">`;
+          if (dp.plus > 0) { ptsBadgeHtml += `<span style="background:#27ae60; color:white; font-size:7.5px; font-weight:bold; padding:1px 3px; border-radius:4px; line-height:1; box-shadow:0 1px 2px rgba(0,0,0,0.15);">+${String(dp.plus).replace('.', ',')}</span>`; }
+          if (dp.minus > 0) { ptsBadgeHtml += `<span style="background:#e74c3c; color:white; font-size:7.5px; font-weight:bold; padding:1px 3px; border-radius:4px; line-height:1; box-shadow:0 1px 2px rgba(0,0,0,0.15); text-shadow:none;">-${String(dp.minus).replace('.', ',')}</span>`; }
+          ptsBadgeHtml += `</div>`;
+      }
+      
+      gridHtml += `
+      <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; aspect-ratio:1; border-radius:50%; box-sizing:border-box; padding:2px; position:relative; ${cellStyle}">
+          ${ptsBadgeHtml}
+          <span style="font-size:9px; font-weight:bold; opacity:0.5; margin-bottom:1px; line-height:1;">${day}</span>
+          <b style="font-size:10px; text-transform:uppercase; letter-spacing:-0.3px; line-height:1;">${statusText || '-'}</b>
+          ${hoursText ? `<span style="font-size:7px; opacity:0.6; margin-top:1px; font-weight:bold; line-height:1;">${hoursText}</span>` : ''}
+      </div>`;
+  }
+  gridHtml += `</div>`;
+
+  let planRd = lastDay - summary.v; if (planRd < 0) planRd = 0;
+  let summaryHtml = `
+  <div style="display:flex; justify-content:space-around; align-items:center; margin:14px 0 8px 0; padding:6px 8px; background:rgba(150,150,150,0.05); border-radius:12px;" class="no-swipe">
+      <div class="tabel-item" style="color:#f39c12; font-size:12px;"><span class="tabel-lbl">БС.</span>${summary.bs}</div>
+      <div class="tabel-item" style="color:#e67e22; font-size:12px;"><span class="tabel-lbl">БЛ.</span>${summary.bl}</div>
+      <div class="tabel-item" style="color:#e74c3c; font-size:12px;"><span class="tabel-lbl">ПР.</span>${summary.pr}</div>
+      <div class="tabel-item" style="color:#f1c40f; font-size:12px;"><span class="tabel-lbl">ОТ.</span>${summary.ot}</div>
+      <div class="tabel-item" style="color:#27ae60; font-size:12px;"><span class="tabel-lbl">РД.</span>${summary.rd} / ${planRd}</div>
+      <div class="tabel-item" style="color:#9b59b6; font-size:12px;"><span class="tabel-lbl">УС.</span>${summary.us}</div>
+  </div>`;
+
+  let legendHtml = `
+  <div style="display:grid; grid-template-columns:1fr 1fr; gap:4px; font-size:10px; margin-top:10px; border-top:1px solid rgba(150,150,150,0.08); padding-top:8px; text-align:center;" class="no-swipe">
+      <div style="color:#27ae60; background:rgba(39,174,96,0.05); padding:3px; border-radius:6px;">РД - Рабочий день</div>
+      <div style="color:#9b59b6; background:rgba(155,89,182,0.05); padding:3px; border-radius:6px;">УС - Усиление</div>
+      <div style="color:#f39c12; background:rgba(243,156,18,0.05); padding:3px; border-radius:6px;">БС - Без содерж.</div>
+      <div style="color:#e67e22; background:rgba(230,126,34,0.05); padding:3px; border-radius:6px;">БЛ - Больничный</div>
+      <div style="color:#e74c3c; background:rgba(231,76,60,0.05); padding:3px; border-radius:6px;">ПР - Прогул</div>
+      <div style="color:#f1c40f; background:rgba(241,196,15,0.05); padding:3px; border-radius:6px;">ОТ - Отпуск</div>
+      <div style="color:#7f8c8d; background:rgba(127,140,141,0.05); padding:3px; border-radius:6px;">В - Выходной</div>
+  </div>`;
+
+  // Сбор и сортировка штрафов/замечаний
+  let finesSource = []; let remarksSource = [];
+  let empMatch = (typeof window.adminEmployeesGlobal !== 'undefined' && window.adminEmployeesGlobal) ? window.adminEmployeesGlobal.find(e => String(e.iin).trim() === String(iin).trim()) : null;
+  if (empMatch) { finesSource = (empMatch.ptsHistory || []).filter(p => p.type === "Штраф"); remarksSource = empMatch.remarks || []; } 
+  else { finesSource = (typeof myMoneyFinesHistory !== 'undefined') ? myMoneyFinesHistory : []; let dashDataStr = localStorage.getItem("dashData_" + (window.appState?.iin || "")); remarksSource = dashDataStr ? (JSON.parse(dashDataStr)?.info?.remarks || []) : []; }
+  
+  let currentFines = finesSource.filter(i => i && typeof i.date === 'string' && i.date.includes(targetMonthStr)); currentFines.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+  let currentRemarks = remarksSource.filter(i => i && typeof i.date === 'string' && i.date.includes(targetMonthStr)); currentRemarks.sort((a, b) => parseCustomDate(b.date) - parseCustomDate(a.date));
+
+  let violHtml = `<div style="margin-top:16px; padding-top:14px; border-top:1px dashed var(--border-color);">`;
+  
+  // ИСПРАВЛЕНО: Зеленый стиль, только содержание причины серым цветом, дата и время — черным внизу (размер увеличен до 12px)
+  if (approvedOvertimes.length > 0) {
+      violHtml += `<div class="grid-details-title" style="color:#27ae60; margin-top:4px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Переработки</div>`;
+      violHtml += approvedOvertimes.map(r => {
+          let mObj = {};
+          try { mObj = typeof r.meta === 'string' ? JSON.parse(r.meta) : (typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.meta || r.metadata || {})); } catch(e){}
+          let dStr = mObj.date || r.date || "";
+          let cleanDate = dStr.split(' ')[0]; // Извлекаем чистую дату без времени
+          let timeInfo = (mObj.from_time && mObj.to_time) ? ` (${mObj.from_time} - ${mObj.to_time})` : " (полный день)";
+          
+          // Бронебойное извлечение ТЕКСТА ПРИЧИНЫ (сначала из метаданных, иначе вырезаем из общей строки после "Причина:")
+          let cleanReasonText = mObj.comment || "";
+          if (!cleanReasonText && r.details) {
+              let matchReason = r.details.match(/Причина:\s*(.*)$/i);
+              cleanReasonText = matchReason ? matchReason[1].trim() : r.details;
+          }
+          if (!cleanReasonText) cleanReasonText = "Утверждено руководством";
+
+          return `
+          <div class="req-item" style="border-left-color: #27ae60; border-left-width: 2px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; background: var(--bg-color, transparent);">
+              <div style="flex:1; min-width:0; padding-right:10px; display:flex; flex-direction:column; gap:4px;">
+                  <span style="color: gray; font-size: 13px; display: inline-block; line-height: 1.3; font-weight: normal; word-break: break-word;">${cleanReasonText}</span>
+                  
+                  <span style="color: var(--text-color); font-size: 11px; display: inline-flex; align-items: center; gap: 4px; font-weight: 500;">
+                      <span class="material-symbols-rounded" style="font-size: 13px; color: var(--text-color);">schedule</span> ${cleanDate}${timeInfo}
+                  </span>
+              </div>
+              <div style="flex-shrink:0; display:flex; align-items:center; justify-content:center; width:28px; height:28px; background:rgba(39, 174, 96, 0.1); border-radius:50%;">
+                  <span class="material-symbols-rounded" style="color:#27ae60; font-size:16px;">more_time</span>
+              </div>
+          </div>`;
+      }).join("");
+  }
+
+  if (currentFines.length > 0) { violHtml += `<div class="grid-details-title" style="color:#e74c3c; margin-top:12px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Нарушения</div>` + currentFines.map(i => renderMoneyFineItem(i)).join(""); }
+  if (currentRemarks.length > 0) { violHtml += `<div class="grid-details-title" style="color:#f39c12; margin-top:12px; margin-bottom:8px; font-weight:bold; font-size:12px; text-transform:none; text-align:left;">Замечания</div>` + currentRemarks.map(r => { let desc = formatRemarkText(r.details); let authorStr = formatRemarkAuthor(r.authorName, r.authorRole); return `<div class="req-item" style="border-left-color: #f39c12; margin-bottom:8px; padding:10px;"><div class="req-title" style="font-size:11px; margin-bottom:4px;"><b style="color:#f39c12;">${authorStr}</b> <span style="float:right; color:gray; font-size:9px;">${r.date || ''}</span></div><div class="req-desc" style="color:var(--text-color); font-size:12px; white-space:pre-wrap; line-height:1.3;">${desc}</div></div>`; }).join(""); }
+  
+  if (approvedOvertimes.length === 0 && currentFines.length === 0 && currentRemarks.length === 0) {
+      violHtml += `<p style='text-align:center; color:gray; font-size:12px; margin-top:15px; padding:10px 0;'>Записей и нарушений не найдено</p>`;
+  }
+  violHtml += `</div>`;
+
+  container.innerHTML = navHtml + weekHeadersHtml + gridHtml + summaryHtml + legendHtml + violHtml;
 }
 
 // ОБРАБОТЧИК НАВИГАЦИИ СТРЕЛКАМИ С ПЕРЕХОДОМ ГОДА
@@ -2576,7 +2626,7 @@ window.onMyRepMonthPickerChange = function(value) {
     renderMyPersonalReportsData();
 };
 
-// ИСПРАВЛЕНО: Возвращена логика выпадающего списка административного плюса и стили вознаграждений
+// ИСПРАВЛЕНО: Кнопка прайса выведена из всех вложенных условий наружу и доступна Продавцам
 window.toggleAdminPlusMenu = function() {
     let menu = document.getElementById("admin-plus-dropdown-menu");
     if (menu) {
@@ -2594,21 +2644,21 @@ window.toggleAdminPlusMenu = function() {
         document.head.appendChild(style);
     }
     
-    let roleLow = String(appState.role || "").toLowerCase();
-    let isOnlyDirOrSup = roleLow.includes("директор") || roleLow.includes("управляющий") || roleLow.includes("супервайзер");
+    let roleStr = String(appState.role || "").toLowerCase();
+    let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
+    let isZavSklad = roleStr.includes("заведующий складом");
+    let isInfoConsultant = roleStr.includes("инфо-консультант");
+    let isSeniorCashier = roleStr.includes("старший кассир");
+    let isGruzchik = roleStr.includes("грузчик");
     
     menu = document.createElement("div");
     menu.id = "admin-plus-dropdown-menu";
-    // Внешняя карточка имеет скругление 12px
-    menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
-    
-    menu = document.createElement("div");
-    menu.id = "admin-plus-dropdown-menu";
-    // Внешняя карточка имеет скругление 12px
     menu.style = "position:fixed; top:60px; left:16px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; box-shadow:0 4px 16px rgba(0,0,0,0.15); padding:4px; z-index:9999; display:flex; flex-direction:column; min-width:190px; animation:slide-up-fade 0.2s ease;";
     
     let menuHtml = "";
-    if (isOnlyDirOrSup) {
+    
+    if (isDir) {
+        // 1. Ветка Администрации
         menuHtml = `
             <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminPointsForm();">
                 <span class="material-symbols-rounded" style="color:#2ecc71; font-size:18px;">stars</span>
@@ -2638,13 +2688,24 @@ window.toggleAdminPlusMenu = function() {
                 <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
                 <span>Штрафы</span>
             </div>`;
-    } else {
+    } else if (isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik) {
+        // 2. Ветка Смежных служб (без доступа к админ-панели, но с переработками)
         menuHtml = `
             <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminOvertimeForm();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
                 <span>Подать на переработку</span>
             </div>`;
     }
+
+    // Если меню не пустое (это админ или склад), добавим разделительную черту. Если это Продавец — черты сверху не будет.
+    let topBorderStyle = (menuHtml !== "") ? "border-top:1px solid var(--border-color);" : "";
+
+    // 3. ОБЩАЯ КНОПКА ДЛЯ ВСЕХ РОЛЕЙ (Включая Продавцов и Кассиров)
+    menuHtml += `
+    <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent; ${topBorderStyle}" onclick="window.openDeliveryPricesModal();">
+        <span class="material-symbols-rounded" style="color:#3498db; font-size:18px;">local_shipping</span>
+        <span>Прайс по доставкам</span>
+    </div>`;
     
     menu.innerHTML = menuHtml;
     document.body.appendChild(menu);
@@ -2687,11 +2748,11 @@ window.openAdminOvertimeForm = function() {
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; width:100%; box-sizing:border-box;">
                     <div style="min-width:0; width:100%;">
                         <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время с</label>
-                        <input type="time" id="ov-hours-from" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:block; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
+                        <input type="time" id="ov-hours-from" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:flex; align-items:center; justify-content:center; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
                     </div>
                     <div style="min-width:0; width:100%;">
                         <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время до</label>
-                        <input type="time" id="ov-hours-to" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:block; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
+                        <input type="time" id="ov-hours-to" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:flex; align-items:center; justify-content:center; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
                     </div>
                 </div>
             </div>
@@ -3147,13 +3208,95 @@ function markAsSeen(id, el) { let stored = {}; try { stored = JSON.parse(localSt
 
 let currentHistFilter = 'all';
 function renderAdminHistory(filterType) {
-  if(filterType) currentHistFilter = filterType; ['all', 'sales', 'pts', 'viol'].forEach(f => { let el = document.getElementById('flt-hist-' + f); if(el) el.classList.remove('active-flt'); }); let activeEl = document.getElementById('flt-hist-' + currentHistFilter); if(activeEl) activeEl.classList.add('active-flt');
-  let listContainer = document.getElementById("admin-history-list"); if (!document.getElementById("admin-hist-panel")) { let panelDiv = document.createElement("div"); panelDiv.id = "admin-hist-panel"; panelDiv.innerHTML = generateDatePanelHTML('admin-hist', 'window.triggerAdminHistReload'); listContainer.parentNode.insertBefore(panelDiv, listContainer); window.triggerAdminHistReload = function(type, val) { if(type) setPanelDates(type, val, 'admin-hist', () => renderAdminHistory(currentHistFilter)); else renderAdminHistory(currentHistFilter); }; }
-  let startD = document.getElementById("admin-hist-start").value; let endD = document.getElementById("admin-hist-end").value; 
-  let sP = startD.split('-'); let startTime = new Date(sP[0], sP[1]-1, sP[2], 0, 0, 0).getTime(); 
-  let eP = endD.split('-'); let endTime = new Date(eP[0], eP[1]-1, eP[2], 23, 59, 59).getTime();
-  let aHist = window.adminHistoryGlobal || []; aHist = aHist.filter(r => { let rd = parseCustomDate(r.date); return rd >= startTime && rd <= endTime; });
-  if (currentHistFilter === 'sales') { aHist = aHist.filter(r => ["Продажа СЦ/Дефект", "Продажа Trade-In", "Горячий чек"].includes(r.type)); } else if (currentHistFilter === 'pts') { aHist = aHist.filter(r => r.type === "Баллы мотивации"); } else if (currentHistFilter === 'viol') { aHist = aHist.filter(r => r.type === "Замечание" || r.type === "Штраф" || r.type === "Запрос на штраф"); }
+  if(filterType) currentHistFilter = filterType; 
+  
+  // Добавление кнопки "Табель" в шапку истории, если её ещё нет
+  if (!document.getElementById('flt-hist-tabel')) {
+      let btnAll = document.getElementById('flt-hist-all');
+      if (btnAll && btnAll.parentElement) {
+          let btnTabel = document.createElement('button');
+          btnTabel.id = 'flt-hist-tabel';
+          btnTabel.className = btnAll.className.replace('active-flt', '').trim();
+          btnTabel.onclick = () => renderAdminHistory('tabel');
+          btnAll.parentNode.appendChild(btnTabel);
+      }
+  }
+
+  // ИСПРАВЛЕНО: Выстраиваем контейнер строго в 1 строку без переносов
+  let btnAll = document.getElementById('flt-hist-all');
+  if (btnAll && btnAll.parentElement) {
+      btnAll.parentElement.style.display = "flex";
+      btnAll.parentElement.style.gap = "4px";
+      btnAll.parentElement.style.width = "100%";
+      btnAll.parentElement.style.marginBottom = "10px";
+  }
+
+  // ИСПРАВЛЕНО: Превращаем текст кнопок в компактные аккуратные иконки
+  ['all', 'sales', 'pts', 'viol', 'tabel'].forEach(f => { 
+      let el = document.getElementById('flt-hist-' + f); 
+      if(el) {
+          el.classList.remove('active-flt');
+          el.style.flex = "1";
+          el.style.minWidth = "0";
+          el.style.padding = "0";
+          el.style.height = "36px";
+          el.style.display = "flex";
+          el.style.alignItems = "center";
+          el.style.justifyContent = "center";
+          el.style.margin = "0";
+          
+          if (f === 'all') el.innerHTML = `<span class="material-symbols-rounded" style="font-size:18px;">box</span>`;
+          if (f === 'sales') el.innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; color:#2ecc71;">sell</span>`;
+          if (f === 'pts') el.innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; color:#f1c40f;">stars</span>`;
+          if (f === 'viol') el.innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; color:#e74c3c;">gavel</span>`;
+          if (f === 'tabel') el.innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; color:#3498db;">calendar_view_month</span>`;
+      }
+  }); 
+  
+  let activeEl = document.getElementById('flt-hist-' + currentHistFilter); 
+  if(activeEl) activeEl.classList.add('active-flt');
+  
+  let listContainer = document.getElementById("admin-history-list"); 
+  if (!document.getElementById("admin-hist-panel")) { 
+      let panelDiv = document.createElement("div"); 
+      panelDiv.id = "admin-hist-panel"; 
+      panelDiv.innerHTML = generateDatePanelHTML('admin-hist', 'window.triggerAdminHistReload'); 
+      listContainer.parentNode.insertBefore(panelDiv, listContainer); 
+      window.triggerAdminHistReload = function(type, val) { if(type) setPanelDates(type, val, 'admin-hist', () => renderAdminHistory(currentHistFilter)); else renderAdminHistory(currentHistFilter); }; 
+  }
+  
+  let startD = document.getElementById("admin-hist-start").value; 
+  let endD = document.getElementById("admin-hist-end").value; 
+  let sP = startD.split('-'); let startTime = new Date(sP[0], sP[1]-1, sP[2], 0, 0, 0).getTime(); 
+  let eP = endD.split('-'); let endTime = new Date(eP[0], eP[1]-1, eP[2], 23, 59, 59).getTime();
+  
+  let aHist = window.adminHistoryGlobal || []; 
+  aHist = aHist.filter(r => { let rd = parseCustomDate(r.date); return rd >= startTime && rd <= endTime; });
+  
+  // Фильтрация карточек по вкладкам категорий
+  if (currentHistFilter === 'sales') { 
+      aHist = aHist.filter(r => ["Продажа СЦ/Дефект", "Продажа Trade-In", "Горячий чек"].includes(r.type)); 
+  } else if (currentHistFilter === 'pts') { 
+      aHist = aHist.filter(r => r.type === "Баллы мотивации"); 
+  } else if (currentHistFilter === 'viol') { 
+      aHist = aHist.filter(r => r.type === "Замечание" || r.type === "Штраф" || r.type === "Запрос на штраф"); 
+  } else if (currentHistFilter === 'tabel') {
+      // ИСПРАВЛЕНО: Вывод строго переработок, отпусков, обмена и исправления смен
+      aHist = aHist.filter(r => {
+          let tLow = String(r.type || "").toLowerCase();
+          return tLow.includes("переработ") || tLow.includes("отпуск") || tLow.includes("обмен") || tLow.includes("исправл");
+      });
+  }
+  
+  // ИСПРАВЛЕНО: Живой сквозной фильтр по конкретному выбранному сотруднику
+  if (window.currentAdminHistEmpIin) {
+      let filterIin = String(window.currentAdminHistEmpIin).trim();
+      aHist = aHist.filter(r => 
+          String(r.authorIin).trim() === filterIin || 
+          String(r.targetIin).trim() === filterIin
+      );
+  }
+  
   listContainer.innerHTML = groupAndRenderByMonth(aHist, r => {
     let stColor = r.status === "approved" || r.status === "approved_notify_zav" ? "#27ae60" : (r.status === "rejected" || r.status === "rejected_by_user" || r.status === "rejected_notify_user" || r.status === "rejected_notify_zav" ? "#e74c3c" : "#95a5a6"); let stText = r.status === "approved" || r.status === "approved_notify_zav" ? "Одобрен" : (String(r.status).includes("rejected") ? "Отклонен" : "Просмотрен"); if(r.status === "rejected_by_user") stText = "Отклонен сменщиком"; if (r.type === "Исправление смены") { if (r.status.includes("approved")) stText = "Исправлен"; else if (r.status.includes("rejected")) stText = "Отклонен"; }
     let rawDesc = String(r.details || ""); let approverName = ""; let metaObj = {}; try { metaObj = JSON.parse(r.meta || r.metadata || "{}"); } catch(e){} let match = rawDesc.match(/\n\[(.*?)\]$/); if (match) { approverName = formatShortName(match[1]); rawDesc = rawDesc.replace(/\n\[(.*?)\]$/, "").trim(); } if (metaObj.approver) approverName = formatShortName(metaObj.approver); if (!approverName && r.approver) approverName = formatShortName(r.approver);
@@ -4744,4 +4887,208 @@ window.submitCashierMetricRequest = async function(subheading, itemName, pts, kp
         console.error(err);
         showToast("Не удалось отправить запрос", true);
     }
+};
+
+// ==========================================
+// ИНТЕРАКТИВНЫЙ МОДАЛЬНЫЙ ПРАЙС ДОСТАВОК
+// ==========================================
+window.openDeliveryPricesModal = function() {
+    // Закрываем выпадающее меню, если оно было открыто
+    let plusMenu = document.getElementById("admin-plus-dropdown-menu");
+    if (plusMenu) plusMenu.remove();
+
+    let existingModal = document.getElementById("delivery-prices-modal-overlay");
+    if (existingModal) existingModal.remove();
+    
+    let modal = document.createElement("div");
+    modal.id = "delivery-prices-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:380px; background:var(--card-bg); padding:14px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; max-height:80vh; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
+            <h3 style="margin:0 0 12px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
+                <span class="material-symbols-rounded" style="color:#3498db; font-size:18px;">local_shipping</span> 
+                Прайс по доставкам
+            </h3>
+            
+            <div style="margin-bottom:12px; position:relative; width:100%;">
+                <input type="text" id="delivery-search-input" placeholder="Поиск населенного пункта или района..." style="width:100%; height:38px; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); padding:0 10px 0 34px; font-size:13px;">
+                <span class="material-symbols-rounded" style="position:absolute; left:10px; top:10px; color:gray; font-size:18px;">search</span>
+            </div>
+            
+            <div id="delivery-prices-scroll-area" style="flex:1; overflow-y:auto; margin-bottom:12px; padding-right:2px; display:flex; flex-direction:column; gap:8px;">
+                <div style="text-align:center; color:gray; font-size:12px; padding:20px 0;">Загрузка данных прайса...</div>
+            </div>
+            
+            <button class="btn-gray" onclick="document.getElementById('delivery-prices-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px; width:100%;">Закрыть</button>
+        </div>
+    `;
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+    
+    window.currentDeliveryItemsRaw = [];
+    
+    // Вешаем слушатель для живого поиска без перезагрузок страницы
+    document.getElementById("delivery-search-input").addEventListener("input", function(e) {
+        window.renderDeliveryPricesList(e.target.value.trim());
+    });
+    
+    // Загружаем актуальные данные из Supabase
+    (async () => {
+        try {
+            let { data, error } = await supabaseClient
+                .from('delivery_prices')
+                .select('*')
+                .order('date', { ascending: false })
+                .limit(1);
+                
+            if (error) throw error;
+            
+            if (data && data.length > 0 && data[0].prices_data) {
+                window.currentDeliveryItemsRaw = data[0].prices_data;
+                window.renderDeliveryPricesList(""); // Первый рендер без фильтра
+            } else {
+                document.getElementById("delivery-prices-scroll-area").innerHTML = `<p style="text-align:center; color:gray; font-size:12px; padding:20px 0;">Данные прайса отсутствуют в базе</p>`;
+            }
+        } catch (err) {
+            console.error(err);
+            document.getElementById("delivery-prices-scroll-area").innerHTML = `<p style="text-align:center; color:gray; font-size:12px; padding:20px 0;">Ошибка соединения с базой</p>`;
+        }
+    })();
+};
+
+// Функция фильтрации и вывода карточек прайса
+window.renderDeliveryPricesList = function(searchQ) {
+    let scrollArea = document.getElementById("delivery-prices-scroll-area");
+    if (!scrollArea) return;
+    
+    let query = String(searchQ).toLowerCase();
+    let filtered = window.currentDeliveryItemsRaw;
+    
+    if (query) {
+        filtered = window.currentDeliveryItemsRaw.filter(item => 
+            String(item.region).toLowerCase().includes(query) || 
+            String(item.locality).toLowerCase().includes(query)
+        );
+    }
+    
+    if (filtered.length === 0) {
+        scrollArea.innerHTML = `<p style="text-align:center; color:gray; font-size:12px; padding:20px 0;">Ничего не найдено</p>`;
+        return;
+    }
+    
+    scrollArea.innerHTML = filtered.map(item => {
+        return `
+            <div style="background:var(--inner-bg, rgba(150,150,150,0.04)); border:1px solid var(--border-color); border-radius:10px; padding:10px 12px; display:flex; justify-content:space-between; align-items:center; gap:10px;">
+                <div style="display:flex; flex-direction:column; gap:2px; min-width:0; flex:1;">
+                    <span style="font-size:12px; font-weight:bold; color:var(--text-color); line-height:1.2; word-break:break-word;">${item.locality || "—"}</span>
+                    <span style="font-size:10px; color:gray; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">Район: ${item.region || "—"}</span>
+                </div>
+                <div style="display:flex; flex-direction:column; align-items:flex-end; gap:3px; flex-shrink:0;">
+                    <span style="background:rgba(39, 174, 96, 0.12); color:#27ae60; font-size:11px; font-weight:bold; padding:4px 8px; border-radius:6px; white-space:nowrap;">
+                        ${item.price}
+                    </span>
+                    <span style="font-size:9px; color:gray; text-align:right; max-width:120px; line-height:1.1; word-break:break-word;">
+                        ${item.days || "—"}
+                    </span>
+                </div>
+            </div>
+        `;
+    }).join("");
+};
+
+// ==========================================================
+// ИСПРАВЛЕНО: УПРАВЛЕНИЕ СЕЛЕКТОРОМ АКТИВНЫХ СОТРУДНИКОВ ДЛЯ ИСТОРИИ
+// ==========================================================
+window.currentAdminHistEmpIin = null;
+window.currentAdminHistEmpName = "Сотрудник";
+
+window.openAdminHistEmpModal = function(event) {
+    if(event) event.stopPropagation();
+    
+    let existingModal = document.getElementById("admin-hist-emp-modal-overlay");
+    if (existingModal) { existingModal.remove(); return; }
+    
+    let emps = window.adminEmployeesGlobal || [];
+    
+    // ИСПРАВЛЕНО: Убираем из списка всех, у кого в должности (role) есть слово "Промоутер"
+    let activeEmps = emps.filter(e => {
+        if (!e || !e.name || String(e.login_status).toUpperCase() === 'FALSE') return false;
+        let roleLow = String(e.role || "").toLowerCase();
+        if (roleLow.includes("промоутер")) return false;
+        return true;
+    });
+    
+    let modal = document.createElement("div");
+    modal.id = "admin-hist-emp-modal-overlay";
+    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.3); backdrop-filter:blur(2px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    
+    let rowsHtml = `
+        <div style="padding:10px 12px; font-size:12px; font-weight:bold; color:#e74c3c; cursor:pointer; border-bottom:1px solid var(--border-color); display:flex; align-items:center; gap:6px;" onclick="window.selectAdminHistEmp(null, 'Сотрудник')">
+            <span class="material-symbols-rounded" style="font-size:16px;">restart_alt</span>
+            <span>Сбросить фильтр (Все)</span>
+        </div>
+    `;
+    
+    if (activeEmps.length === 0) {
+        rowsHtml += `<div style="padding:16px; text-align:center; color:gray; font-size:12px;">Нет активных сотрудников</div>`;
+    } else {
+        activeEmps.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
+        
+        rowsHtml += activeEmps.map(u => {
+            let isSelected = window.currentAdminHistEmpIin === u.iin;
+            let checkMark = isSelected ? `<span class="material-symbols-rounded" style="color:#2ecc71; font-size:16px;">check</span>` : '';
+            
+            // ИСПРАВЛЕНО: Теперь в скобках выводится РОЛЬ пользователя (u.role) вместо отдела
+            let roleStr = u.role ? ` <span style="color:gray; font-size:10px;">(${u.role})</span>` : '';
+            
+            return `
+                <div style="padding:11px 12px; font-size:12px; color:var(--text-color); cursor:pointer; display:flex; justify-content:space-between; align-items:center; gap:8px; border-bottom:1px solid rgba(150,150,150,0.08); -webkit-tap-highlight-color:transparent;" onclick="window.selectAdminHistEmp('${u.iin}', '${u.name}')">
+                    <span style="font-weight:${isSelected ? 'bold' : 'normal'}; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1;">${u.name}${roleStr}</span>
+                    ${checkMark}
+                </div>
+            `;
+        }).join("");
+    }
+    
+    modal.innerHTML = `
+        <div class="card" style="width:100%; max-width:320px; background:var(--card-bg); padding:10px; border-radius:14px; box-shadow:0 6px 20px rgba(0,0,0,0.15); border:1px solid var(--border-color); display:flex; flex-direction:column; max-height:65vh;" onclick="event.stopPropagation();">
+            <h4 style="margin:4px 0 10px 6px; font-size:13px; color:var(--text-color); display:flex; align-items:center; gap:4px;">
+                <span class="material-symbols-rounded" style="font-size:16px; color:#2ecc71;">filter_alt</span> Выберите сотрудника
+            </h4>
+            <div style="flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+                ${rowsHtml}
+            </div>
+            <button class="btn-gray" onclick="document.getElementById('admin-hist-emp-modal-overlay').remove();" style="margin-top:8px; height:34px; font-size:12px; width:100%;">Закрыть</button>
+        </div>
+    `;
+    
+    modal.onclick = () => modal.remove();
+    document.body.appendChild(modal);
+};
+
+window.selectAdminHistEmp = function(iin, name) {
+    window.currentAdminHistEmpIin = iin;
+    window.currentAdminHistEmpName = name;
+    
+    let btn = document.getElementById("admin-hist-emp-filter-btn");
+    let txt = document.getElementById("admin-hist-emp-btn-text");
+    
+    if (txt) txt.innerText = name;
+    if (btn) {
+        if (iin) {
+            btn.style.background = "var(--btn-color)";
+            btn.style.color = "white";
+            btn.style.borderColor = "var(--btn-color)";
+        } else {
+            btn.style.background = "var(--card-bg)";
+            btn.style.borderColor = "var(--border-color)";
+            btn.style.color = "var(--text-color)";
+        }
+    }
+    
+    let overlay = document.getElementById("admin-hist-emp-modal-overlay");
+    if (overlay) overlay.remove();
+    
+    // Перезапуск отрисовки истории с новыми фильтрами
+    renderAdminHistory(currentHistFilter);
 };
