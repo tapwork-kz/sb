@@ -1,4 +1,4 @@
-const CACHE_NAME = 'motivation-app-v3'; // Подняли версию для принудительного обновления кэша на устройствах
+const CACHE_NAME = 'motivation-app-v4'; // Подняли версию для принудительного обновления кэша на устройствах
 const urlsToCache = [
   './',
   './index.html',
