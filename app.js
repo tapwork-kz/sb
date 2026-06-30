@@ -628,10 +628,14 @@ async function callBackend(actionName, payloadData = {}) {
                       ptPenPerErr = ptsCfg.rev; kpiPenPerErr = kpiCfg.rev; 
                   }
                   
-                  // ИСПРАВЛЕНО: Если это должность обычного Кассира, то автоматические штрафы по баллам на них не действуют
+                  // ИСПРАВЛЕНО: Если это должность обычного Кассира, то автоматические штрафы по баллам и урезание КФ. ЭФФ. за отчеты (кроме Отзывов) на них не действуют
                   let uRoleLow = String(u.role || "").toLowerCase();
                   if (uRoleLow.includes("кассир") && !uRoleLow.includes("старший кассир")) {
                       ptPenPerErr = 0;
+                      // Если имя отчета не содержит упоминание отзывов — обнуляем штрафной процент KPI
+                      if (!titleLow.includes("отзыв")) {
+                          kpiPenPerErr = 0;
+                      }
                   }
                   
                   let totalKpiPenalty = rep.errors * kpiPenPerErr;
@@ -2688,8 +2692,8 @@ window.toggleAdminPlusMenu = function() {
                 <span class="material-symbols-rounded" style="color:#e74c3c; font-size:18px;">gavel</span>
                 <span>Штрафы</span>
             </div>`;
-    } else if (isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik) {
-        // 2. Ветка Смежных служб (без доступа к админ-панели, но с переработками)
+    } else {
+        // 2. Ветка для всего персонала (Продавцы, Кассиры, Склад, Консультанты) — открываем подачу переработок
         menuHtml = `
             <div style="padding:10px 12px; font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer; display:flex; align-items:center; gap:8px; border-radius:0px; -webkit-tap-highlight-color:transparent;" onclick="window.openAdminOvertimeForm();">
                 <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
