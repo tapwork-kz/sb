@@ -289,10 +289,22 @@ async function callBackend(actionName, payloadData = {}) {
               else if ((currentStatus === "pending_admin_view" || currentStatus === "pending") && reqAction === "viewed") { newStatus = "viewed"; isHandled = true; responseMsg = "Просмотрено"; }
               else if ((currentStatus === "pending_admin" || currentStatus === "pending") && reqAction === "approve_admin") {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
-                  if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
-                  else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   
-                  // ИСПРАВЛЕНО: Добавлен перехват Кассовой метрики СТРОГО между Горячим чеком и Продажами СЦ
+                  // ИСПРАВЛЕНО: Вычисляем правильную дату транзакции. Если в мете есть дата от пользователя (DD.MM.YYYY), 
+                  // превращаем её в ISO строку для Supabase. Иначе сохраняем дату отправки самой заявки (req.created_at).
+                  let targetTransactionIsoDate = req.created_at;
+                  if (metaObj.date) {
+                      try {
+                          let dateParts = metaObj.date.split(' ')[0].split('.');
+                          if (dateParts.length === 3) {
+                              // Формируем ISO-дату на начало дня (с сохранением часового пояса или в формате UTC)
+                              targetTransactionIsoDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], 12, 0, 0).toISOString();
+                          }
+                      } catch(e) { console.error("Ошибка конвертации даты для user_details:", e); }
+                  }
+
+                  if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
+                  else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Кассовая метрика") {
                       let pts = parseFloat(metaObj.pts) || parseFloat(metaObj.pts_to_award) || 0;
                       let bonus = parseFloat(metaObj.bonus) || parseFloat(metaObj.kpi_to_award) || 0;
@@ -305,25 +317,22 @@ async function callBackend(actionName, payloadData = {}) {
                           action_text: req.details, 
                           points_motivation: pts, 
                           kpi_change: bonus, 
-                          manager_iin: appState.iin 
+                          manager_iin: appState.iin,
+                          created_at: targetTransactionIsoDate
                       }]);
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
                   }
-                  
                   else if (reqType === "Продажа СЦ/Дефект" || reqType === "Продажа Trade-In" || metaObj.type || reqType === metaObj.type) { 
                       let earnSourceType = (reqType === "Продажа Trade-In") ? "Trade-In" : (metaObj.type || reqType); 
-                      // Берем точные значения баллов и KPI из сформированной заявки (или БД)
                       let pts = parseFloat(metaObj.pts) || 0; 
                       let bonus = parseFloat(metaObj.bonus) || 0;
                       
-                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: bonus, manager_iin: appState.iin }]); 
+                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: bonus, manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); 
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
                       
                       if ((reqType === "Продажа СЦ/Дефект" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
                   }
-                  else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
-                  
-                  // ИСПРАВЛЕНО: Новый аккуратный формат текста для начислений вознаграждений в Telegram
+                  else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Вознаграждение") {
                       let targetIin = metaObj.target_iin || req.target_iin;
                       let pointsVal = parseFloat(String(metaObj.points || "0").replace('+', '')) || 0;
@@ -335,7 +344,8 @@ async function callBackend(actionName, payloadData = {}) {
                               type: 'Вознаграждение', 
                               action_text: reasonStr, 
                               points_motivation: pointsVal, 
-                              manager_iin: appState.iin 
+                              manager_iin: appState.iin,
+                              created_at: targetTransactionIsoDate
                           }]);
                           
                           // Запрашиваем ФИО сотрудника по его ИИН из базы данных
