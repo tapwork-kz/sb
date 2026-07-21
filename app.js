@@ -290,14 +290,21 @@ async function callBackend(actionName, payloadData = {}) {
               else if ((currentStatus === "pending_admin" || currentStatus === "pending") && reqAction === "approve_admin") {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
                   
-                  // ИСПРАВЛЕНО: Гарантированное извлечение даты, указанной пользователем при создании заявки
+                  // ИСПРАВЛЕНО: Принудительный парсинг пользовательской даты из метаданных заявки (metaObj.date / metaObj.startDate)
                   let targetTransactionIsoDate = req.created_at;
-                  let rawUserDate = metaObj.date || metaObj.display_date || null;
+                  let rawUserDate = metaObj.date || metaObj.display_date || metaObj.startDate || null;
                   if (rawUserDate) {
                       try {
-                          let dateParts = String(rawUserDate).split(' ')[0].split('.');
+                          let cleanD = String(rawUserDate).trim().split(' ')[0];
+                          let dateParts = cleanD.includes('.') ? cleanD.split('.') : (cleanD.includes('-') ? cleanD.split('-') : []);
                           if (dateParts.length === 3) {
-                              targetTransactionIsoDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], 12, 0, 0).toISOString();
+                              // Если дата в формате DD.MM.YYYY
+                              if (cleanD.includes('.')) {
+                                  targetTransactionIsoDate = new Date(parseInt(dateParts[2], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[0], 10), 12, 0, 0).toISOString();
+                              } else {
+                                  // Если дата в формате YYYY-MM-DD
+                                  targetTransactionIsoDate = new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10), 12, 0, 0).toISOString();
+                              }
                           }
                       } catch(e) { console.error("Ошибка конвертации даты:", e); }
                   }
@@ -715,7 +722,7 @@ async function callBackend(actionName, payloadData = {}) {
       } 
       else { localData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] }; }
 
-      // ИСПРАВЛЕНО: Убрано дублирующее слияние concat(), которое удваивало каждую запись о баллах
+      // ИСПРАВЛЕНО: Гарантируем отсутствие задвоений (все записи начислений формируются строго 1 раз в цикле allUserDetails)
       let myPtsHistory = []; 
       let myKpiChanges = 0;
       
@@ -751,12 +758,12 @@ async function callBackend(actionName, payloadData = {}) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
               }
 
-              // ИСПРАВЛЕНО: Безупречный поиск родительской заявки по ID, типам или точному совпадению деталей
+              // ИСПРАВЛЕНО: Умный поиск оригинальной даты из метаданных связанной заявки
               if (allReqs) {
                   let reqMatch = allReqs.find(r => {
                       if (!r) return false;
-                      let rMeta = {}; try { rMatchMeta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {}); } catch(e){}
-                      if (rMatchMeta.req_id && String(rMatchMeta.req_id) === String(ud.id)) return true;
+                      let rMeta = {}; try { rMeta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {}); } catch(e){}
+                      if (rMeta.req_id && String(rMeta.req_id) === String(ud.id)) return true;
                       
                       let isSameAuthor = String(r.author_iin || r.target_iin).trim() === String(ud.iin).trim();
                       if (!isSameAuthor) return false;
@@ -769,11 +776,12 @@ async function callBackend(actionName, payloadData = {}) {
                   if (reqMatch) {
                       try {
                           let m = typeof reqMatch.metadata === 'string' ? JSON.parse(reqMatch.metadata) : (reqMatch.metadata || {});
-                          if (m.date) {
-                              dateStr = m.date; 
+                          let userSelDate = m.date || m.display_date || m.startDate || null;
+                          if (userSelDate) {
+                              dateStr = userSelDate; 
                           } else if (reqMatch.created_at) {
                               let dReq = new Date(reqMatch.created_at);
-                              dateStr = ("0" + dReq.getDate()).slice(-2) + "." + ("0" + (dReq.getMonth() + 1)).slice(-2) + "." + dReq.getFullYear();
+                              dateStr = ("0" + dReq.getDate()).slice(-2) + "." + ("0" + (dReq.getMonth() + 1)).slice(-2) + "." + dReq.getFullYear() + " " + ("0" + dReq.getHours()).slice(-2) + ":" + ("0" + dReq.getMinutes()).slice(-2);
                           }
                       } catch(e) {}
                   }
