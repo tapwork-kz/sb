@@ -2016,6 +2016,13 @@ function openDetails(type) {
       listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
       let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date)); 
       
+      // ИСПРАВЛЕНО: Сортировка личного КФ. ЭФФ. от новых к старым (свежие сверху)
+      currentKpi.sort((a, b) => {
+          if (!a.date) return 1;
+          if (!b.date) return -1;
+          return parseCustomDate(b.date) - parseCustomDate(a.date);
+      });
+
       currentKpi.forEach(k => { 
           let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); 
           let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; 
@@ -2090,7 +2097,14 @@ function openEmpKpiDetails(iin, fromDetails = false) {
   const emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return; let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => { if (fromDetails) openEmpDetails(iin); else switchTab(prevTab); }; document.getElementById("details-title").innerText = "КФ. ЭФФ: " + emp.name; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
   let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
   
-  emp.kpiDetails.forEach(k => { 
+  // ИСПРАВЛЕНО: Сортировка записей КФ. ЭФФ. от новых к старым (свежие сверху)
+  let sortedKpiDetails = [...(emp.kpiDetails || [])].sort((a, b) => {
+      if (!a.date) return 1;
+      if (!b.date) return -1;
+      return parseCustomDate(b.date) - parseCustomDate(a.date);
+  });
+
+  sortedKpiDetails.forEach(k => { 
       let col = k.val > 0 ? 'detail-plus' : (k.val < 0 ? 'detail-minus' : 'detail-val'); 
       let valStr = k.val > 0 ? `+${k.val}%` : `${k.val}%`; 
       let srcColor = getSourceColor(k.source); 
