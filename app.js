@@ -289,31 +289,10 @@ async function callBackend(actionName, payloadData = {}) {
               else if ((currentStatus === "pending_admin_view" || currentStatus === "pending") && reqAction === "viewed") { newStatus = "viewed"; isHandled = true; responseMsg = "Просмотрено"; }
               else if ((currentStatus === "pending_admin" || currentStatus === "pending") && reqAction === "approve_admin") {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
+                  if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
+                  else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
                   
-                  // ИСПРАВЛЕНО: Принудительный парсинг пользовательской даты из метаданных заявки (metaObj.date / metaObj.startDate)
-                  let targetTransactionIsoDate = req.created_at;
-                  let rawUserDate = metaObj.date || metaObj.display_date || metaObj.startDate || null;
-                  if (rawUserDate) {
-                      try {
-                          let cleanD = String(rawUserDate).trim().split(' ')[0];
-                          let dateParts = cleanD.includes('.') ? cleanD.split('.') : (cleanD.includes('-') ? cleanD.split('-') : []);
-                          if (dateParts.length === 3) {
-                              // Если дата в формате DD.MM.YYYY
-                              if (cleanD.includes('.')) {
-                                  targetTransactionIsoDate = new Date(parseInt(dateParts[2], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[0], 10), 12, 0, 0).toISOString();
-                              } else {
-                                  // Если дата в формате YYYY-MM-DD
-                                  targetTransactionIsoDate = new Date(parseInt(dateParts[0], 10), parseInt(dateParts[1], 10) - 1, parseInt(dateParts[2], 10), 12, 0, 0).toISOString();
-                              }
-                          }
-                      } catch(e) { console.error("Ошибка конвертации даты:", e); }
-                  }
-
-                  // В метаданные транзакции явно записываем ID родительской заявки
-                  metaObj.req_id = req.id;
-
-                  if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
-                  else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                  // ИСПРАВЛЕНО: Добавлен перехват Кассовой метрики СТРОГО между Горячим чеком и Продажами СЦ
                   else if (reqType === "Кассовая метрика") {
                       let pts = parseFloat(metaObj.pts) || parseFloat(metaObj.pts_to_award) || 0;
                       let bonus = parseFloat(metaObj.bonus) || parseFloat(metaObj.kpi_to_award) || 0;
@@ -326,22 +305,25 @@ async function callBackend(actionName, payloadData = {}) {
                           action_text: req.details, 
                           points_motivation: pts, 
                           kpi_change: bonus, 
-                          manager_iin: appState.iin,
-                          created_at: targetTransactionIsoDate
+                          manager_iin: appState.iin 
                       }]);
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
                   }
+                  
                   else if (reqType === "Продажа СЦ/Дефект" || reqType === "Продажа Trade-In" || metaObj.type || reqType === metaObj.type) { 
                       let earnSourceType = (reqType === "Продажа Trade-In") ? "Trade-In" : (metaObj.type || reqType); 
+                      // Берем точные значения баллов и KPI из сформированной заявки (или БД)
                       let pts = parseFloat(metaObj.pts) || 0; 
                       let bonus = parseFloat(metaObj.bonus) || 0;
                       
-                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: bonus, manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); 
+                      await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: reqType, category: earnSourceType, action_text: req.details, points_motivation: pts, kpi_change: bonus, manager_iin: appState.iin }]); 
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; 
                       
                       if ((reqType === "Продажа СЦ/Дефект" || metaObj.type) && metaObj.row && metaObj.dept) { const todayStr = formatDateLocal(new Date()); const { data: scData } = await supabaseClient.from('store_sc_items').select('*').eq('date', todayStr).maybeSingle(); if (scData && scData.items_data) { let updatedItems = scData.items_data.filter(i => !(i.row === metaObj.row && i.dept === metaObj.dept && i.type === metaObj.type)); await supabaseClient.from('store_sc_items').update({ items_data: updatedItems }).eq('date', todayStr); } fetch(GAS_URL, { method: "POST", body: JSON.stringify({ action: "markScSold", payload: { row: metaObj.row, dept: metaObj.dept, type: metaObj.type } }) }).catch(()=>{}); }
                   }
-                  else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                  else if (reqType.includes("Баллы мотивации")) { let cost = -1; if (req.details.includes("30 мин")) cost = -0.5; else if (req.details.includes("1 час")) cost = -1; else if (req.details.includes("2 часа")) cost = -2; else if (req.details.includes("3 часа")) cost = -3; await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Использование", category: "Мотивация", action_text: req.details, points_motivation: cost, manager_iin: appState.iin }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
+                  
+                  // ИСПРАВЛЕНО: Новый аккуратный формат текста для начислений вознаграждений в Telegram
                   else if (reqType === "Вознаграждение") {
                       let targetIin = metaObj.target_iin || req.target_iin;
                       let pointsVal = parseFloat(String(metaObj.points || "0").replace('+', '')) || 0;
@@ -353,8 +335,7 @@ async function callBackend(actionName, payloadData = {}) {
                               type: 'Вознаграждение', 
                               action_text: reasonStr, 
                               points_motivation: pointsVal, 
-                              manager_iin: appState.iin,
-                              created_at: targetTransactionIsoDate
+                              manager_iin: appState.iin 
                           }]);
                           
                           // Запрашиваем ФИО сотрудника по его ИИН из базы данных
@@ -722,9 +703,8 @@ async function callBackend(actionName, payloadData = {}) {
       } 
       else { localData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] }; }
 
-      // ИСПРАВЛЕНО: Гарантируем отсутствие задвоений (все записи начислений формируются строго 1 раз в цикле allUserDetails)
-      let myPtsHistory = []; 
-      let myKpiChanges = 0;
+      let myPtsHistory = []; let myKpiChanges = 0;
+      if (myEmp) { myPtsHistory = myPtsHistory.concat(myEmp.ptsHistory); }
       
       // --- НОВОЕ: Очищаем старые начисления перед новым подсчетом (чтобы не двоились) ---
       if (localData.info && localData.info.kpiDetails) {
@@ -740,6 +720,9 @@ async function callBackend(actionName, payloadData = {}) {
           }
       }
       // ---------------------------------------------------------------------------------
+
+      // ИСПРАВЛЕНО: Создаем копию списка заявок для строгого сопоставления 1-к-1
+      let availableReqsForMatching = allReqs ? [...allReqs] : [];
 
       if (allUserDetails) {
           allUserDetails.forEach(ud => {
@@ -758,31 +741,15 @@ async function callBackend(actionName, payloadData = {}) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
               }
 
-              // ИСПРАВЛЕНО: Умный поиск оригинальной даты из метаданных связанной заявки
-              if (allReqs) {
-                  let reqMatch = allReqs.find(r => {
-                      if (!r) return false;
-                      let rMeta = {}; try { rMeta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {}); } catch(e){}
-                      if (rMeta.req_id && String(rMeta.req_id) === String(ud.id)) return true;
-                      
-                      let isSameAuthor = String(r.author_iin || r.target_iin).trim() === String(ud.iin).trim();
-                      if (!isSameAuthor) return false;
-                      
-                      let rDetails = String(r.details || "").trim();
-                      let actDetails = String(ud.action_text || "").trim();
-                      return rDetails === actDetails || (rDetails.length > 5 && actDetails.includes(rDetails));
-                  });
-
-                  if (reqMatch) {
+              // ИСПРАВЛЕНО: Строгий поиск с удалением найденной заявки из пула, чтобы исключить дубликаты и "съезжание" дат
+              if (availableReqsForMatching.length > 0) {
+                  let reqIdx = availableReqsForMatching.findIndex(r => r.author_iin === ud.iin && r.details && String(r.details).includes(cleanActionText));
+                  if (reqIdx !== -1) {
+                      let reqMatch = availableReqsForMatching[reqIdx];
+                      availableReqsForMatching.splice(reqIdx, 1); // Вырезаем из списка! Следующий дубль по тексту найдет уже старую заявку.
                       try {
                           let m = typeof reqMatch.metadata === 'string' ? JSON.parse(reqMatch.metadata) : (reqMatch.metadata || {});
-                          let userSelDate = m.date || m.display_date || m.startDate || null;
-                          if (userSelDate) {
-                              dateStr = userSelDate; 
-                          } else if (reqMatch.created_at) {
-                              let dReq = new Date(reqMatch.created_at);
-                              dateStr = ("0" + dReq.getDate()).slice(-2) + "." + ("0" + (dReq.getMonth() + 1)).slice(-2) + "." + dReq.getFullYear() + " " + ("0" + dReq.getHours()).slice(-2) + ":" + ("0" + dReq.getMinutes()).slice(-2);
-                          }
+                          if (m.date) dateStr = m.date; // Берем оригинальную дату, которую выбрал пользователь
                       } catch(e) {}
                   }
               }
