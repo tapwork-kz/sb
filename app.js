@@ -402,6 +402,12 @@ async function callBackend(actionName, payloadData = {}) {
       const { data: userData, error: userErr } = await supabaseClient.from('users').select('*').eq('iin', appState.iin).maybeSingle();
       if (userErr || !userData) return { authorized: false };
 
+      // ИСПРАВЛЕНО: Если у вошедшего сотрудника статус в БД изменился на False / false — принудительно разлогиниваем
+      let isBlocked = String(userData.login_status).toUpperCase() === 'FALSE' || userData.login_status === false;
+      if (isBlocked) {
+          return { authorized: false, error: "Учетная запись заблокирована" };
+      }
+
       // ИСПРАВЛЕНО: Автоматически вычисляем границы текущего месяца для живого подсчета дней табеля
       let dNow = new Date();
       let yNow = dNow.getFullYear();
@@ -2016,10 +2022,15 @@ function openDetails(type) {
       listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
       let currentKpi = myKpiDetails.filter(k => isCurrentMonth(k.date)); 
       
-      // ИСПРАВЛЕНО: Сортировка личного КФ. ЭФФ. от новых к старым (свежие сверху)
+      // ИСПРАВЛЕНО: Системная база и отчеты закреплены ВВЕРХУ, остальные бонусы — от новых к старым под ними
       currentKpi.sort((a, b) => {
-          if (!a.date) return 1;
-          if (!b.date) return -1;
+          let isBaseA = (!a.date || a.source === "База" || a.name === "Базовый KPI" || a.name === "Больничный" || a.name === "Прогул" || a.name === "Ошибки");
+          let isBaseB = (!b.date || b.source === "База" || b.name === "Базовый KPI" || b.name === "Больничный" || b.name === "Прогул" || b.name === "Ошибки");
+
+          if (isBaseA && !isBaseB) return -1;
+          if (!isBaseA && isBaseB) return 1;
+          if (isBaseA && isBaseB) return 0;
+
           return parseCustomDate(b.date) - parseCustomDate(a.date);
       });
 
@@ -2097,10 +2108,15 @@ function openEmpKpiDetails(iin, fromDetails = false) {
   const emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return; let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => { if (fromDetails) openEmpDetails(iin); else switchTab(prevTab); }; document.getElementById("details-title").innerText = "КФ. ЭФФ: " + emp.name; document.getElementById("details-kpi-circle-container").innerHTML = ""; 
   let listHtml = "<div class='card' style='padding:0; overflow:hidden;'>"; 
   
-  // ИСПРАВЛЕНО: Сортировка записей КФ. ЭФФ. от новых к старым (свежие сверху)
+  // ИСПРАВЛЕНО: Системная база и отчеты закреплены ВВЕРХУ, остальные бонусы — от новых к старым под ними
   let sortedKpiDetails = [...(emp.kpiDetails || [])].sort((a, b) => {
-      if (!a.date) return 1;
-      if (!b.date) return -1;
+      let isBaseA = (!a.date || a.source === "База" || a.name === "Базовый KPI" || a.name === "Больничный" || a.name === "Прогул" || a.name === "Ошибки");
+      let isBaseB = (!b.date || b.source === "База" || b.name === "Базовый KPI" || b.name === "Больничный" || b.name === "Прогул" || b.name === "Ошибки");
+
+      if (isBaseA && !isBaseB) return -1;
+      if (!isBaseA && isBaseB) return 1;
+      if (isBaseA && isBaseB) return 0;
+
       return parseCustomDate(b.date) - parseCustomDate(a.date);
   });
 
