@@ -290,18 +290,20 @@ async function callBackend(actionName, payloadData = {}) {
               else if ((currentStatus === "pending_admin" || currentStatus === "pending") && reqAction === "approve_admin") {
                   metaObj.approver = currentUser.full_name; metaObj.approverIin = appState.iin; newDetails = req.details; 
                   
-                  // ИСПРАВЛЕНО: Вычисляем правильную дату транзакции. Если в мете есть дата от пользователя (DD.MM.YYYY), 
-                  // превращаем её в ISO строку для Supabase. Иначе сохраняем дату отправки самой заявки (req.created_at).
+                  // ИСПРАВЛЕНО: Гарантированное извлечение даты, указанной пользователем при создании заявки
                   let targetTransactionIsoDate = req.created_at;
-                  if (metaObj.date) {
+                  let rawUserDate = metaObj.date || metaObj.display_date || null;
+                  if (rawUserDate) {
                       try {
-                          let dateParts = metaObj.date.split(' ')[0].split('.');
+                          let dateParts = String(rawUserDate).split(' ')[0].split('.');
                           if (dateParts.length === 3) {
-                              // Формируем ISO-дату на начало дня (с сохранением часового пояса или в формате UTC)
                               targetTransactionIsoDate = new Date(dateParts[2], dateParts[1] - 1, dateParts[0], 12, 0, 0).toISOString();
                           }
-                      } catch(e) { console.error("Ошибка конвертации даты для user_details:", e); }
+                      } catch(e) { console.error("Ошибка конвертации даты:", e); }
                   }
+
+                  // В метаданные транзакции явно записываем ID родительской заявки
+                  metaObj.req_id = req.id;
 
                   if (reqType === "Запрос на штраф") { await supabaseClient.from('user_details').insert([{ iin: req.target_iin, type: "Штраф", action_text: metaObj.reason || req.details, points_motivation: -(Math.abs(parseFloat(metaObj.amount) || 0)), fine_money: -(Math.abs(parseFloat(metaObj.moneyAmount) || 0)), manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); await supabaseClient.from('requests').insert([{ author_iin: req.author_iin, type: "Уведомление о штрафе", details: metaObj.reason || req.details, target_iin: req.target_iin, status: "notify_user_fine", metadata: metaObj }]); newStatus = "approved_notify_zav"; isHandled = true; responseMsg = "Одобрено"; }
                   else if (reqType === "Горячий чек") { await supabaseClient.from('user_details').insert([{ iin: req.author_iin, type: "Горячий чек", action_text: req.details, points_motivation: parseFloat(metaObj.pts) || 0, kpi_change: parseFloat(metaObj.bonus) || 0, manager_iin: appState.iin, created_at: targetTransactionIsoDate }]); newStatus = "approved"; isHandled = true; responseMsg = "Одобрено"; }
@@ -713,8 +715,9 @@ async function callBackend(actionName, payloadData = {}) {
       } 
       else { localData.info = { tabel: myEmp.rawTabel, reports: myEmp.reports, kpiValue: myEmp.kpi, kpiDetails: myEmp.kpiDetails, baseKpi: kpiCfg.base, reportErrors: myEmp.reportErrors, directPenaltyPoints: myEmp.directPenaltyPoints, remarks: [], myPtsHistory: [] }; }
 
-      let myPtsHistory = []; let myKpiChanges = 0;
-      if (myEmp) { myPtsHistory = myPtsHistory.concat(myEmp.ptsHistory); }
+      // ИСПРАВЛЕНО: Убрано дублирующее слияние concat(), которое удваивало каждую запись о баллах
+      let myPtsHistory = []; 
+      let myKpiChanges = 0;
       
       // --- НОВОЕ: Очищаем старые начисления перед новым подсчетом (чтобы не двоились) ---
       if (localData.info && localData.info.kpiDetails) {
@@ -748,13 +751,30 @@ async function callBackend(actionName, payloadData = {}) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
               }
 
-              // Ищем исходную заявку, чтобы вытащить пользовательскую дату
+              // ИСПРАВЛЕНО: Безупречный поиск родительской заявки по ID, типам или точному совпадению деталей
               if (allReqs) {
-                  let reqMatch = allReqs.find(r => r.author_iin === ud.iin && r.details && String(r.details).includes(cleanActionText));
+                  let reqMatch = allReqs.find(r => {
+                      if (!r) return false;
+                      let rMeta = {}; try { rMatchMeta = typeof r.metadata === 'string' ? JSON.parse(r.metadata) : (r.metadata || {}); } catch(e){}
+                      if (rMatchMeta.req_id && String(rMatchMeta.req_id) === String(ud.id)) return true;
+                      
+                      let isSameAuthor = String(r.author_iin || r.target_iin).trim() === String(ud.iin).trim();
+                      if (!isSameAuthor) return false;
+                      
+                      let rDetails = String(r.details || "").trim();
+                      let actDetails = String(ud.action_text || "").trim();
+                      return rDetails === actDetails || (rDetails.length > 5 && actDetails.includes(rDetails));
+                  });
+
                   if (reqMatch) {
                       try {
                           let m = typeof reqMatch.metadata === 'string' ? JSON.parse(reqMatch.metadata) : (reqMatch.metadata || {});
-                          if (m.date) dateStr = m.date; // Заменяем дату на ту, что была выбрана при продаже
+                          if (m.date) {
+                              dateStr = m.date; 
+                          } else if (reqMatch.created_at) {
+                              let dReq = new Date(reqMatch.created_at);
+                              dateStr = ("0" + dReq.getDate()).slice(-2) + "." + ("0" + (dReq.getMonth() + 1)).slice(-2) + "." + dReq.getFullYear();
+                          }
                       } catch(e) {}
                   }
               }
