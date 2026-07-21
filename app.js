@@ -726,7 +726,10 @@ async function callBackend(actionName, payloadData = {}) {
 
       if (allUserDetails) {
           allUserDetails.forEach(ud => {
-              let d = new Date(ud.created_at); let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+              // Базовая дата - дата одобрения администратором (на случай если исходная заявка удалена)
+              let d = new Date(ud.created_at); 
+              let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+              
               let ptsMotivation = parseFloat(ud.points_motivation) || 0; let kpiChange = parseFloat(ud.kpi_change) || 0; let managerName = ud.manager_iin ? (userMap[ud.manager_iin]?.full_name || ud.manager_iin) : "";
               
               // Ретроактивно чиним прошлые записи Trade-In (если в БД они лежат с 0%)
@@ -741,15 +744,21 @@ async function callBackend(actionName, payloadData = {}) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
               }
 
-              // ИСПРАВЛЕНО: Строгий поиск с удалением найденной заявки из пула, чтобы исключить дубликаты и "съезжание" дат
+              // ИСПРАВЛЕНО: Строгий поиск 1-к-1 и извлечение правильной даты ПОДАЧИ заявки
               if (availableReqsForMatching.length > 0) {
                   let reqIdx = availableReqsForMatching.findIndex(r => r.author_iin === ud.iin && r.details && String(r.details).includes(cleanActionText));
                   if (reqIdx !== -1) {
                       let reqMatch = availableReqsForMatching[reqIdx];
-                      availableReqsForMatching.splice(reqIdx, 1); // Вырезаем из списка! Следующий дубль по тексту найдет уже старую заявку.
+                      availableReqsForMatching.splice(reqIdx, 1); // Вырезаем из списка, чтобы не было дублей
+                      
+                      // 1. По умолчанию берем дату СОЗДАНИЯ заявки (когда сотрудник реально нажал "Отправить")
+                      let rD = new Date(reqMatch.created_at);
+                      dateStr = ("0" + rD.getDate()).slice(-2) + "." + ("0" + (rD.getMonth() + 1)).slice(-2) + "." + rD.getFullYear() + " " + ("0" + rD.getHours()).slice(-2) + ":" + ("0" + rD.getMinutes()).slice(-2);
+                      
+                      // 2. Если в метаданных есть жестко выбранная дата из календаря (m.date), она в приоритете
                       try {
                           let m = typeof reqMatch.metadata === 'string' ? JSON.parse(reqMatch.metadata) : (reqMatch.metadata || {});
-                          if (m.date) dateStr = m.date; // Берем оригинальную дату, которую выбрал пользователь
+                          if (m.date) dateStr = m.date; 
                       } catch(e) {}
                   }
               }
