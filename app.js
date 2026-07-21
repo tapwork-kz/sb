@@ -768,17 +768,18 @@ async function callBackend(actionName, payloadData = {}) {
                       if(firstWord && firstWord !== "Горячий" && cleanActionText.includes(firstWord + ' ')) { histItem.source = firstWord; }
                       histItem.val = "+" + ptsMotivation; 
                   }
-                  // ИСПРАВЛЕНО: Запись заносится строго один раз в объект сотрудника empMap
-              if (empMap[ud.iin]) { 
-                  empMap[ud.iin].ptsHistory.push(histItem); 
-                  if (histItem.type === "Начисление") { 
-                      empMap[ud.iin].pts.acc += ptsMotivation; 
-                      if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; 
-                      else if (histItem.source !== "Вознаграждение" && ud.type !== "Кассовая метрика") empMap[ud.iin].sales.sc++; 
-                  } 
-                  if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); 
-                  if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); 
-              }
+                  if (ud.iin === appState.iin) { myPtsHistory.push(histItem); }
+                  if (empMap[ud.iin]) { 
+                      empMap[ud.iin].ptsHistory.push(histItem); 
+                      if (histItem.type === "Начисление") { 
+                          empMap[ud.iin].pts.acc += ptsMotivation; 
+                          // ИСПРАВЛЕНО: Кассовые показатели прибавляют баллы, но не накручивают счетчики продаж СЦ/Дефектов сотрудника
+                          if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; 
+                          else if (histItem.source !== "Вознаграждение" && ud.type !== "Кассовая метрика") empMap[ud.iin].sales.sc++; 
+                      } 
+                      if (histItem.type === "Использование") empMap[ud.iin].pts.use += Math.abs(ptsMotivation); 
+                      if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); 
+                  }
               }
               if (kpiChange !== 0) {
                   let kName = cleanActionText || ud.type; let kSource = dynamicType;
@@ -3745,31 +3746,7 @@ function submitVacation() {
 }
 function submitHotCheck(typeText, valText, ptsText) { let promptMsg = `Вы подтверждаете продажу: ${typeText}?`; let dStr = (()=>{let d=new Date(); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let metaStr = JSON.stringify({ date: dStr, bonus: valText, pts: ptsText }); if (typeof tg !== 'undefined' && tg && tg.showPopup) { try { tg.showPopup({ title: 'Горячий чек', message: promptMsg, buttons: [{id: 'yes', type: 'ok', text: 'Да'}, {type: 'cancel', text: 'Отмена'}] }, function(btnId) { if (btnId === 'yes') executeSubmit("Горячий чек", typeText, null, metaStr); }); } catch(e) { if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); } } else { if (confirm(promptMsg)) executeSubmit("Горячий чек", typeText, null, metaStr); } }
 
-async function processReq(id, action, replyText = "") { 
-    // Защита от повторного нажатия на ту же заявку
-    if (processedReqIds.has(String(id))) return;
-    processedReqIds.add(String(id)); 
-    
-    vibrate(50); 
-    showToast("Обработка...", false, 9999); 
-    
-    let el = document.getElementById("req-" + id); 
-    if (el) { 
-        el.style.pointerEvents = 'none';
-        el.style.opacity = '0.4';
-        el.style.display = 'none'; 
-    } 
-    
-    let res = await callBackend('processRequest', { token: appState.token, reqId: id, reqAction: action, replyText: replyText }); 
-    if(res.success) { 
-        showToast(res.msg); 
-        loadDashboard(true); 
-    } else { 
-        processedReqIds.delete(String(id)); // В случае ошибки разрешаем повторить
-        showToast(res.error, true); 
-        loadDashboard(true); 
-    } 
-}
+async function processReq(id, action, replyText = "") { vibrate(50); showToast("Обработка...", false, 9999); processedReqIds.add(String(id)); let el = document.getElementById("req-" + id); if (el) { el.style.display = 'none'; } let res = await callBackend('processRequest', { token: appState.token, reqId: id, reqAction: action, replyText: replyText }); if(res.success) { showToast(res.msg); loadDashboard(true); } else { showToast(res.error, true); loadDashboard(true); } }
 document.addEventListener('keydown', function(e) { if (e.key === 'Enter' && document.activeElement && document.activeElement.tagName === 'INPUT') { document.activeElement.blur(); } });
 
 function openAdminPlanScDetails() {
