@@ -739,26 +739,41 @@ async function callBackend(actionName, payloadData = {}) {
               }
 
               let dynamicType = ud.category || ud.type;
-              let cleanActionText = ud.action_text || "";
+              let origActionText = ud.action_text || "";
+              let cleanActionText = origActionText;
+              
               if (dynamicType && cleanActionText.startsWith(dynamicType + " ")) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
               }
 
-              // ИСПРАВЛЕНО: Строгий поиск 1-к-1 и извлечение правильной даты ПОДАЧИ заявки
-              if (availableReqsForMatching.length > 0) {
-                  let reqIdx = availableReqsForMatching.findIndex(r => r.author_iin === ud.iin && r.details && String(r.details).includes(cleanActionText));
+              // ИСПРАВЛЕНО: Строгий поиск 1-к-1 и защита от пустых совпадений
+              if (availableReqsForMatching.length > 0 && origActionText) {
+                  let reqIdx = availableReqsForMatching.findIndex(r => {
+                      if (r.author_iin !== ud.iin) return false;
+                      let rDetails = String(r.details || "");
+                      return rDetails === origActionText || rDetails.includes(cleanActionText);
+                  });
+                  
                   if (reqIdx !== -1) {
                       let reqMatch = availableReqsForMatching[reqIdx];
                       availableReqsForMatching.splice(reqIdx, 1); // Вырезаем из списка, чтобы не было дублей
                       
-                      // 1. По умолчанию берем дату СОЗДАНИЯ заявки (когда сотрудник реально нажал "Отправить")
+                      // Берем точное время СОЗДАНИЯ заявки сотрудником
                       let rD = new Date(reqMatch.created_at);
-                      dateStr = ("0" + rD.getDate()).slice(-2) + "." + ("0" + (rD.getMonth() + 1)).slice(-2) + "." + rD.getFullYear() + " " + ("0" + rD.getHours()).slice(-2) + ":" + ("0" + rD.getMinutes()).slice(-2);
+                      let timePart = ("0" + rD.getHours()).slice(-2) + ":" + ("0" + rD.getMinutes()).slice(-2);
                       
-                      // 2. Если в метаданных есть жестко выбранная дата из календаря (m.date), она в приоритете
+                      dateStr = ("0" + rD.getDate()).slice(-2) + "." + ("0" + (rD.getMonth() + 1)).slice(-2) + "." + rD.getFullYear() + " " + timePart;
+                      
+                      // Если в метаданных есть выбранная дата, используем её, но ДОБАВЛЯЕМ время отправки, чтобы записи не слипались
                       try {
                           let m = typeof reqMatch.metadata === 'string' ? JSON.parse(reqMatch.metadata) : (reqMatch.metadata || {});
-                          if (m.date) dateStr = m.date; 
+                          if (m.date) {
+                              if (m.date.includes(":")) {
+                                  dateStr = m.date; // Если время уже есть
+                              } else {
+                                  dateStr = m.date + " " + timePart; // Добавляем время к пустой дате
+                              }
+                          }
                       } catch(e) {}
                   }
               }
