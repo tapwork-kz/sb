@@ -524,11 +524,16 @@ async function callBackend(actionName, payloadData = {}) {
                           if (urlMatch) link = urlMatch[0];
                       }
                       if (count !== null && allReqs) {
-                          let approvedCount = allReqs.filter(req => 
-                              (req.status === 'approved' || req.status === 'approved_notify_zav') && 
-                              String(req.details).trim() === cleanName &&
-                              (req.type === activeAdminPromoList.prefix || (req.metadata && req.metadata.type === activeAdminPromoList.prefix) || (req.meta && req.meta.includes(`"type":"${activeAdminPromoList.prefix}"`)))
-                          ).length;
+                          // ИСПРАВЛЕНО: Учитываем только подлинно одобренные заявки (status === approved / approved_notify_zav / система)
+                          let approvedCount = allReqs.filter(req => {
+                              let st = String(req.status || "").toLowerCase();
+                              let isApproved = st === 'approved' || st === 'approved_notify_zav' || st === 'система';
+                              if (!isApproved) return false;
+
+                              let isSameDetails = String(req.details).trim() === cleanName;
+                              let isSameType = (req.type === activeAdminPromoList.prefix || (req.metadata && req.metadata.type === activeAdminPromoList.prefix) || (req.meta && String(req.meta).includes(`"type":"${activeAdminPromoList.prefix}"`)));
+                              return isSameDetails && isSameType;
+                          }).length;
                           count = Math.max(0, count - approvedCount);
                       }
                       if (count !== null && count <= 0) return; 
@@ -746,33 +751,36 @@ async function callBackend(actionName, payloadData = {}) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
               }
 
-              // ИСПРАВЛЕНО: Строгий поиск 1-к-1 и защита от пустых совпадений
+              // ИСПРАВЛЕНО: Приоритетно берем дату из самой проводимой транзакции user_details, 
+              // а при поиске родительской заявки ВЫПИЛИВАЕМ ВСЕ ОТКЛОНЕННЫЕ (rejected)
               if (availableReqsForMatching.length > 0 && origActionText) {
                   let reqIdx = availableReqsForMatching.findIndex(r => {
-                      if (r.author_iin !== ud.iin) return false;
-                      let rDetails = String(r.details || "");
-                      return rDetails === origActionText || rDetails.includes(cleanActionText);
+                      if (!r) return false;
+                      let stLow = String(r.status || "").toLowerCase();
+                      // Пропускаем отклоненные полностью
+                      if (stLow.includes("rejected")) return false;
+                      
+                      let isAuthor = String(r.author_iin || r.target_iin).trim() === String(ud.iin).trim();
+                      if (!isAuthor) return false;
+                      
+                      let rDetails = String(r.details || "").trim();
+                      return rDetails === origActionText || (cleanActionText && rDetails.includes(cleanActionText));
                   });
                   
                   if (reqIdx !== -1) {
                       let reqMatch = availableReqsForMatching[reqIdx];
-                      availableReqsForMatching.splice(reqIdx, 1); // Вырезаем из списка, чтобы не было дублей
+                      availableReqsForMatching.splice(reqIdx, 1); // Исключаем повторное связывание
                       
-                      // Берем точное время СОЗДАНИЯ заявки сотрудником
                       let rD = new Date(reqMatch.created_at);
                       let timePart = ("0" + rD.getHours()).slice(-2) + ":" + ("0" + rD.getMinutes()).slice(-2);
                       
-                      dateStr = ("0" + rD.getDate()).slice(-2) + "." + ("0" + (rD.getMonth() + 1)).slice(-2) + "." + rD.getFullYear() + " " + timePart;
-                      
-                      // Если в метаданных есть выбранная дата, используем её, но ДОБАВЛЯЕМ время отправки, чтобы записи не слипались
                       try {
                           let m = typeof reqMatch.metadata === 'string' ? JSON.parse(reqMatch.metadata) : (reqMatch.metadata || {});
-                          if (m.date) {
-                              if (m.date.includes(":")) {
-                                  dateStr = m.date; // Если время уже есть
-                              } else {
-                                  dateStr = m.date + " " + timePart; // Добавляем время к пустой дате
-                              }
+                          let userSelDate = m.date || m.display_date || m.startDate || null;
+                          if (userSelDate) {
+                              dateStr = userSelDate.includes(":") ? userSelDate : userSelDate + " " + timePart;
+                          } else {
+                              dateStr = ("0" + rD.getDate()).slice(-2) + "." + ("0" + (rD.getMonth() + 1)).slice(-2) + "." + rD.getFullYear() + " " + timePart;
                           }
                       } catch(e) {}
                   }
@@ -787,12 +795,11 @@ async function callBackend(actionName, payloadData = {}) {
                       if(firstWord && firstWord !== "Горячий" && cleanActionText.includes(firstWord + ' ')) { histItem.source = firstWord; }
                       histItem.val = "+" + ptsMotivation; 
                   }
-                  if (ud.iin === appState.iin) { myPtsHistory.push(histItem); }
+                  // ИСПРАВЛЕНО: Пушим ровно ОДИН раз в объект сотрудника в empMap (без параллельного myPtsHistory.push, который создавал дубль)
                   if (empMap[ud.iin]) { 
                       empMap[ud.iin].ptsHistory.push(histItem); 
                       if (histItem.type === "Начисление") { 
                           empMap[ud.iin].pts.acc += ptsMotivation; 
-                          // ИСПРАВЛЕНО: Кассовые показатели прибавляют баллы, но не накручивают счетчики продаж СЦ/Дефектов сотрудника
                           if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; 
                           else if (histItem.source !== "Вознаграждение" && ud.type !== "Кассовая метрика") empMap[ud.iin].sales.sc++; 
                       } 
