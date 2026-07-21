@@ -726,8 +726,13 @@ async function callBackend(actionName, payloadData = {}) {
 
       if (allUserDetails) {
           allUserDetails.forEach(ud => {
-              let d = new Date(ud.created_at); let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
-              let ptsMotivation = parseFloat(ud.points_motivation) || 0; let kpiChange = parseFloat(ud.kpi_change) || 0; let managerName = ud.manager_iin ? (userMap[ud.manager_iin]?.full_name || ud.manager_iin) : "";
+              let d = new Date(ud.created_at); 
+              let dateStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear() + " " + ("0" + d.getHours()).slice(-2) + ":" + ("0" + d.getMinutes()).slice(-2);
+              let ptsMotivation = parseFloat(ud.points_motivation) || 0; 
+              let kpiChange = parseFloat(ud.kpi_change) || 0; 
+              
+              // ИСПРАВЛЕНО: Строго берем ФИО менеджера ТОЛЬКО из manager_iin таблицы user_details
+              let managerName = ud.manager_iin ? (userMap[ud.manager_iin]?.full_name || ud.manager_iin) : "";
               
               // Ретроактивно чиним прошлые записи Trade-In (если в БД они лежат с 0%)
               if (ud.type === "Продажа Trade-In") {
@@ -741,34 +746,46 @@ async function callBackend(actionName, payloadData = {}) {
                   cleanActionText = cleanActionText.substring(dynamicType.length + 1).trim();
               }
 
-              // ИСПРАВЛЕНО: Строгий поиск с удалением найденной заявки из пула, чтобы исключить дубликаты и "съезжание" дат
-              if (availableReqsForMatching.length > 0) {
+              // Ищем исходную заявку только ради оригинальной даты (чтобы дата в списке была правильной)
+              if (availableReqsForMatching && availableReqsForMatching.length > 0) {
                   let reqIdx = availableReqsForMatching.findIndex(r => r.author_iin === ud.iin && r.details && String(r.details).includes(cleanActionText));
                   if (reqIdx !== -1) {
                       let reqMatch = availableReqsForMatching[reqIdx];
-                      availableReqsForMatching.splice(reqIdx, 1); // Вырезаем из списка! Следующий дубль по тексту найдет уже старую заявку.
+                      availableReqsForMatching.splice(reqIdx, 1);
                       try {
                           let m = typeof reqMatch.metadata === 'string' ? JSON.parse(reqMatch.metadata) : (reqMatch.metadata || {});
-                          if (m.date) dateStr = m.date; // Берем оригинальную дату, которую выбрал пользователь
+                          if (m.date) dateStr = m.date; 
                       } catch(e) {}
                   }
               }
 
               if (ptsMotivation !== 0 || ud.type === "Штраф") {
+                  // ИСПРАВЛЕНО: Присваиваем managerName в поле approver для всех записей!
                   let histItem = { date: dateStr, type: ud.type, source: dynamicType, reason: cleanActionText, val: ptsMotivation > 0 ? "+" + ptsMotivation : ptsMotivation, approver: managerName, moneyFine: ud.fine_money || 0, kpiChange: kpiChange };
-                  // ИСПРАВЛЕНО: Явно указали тип "Кассовая метрика" для зачисления баллов в активный баланс кассира
-                  if (ud.type === "Штраф") { histItem.type = "Штраф"; histItem.source = managerName; } else if (ud.type === "Продажа СЦ/Дефект" || ud.type === "Продажа Trade-In" || ud.type === "Кассовая метрика" || ud.type === dynamicType) { histItem.type = "Начисление"; histItem.source = dynamicType; histItem.val = "+" + ptsMotivation; } else if (ud.type === "Использование") { histItem.type = "Использование"; histItem.source = "Мотивация"; } else if (ud.type === "Горячий чек") { 
-                      histItem.type = "Начисление"; histItem.source = "Горячий чек"; 
+                  
+                  if (ud.type === "Штраф") { 
+                      histItem.type = "Штраф"; 
+                      histItem.source = "Штраф"; 
+                  } else if (ud.type === "Продажа СЦ/Дефект" || ud.type === "Продажа Trade-In" || ud.type === "Кассовая метрика" || ud.type === dynamicType) { 
+                      histItem.type = "Начисление"; 
+                      histItem.source = dynamicType; 
+                      histItem.val = "+" + ptsMotivation; 
+                  } else if (ud.type === "Использование") { 
+                      histItem.type = "Использование"; 
+                      histItem.source = "Мотивация"; 
+                  } else if (ud.type === "Горячий чек") { 
+                      histItem.type = "Начисление"; 
+                      histItem.source = "Горячий чек"; 
                       let firstWord = String(cleanActionText).split(' ')[0];
                       if(firstWord && firstWord !== "Горячий" && cleanActionText.includes(firstWord + ' ')) { histItem.source = firstWord; }
                       histItem.val = "+" + ptsMotivation; 
                   }
+                  
                   if (ud.iin === appState.iin) { myPtsHistory.push(histItem); }
                   if (empMap[ud.iin]) { 
                       empMap[ud.iin].ptsHistory.push(histItem); 
                       if (histItem.type === "Начисление") { 
                           empMap[ud.iin].pts.acc += ptsMotivation; 
-                          // ИСПРАВЛЕНО: Кассовые показатели прибавляют баллы, но не накручивают счетчики продаж СЦ/Дефектов сотрудника
                           if (histItem.source === "Trade-In") empMap[ud.iin].sales.trade++; 
                           else if (histItem.source !== "Вознаграждение" && ud.type !== "Кассовая метрика") empMap[ud.iin].sales.sc++; 
                       } 
@@ -776,15 +793,16 @@ async function callBackend(actionName, payloadData = {}) {
                       if (histItem.type === "Штраф") empMap[ud.iin].pts.fin += Math.abs(ptsMotivation); 
                   }
               }
+              
               if (kpiChange !== 0) {
-                  let kName = cleanActionText || ud.type; let kSource = dynamicType;
-                  let kpiItem = { name: kName, source: kSource, val: kpiChange, date: dateStr };
-                  // НОВОЕ: Прибавляем +KPI только если дата заявки относится к текущему месяцу
-                  if (isCurrentMonth(dateStr)) {
-                      if (ud.iin === appState.iin) { if (!localData.info.kpiDetails) localData.info.kpiDetails = []; localData.info.kpiDetails.push(kpiItem); myKpiChanges += kpiChange; }
-                      if (empMap[ud.iin]) { empMap[ud.iin].kpi += kpiChange; if (ud.iin !== appState.iin) empMap[ud.iin].kpiDetails.push(kpiItem); }
-                  }
-              }
+                  let kName = cleanActionText || ud.type; let kSource = dynamicType;
+                  // ИСПРАВЛЕНО: Менеджер передается и для KPI
+                  let kpiItem = { name: kName, source: kSource, val: kpiChange, date: dateStr, approver: managerName };
+                  if (isCurrentMonth(dateStr)) {
+                      if (ud.iin === appState.iin) { if (!localData.info.kpiDetails) localData.info.kpiDetails = []; localData.info.kpiDetails.push(kpiItem); myKpiChanges += kpiChange; }
+                      if (empMap[ud.iin]) { empMap[ud.iin].kpi += kpiChange; if (ud.iin !== appState.iin) empMap[ud.iin].kpiDetails.push(kpiItem); }
+                  }
+              }
           });
       }
 
@@ -1846,8 +1864,8 @@ function generateHorizontalGrid(dataObj, isCashier = false) {
 }
 
 function renderHistoryItem(i, isCompact = false) { 
-    let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); 
-    let rawNum = parseFloat(String(i.val).replace(',', '.').replace('+', '')) || 0; let valStr = String(rawNum).replace('.', ',');
+    let rawNum = parseFloat(String(i.val).replace(',', '.').replace('+', '')) || 0; 
+    let valStr = String(rawNum).replace('.', ',');
     let isPenalty = String(i.type).toLowerCase().includes('штраф') || String(i.type).toLowerCase().includes('списание');
     
     if (rawNum > 0 && !isPenalty) { valStr = '+' + valStr; } 
@@ -1862,38 +1880,41 @@ function renderHistoryItem(i, isCompact = false) {
     
     if (String(i.type).toLowerCase().includes('использ')) { 
         finalColor = "#f39c12"; finalType = "Мотивация"; 
-    } else if (String(i.type).toLowerCase() === 'штраф' && i.source === i.approver) {
+    } else if (String(i.type).toLowerCase() === 'штраф') {
         finalColor = "#e74c3c"; finalType = "Штраф"; 
     } else if (String(i.type).toLowerCase() === "kpi" && i.source === "Горячий чек") { 
         finalColor = "#27ae60"; finalType = "Горячий чек"; col = "detail-plus"; i.approver = ""; 
     }
     
-    let rightText = isDirOrZav ? formatShortName(String(i.type).toLowerCase() === 'штраф' ? i.source : i.approver) : "";
+    // ИСПРАВЛЕНО: Выводим реального менеджера из БД (i.approver) для всех
+    let rightText = i.approver ? formatShortName(i.approver) : "";
     
-    // Если это списание из отчетов или системы, выводим "Система"
-        if (i.type === "Списание" || i.approver === "Система" || i.approver === "Отчет") {
-            rightText = "Система";
-        }
-        
-        let bColor = rawNum > 0 ? "#27ae60" : (isPenalty ? "#e74c3c" : "#f39c12");
-        
-        // ИСПРАВЛЕНО: Генерация иконок для системных типов и Вознаграждения в истории баллов
-        let iconHtml = "";
-        let sType = String(finalType || "").toLowerCase();
-        let sReason = String(i.reason || "").toLowerCase();
-        let sSrc = String(i.source || "").toLowerCase();
-        
-        if (sType.includes("ценник") || sReason.includes("ценник")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">sell</span>`;
-        else if (sType.includes("ревизи") || sReason.includes("ревизи")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">fact_check</span>`;
-        else if (sType.includes("уборк") || sReason.includes("уборк")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">cleaning_services</span>`;
-        else if (sType.includes("отзыв") || sReason.includes("отзыв")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">rate_review</span>`;
-        else if (sType.includes("табель") || sReason.includes("отсутствие отчета")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">calendar_today</span>`;
-        else if (sType.includes("вознагражд") || sSrc.includes("вознагражд")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">stars</span>`;
-        
-        finalType = iconHtml + finalType;
-
-        return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, borderColor: bColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
+    // Если это списание из отчетов или системы
+    if (i.type === "Списание" || i.approver === "Система" || i.approver === "Отчет") {
+        rightText = "Система";
+    } else if (!rightText && !String(i.type).toLowerCase().includes('использ')) {
+        // Если вдруг manager_iin пуст (старые записи), пишем Система
+        rightText = "Система";
     }
+    
+    let bColor = rawNum > 0 ? "#27ae60" : (isPenalty ? "#e74c3c" : "#f39c12");
+    
+    let iconHtml = "";
+    let sType = String(finalType || "").toLowerCase();
+    let sReason = String(i.reason || "").toLowerCase();
+    let sSrc = String(i.source || "").toLowerCase();
+    
+    if (sType.includes("ценник") || sReason.includes("ценник")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">sell</span>`;
+    else if (sType.includes("ревизи") || sReason.includes("ревизи")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">fact_check</span>`;
+    else if (sType.includes("уборк") || sReason.includes("уборк")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">cleaning_services</span>`;
+    else if (sType.includes("отзыв") || sReason.includes("отзыв")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">rate_review</span>`;
+    else if (sType.includes("табель") || sReason.includes("отсутствие отчета")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">calendar_today</span>`;
+    else if (sType.includes("вознагражд") || sSrc.includes("вознагражд")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">stars</span>`;
+    
+    finalType = iconHtml + finalType;
+
+    return buildStandardRow({ title: i.reason, typeText: finalType, typeColor: finalColor, borderColor: bColor, dateText: i.date, nameText: rightText, valText: valStr, valClass: col, hasBorder: isCompact });
+}
 
 function renderMoneyFineItem(i) { let roleStr = String(appState.role).toLowerCase(); let isDirOrZav = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер") || roleStr.includes("заведующий складом"); let moneyVal = parseFloat(String(i.moneyFine).replace(',', '.')) || 0; let ptsVal = parseFloat(String(i.val).replace(',', '.')) || 0; let badgeHtml = ""; if (moneyVal !== 0) badgeHtml += `<span class="detail-fine" style="margin-left:10px; white-space:nowrap;">${formatNumberWithSpaces(String(moneyVal).replace('.',','))} ₸</span>`; if (ptsVal !== 0) badgeHtml += `<span class="detail-fine" style="margin-left:10px; white-space:nowrap;">${String(ptsVal).replace('.',',')} б.</span>`; if (badgeHtml === "") badgeHtml = `<span class="detail-fine" style="margin-left:10px;">0</span>`; let issuerHtml = (i.source && isDirOrZav) ? `<span style="color:gray; font-size:10px; font-weight:normal;">${formatShortName(i.source)}</span>` : ''; return `<div class="req-item" style="border-left-color: #e74c3c; border-left-width: 2px; padding: 10px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center;"><div style="flex:1;"><b style="font-size:12px; color:#e74c3c; display:inline-block; margin-bottom:3px;">Штраф</b><br><span style="color:var(--text-color); font-size:12px; display:inline-block; margin-bottom:3px;">${i.reason}</span><br><div style="display:flex; justify-content:space-between; align-items:center;"><div><span style="color:gray;font-size:10px;">${i.date}</span></div>${issuerHtml}</div></div><div style="display:flex; flex-direction:column; gap:4px; align-items:flex-end;">${badgeHtml}</div></div>`; }
 
@@ -1993,23 +2014,22 @@ function openDetails(type) {
           if (k.source === "База" || k.name === "Ошибки") dispName = k.name; 
           if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } 
           
-          // ИСПРАВЛЕНО: Генерация иконок для системных типов в КФ. ЭФФ. текущего пользователя
           let iconHtml = "";
           let sSrc = String(k.source || "").toLowerCase();
           let sName = String(k.name || "").toLowerCase();
-          
           if (sSrc.includes("ценник") || sName.includes("ценник")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">sell</span>`;
           else if (sSrc.includes("ревизи") || sName.includes("ревизи")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">fact_check</span>`;
           else if (sSrc.includes("уборк") || sName.includes("уборк")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">cleaning_services</span>`;
           else if (sSrc.includes("отзыв") || sName.includes("отзыв")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">rate_review</span>`;
           else if (sSrc.includes("табель") || sName.includes("больничн") || sName.includes("прогул")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">calendar_today</span>`;
-          
           let displaySource = iconHtml + k.source;
 
-          listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: displaySource, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); 
-      }); 
-      listHtml += "</div>"; 
-  }
+          // ИСПРАВЛЕНО: Выводим approver (ФИО менеджера) в nameText
+          let rightText = k.approver ? formatShortName(k.approver) : "";
+          if (dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул") rightText = "Система";
+
+          listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: displaySource, typeColor: srcColor, dateText: k.date || "За месяц", nameText: rightText, valText: valStr, valClass: col, hasBorder: false }); 
+      });
   else if (type === 'report') { 
           // ИСПРАВЛЕНО: Заменили innerText на innerHTML и добавили системную иконку отчетов
           document.getElementById("details-title").innerHTML = `<span class="material-symbols-rounded" style="font-size:18px; vertical-align:middle; margin-right:6px; color:#3390ec;">assignment</span>Мои отчеты`; 
@@ -2067,23 +2087,22 @@ function openEmpKpiDetails(iin, fromDetails = false) {
       if (k.source === "База" || k.name === "Ошибки") dispName = k.name; 
       if (k.name === "Больничный" || k.name === "Прогул") { dispName = k.name; srcColor = "#7f8c8d"; } 
       
-      // ИСПРАВЛЕНО: Генерация иконок для системных типов в КФ. ЭФФ. при просмотре сотрудника админом
       let iconHtml = "";
       let sSrc = String(k.source || "").toLowerCase();
       let sName = String(k.name || "").toLowerCase();
-      
       if (sSrc.includes("ценник") || sName.includes("ценник")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">sell</span>`;
       else if (sSrc.includes("ревизи") || sName.includes("ревизи")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">fact_check</span>`;
       else if (sSrc.includes("уборк") || sName.includes("уборк")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">cleaning_services</span>`;
       else if (sSrc.includes("отзыв") || sName.includes("отзыв")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">rate_review</span>`;
       else if (sSrc.includes("табель") || sName.includes("больничн") || sName.includes("прогул")) iconHtml = `<span class="material-symbols-rounded" style="font-size:11px; vertical-align:middle; margin-right:3px; line-height:1;">calendar_today</span>`;
-      
       let displaySource = iconHtml + k.source;
 
-      listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: displaySource, typeColor: srcColor, dateText: k.date || "За месяц", valText: valStr, valClass: col, hasBorder: false }); 
-  }); 
-  listHtml += "</div>"; document.getElementById("details-list").innerHTML = listHtml; 
-}
+      // ИСПРАВЛЕНО: Выводим approver (ФИО менеджера) в nameText
+      let rightText = k.approver ? formatShortName(k.approver) : "";
+      if (dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул") rightText = "Система";
+
+      listHtml += buildStandardRow({ title: dispName, isBoldTitle: (dispName === "Базовый KPI" || dispName === "База" || dispName === "Ошибки" || dispName === "Больничный" || dispName === "Прогул"), typeText: displaySource, typeColor: srcColor, dateText: k.date || "За месяц", nameText: rightText, valText: valStr, valClass: col, hasBorder: false }); 
+  });
 
 function openEmpDetails(iin) {
   const emp = allEmployeesData.find(e => safeIin(e.iin) === safeIin(iin)); if(!emp) return; let prevTab = lastActiveTab; switchTab('details'); document.getElementById("btn-details-back").onclick = () => switchTab(prevTab); 
