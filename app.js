@@ -393,9 +393,24 @@ async function callBackend(actionName, payloadData = {}) {
     }
 
     if (actionName === "submitRequest") {
-      const { type, details, targetIin, metadata } = payloadData; let metaObj = {}; try { metaObj = metadata ? JSON.parse(metadata) : {}; } catch(e) {}
-      const { error } = await supabaseClient.from('requests').insert([{ author_iin: appState.iin, type: type, details: details, target_iin: targetIin, status: "pending", metadata: metaObj }]);
-      if (error) return { success: false, error: error.message }; return { success: true };
+      const { type, details, targetIin, authorIin, metadata } = payloadData; 
+      let metaObj = {}; 
+      try { metaObj = metadata ? JSON.parse(metadata) : {}; } catch(e) {}
+      
+      // ИСПРАВЛЕНО: Использование переданного authorIin (выбранного сотрудника) вместо принудительного appState.iin
+      let realAuthorIin = authorIin || appState.iin;
+      
+      const { error } = await supabaseClient.from('requests').insert([{ 
+          author_iin: realAuthorIin, 
+          type: type, 
+          details: details, 
+          target_iin: targetIin || realAuthorIin, 
+          status: "pending", 
+          metadata: metaObj 
+      }]);
+      
+      if (error) return { success: false, error: error.message }; 
+      return { success: true };
     }
 
     if (actionName === "getDashboardData") {
@@ -3846,7 +3861,28 @@ function renderScItems() {
 
 function openScDoc() { if (selectedScItem && selectedScItem.docUrl) { if (tg && tg.openLink) tg.openLink(selectedScItem.docUrl); else window.open(selectedScItem.docUrl, '_blank'); } }
 function showToast(msg, isError = false, duration = 3000) { const t = document.getElementById("toast"); t.innerText = msg; t.style.background = isError ? "#e74c3c" : "#34495e"; t.classList.add("show"); if (duration !== 9999) setTimeout(() => t.classList.remove("show"), duration); }
-async function executeSubmit(type, details, targetIin = null, meta = "", customMsg = null) { vibrate(50); showToast("Отправка...", false, 9999); let res = await callBackend('submitRequest', { token: appState.token, type: type, details: details, targetIin: targetIin, metadata: meta }); if(res.success) { showToast(customMsg || "Запрос успешно отправлен!"); closeForm(); loadDashboard(true); } else showToast("Ошибка: " + res.error, true); }
+async function executeSubmit(type, details, targetIin = null, meta = "", customMsg = null) { 
+    vibrate(50); 
+    showToast("Отправка...", false, 9999); 
+    
+    // ИСПРАВЛЕНО: Если передан targetIin, он также отправляется как authorIin для корректной привязки к сотруднику
+    let res = await callBackend('submitRequest', { 
+        token: appState.token, 
+        type: type, 
+        details: details, 
+        targetIin: targetIin, 
+        authorIin: targetIin || appState.iin, 
+        metadata: meta 
+    }); 
+    
+    if(res.success) { 
+        showToast(customMsg || "Запрос успешно отправлен!"); 
+        closeForm(); 
+        loadDashboard(true); 
+    } else { 
+        showToast("Ошибка: " + res.error, true); 
+    } 
+}
 
 function submitScForm() { if(!selectedScItem) return showToast("Выберите товар из списка", true); let scDateVal = document.getElementById("sc-date").dataset.realdate; let dStr = scDateVal; if(dStr==="Сегодня") { dStr = formatDateLocal(new Date()); } else { let d = new Date(dStr); dStr = ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear(); } selectedScItem.date = dStr; selectedScItem.bonus = window.scKpiBonus; selectedScItem.pts = window.scPtsBonus; executeSubmit("Продажа СЦ/Дефект", selectedScItem.name, null, JSON.stringify(selectedScItem)); }
 function submitTradeIn() { if(!selectedTradeInModel) return showToast("Выберите модель!", true); const dateVal = document.getElementById("ft-date").dataset.realdate; let dStr = dateVal==="Сегодня" ? formatDateLocal(new Date()) : (()=>{let d=new Date(dateVal); return ("0" + d.getDate()).slice(-2) + "." + ("0" + (d.getMonth() + 1)).slice(-2) + "." + d.getFullYear();})(); let meta = JSON.stringify({ date: dStr, text: selectedTradeInModel, bonus: window.tradeInKpiBonus, pts: window.tradeInPtsBonus }); executeSubmit("Продажа Trade-In", selectedTradeInModel, null, meta); }
