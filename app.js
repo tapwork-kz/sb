@@ -389,10 +389,10 @@ async function callBackend(actionName, payloadData = {}) {
 
                       if (isBsVacation) {
                           if (isSingleDay) {
-                              tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📜 в ${singleDateStr}.`;
+                              tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📝 в ${singleDateStr}.`;
                           } else {
                               let periodStr = String(req.details || "").replace(/^С /, "с ");
-                              tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📜 в период ${periodStr}.`;
+                              tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📝 в период ${periodStr}.`;
                           }
                       } else {
                           if (isSingleDay) {
