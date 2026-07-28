@@ -346,7 +346,7 @@ async function callBackend(actionName, payloadData = {}) {
                           } catch(e){}
                           
                           let pointsStr = metaObj.points || ("+" + pointsVal);
-                          let tgMessage = `${empName} *вознагражден* ${pointsStr} 🏅 мотивационными баллами за ${reasonStr}`;
+                          let tgMessage = `*${empName}* вознагражден *${pointsStr} 🏅 мотивационными баллами* за ${reasonStr}`;
                           
                           fetch(GAS_URL, { 
                               method: "POST", 
@@ -356,17 +356,25 @@ async function callBackend(actionName, payloadData = {}) {
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
                   }
                   
-                  // ИСПРАВЛЕНО: Выделенная ветка и новый аккуратный формат текста для трудовых отпусков
-                  else if (reqType === "Трудовой отпуск" || reqType === "Отпуск") {
+                  // ИСПРАВЛЕНО: Поддержка как Трудового, так и Отпуска Без Содержания (БС)
+                  else if (reqType === "Трудовой отпуск" || reqType === "Отпуск" || reqType === "Отпуск без содержания" || reqType === "БС") {
                       let empName = req.author_iin;
                       try {
                           let { data: uData } = await supabaseClient.from('users').select('full_name').eq('iin', req.author_iin).maybeSingle();
                           if (uData && uData.full_name) empName = uData.full_name;
                       } catch(e){}
                       
-                      // Меняем заглавную "С" на строчную для бесшовного слияния предложения
                       let periodStr = String(req.details || "").replace(/^С /, "с ");
-                      let tgMessage = `${empName} будет находиться на *трудовом отпуске*🌴 в период ${periodStr}.`;
+                      
+                      // Проверяем статус БС (по типу запроса или метаданным)
+                      let isBsVacation = (reqType === "Отпуск без содержания" || reqType === "БС" || metaObj.is_bs === true);
+                      
+                      let tgMessage = "";
+                      if (isBsVacation) {
+                          tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📜 в период ${periodStr}.`;
+                      } else {
+                          tgMessage = `*${empName}* будет находиться на *трудовом отпуске*🌴 в период ${periodStr}.`;
+                      }
                       
                       fetch(GAS_URL, { 
                           method: "POST", 
@@ -865,7 +873,7 @@ async function callBackend(actionName, payloadData = {}) {
               // Возвращаем dateStr (которое содержит точное время) в свойство date для отображения в углу
               let reqObj = { id: r.id, date: dateStr, authorIin: r.author_iin, authorName: author.full_name || r.author_iin, authorRole: author.role || "Продавец", authorDept: author.dept || "", adminDisplayName: author.dept ? `${author.full_name} — ${author.dept}` : author.full_name, type: r.type, details: r.details, targetIin: r.target_iin, targetName: target.full_name || "", status: r.status === 'pending' ? 'pending_admin' : r.status, meta: r.metadata ? JSON.stringify(r.metadata) : "{}" };
               let isDismissedByMe = false; try { if (metaObj.dismissedBy && metaObj.dismissedBy.includes(appState.iin)) isDismissedByMe = true; } catch(e) {}
-              if (reqObj.type === "Трудовой отпуск" && !["rejected", "rejected_by_user", "rejected_notify_user", "rejected_notify_zav"].includes(reqObj.status)) { globalVacations.push(reqObj); }
+              if ((reqObj.type === "Трудовой отпуск" || reqObj.type === "Отпуск без содержания" || reqObj.type === "Отпуск") && !["rejected", "rejected_by_user", "rejected_notify_user", "rejected_notify_zav"].includes(reqObj.status)) { globalVacations.push(reqObj); }
               if (r.type === "Замечание" && (r.status === "approved" || r.status === "pending_user_reply" || r.status === "pending_admin_view_remark")) { if (empMap[r.target_iin]) empMap[r.target_iin].remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr }); if (r.target_iin === appState.iin) { if (!localData.info.remarks) localData.info.remarks = []; localData.info.remarks.push({ details: r.details, authorName: author.full_name, authorRole: author.role, date: dateStr }); } }
               if (isDir) { if (reqObj.status === "pending_admin" || reqObj.status === "pending_admin_view") adminInbox.push(reqObj); if (reqObj.status === "pending_admin_view_remark" && !isDismissedByMe) adminInbox.push(reqObj); if (reqObj.type === "Замечание" && reqObj.status === "pending_user_reply" && reqObj.authorIin !== appState.iin && !isDismissedByMe) adminInbox.push(reqObj); if (["approved", "rejected", "viewed", "rejected_by_user", "rejected_notify_user", "approved_notify_zav", "rejected_notify_zav"].includes(reqObj.status) || isDismissedByMe) { if (adminHistory.length < 200) adminHistory.push(reqObj); } }
               if (isZavSklad) { if ((reqObj.status === "rejected_notify_zav" || reqObj.status === "approved_notify_zav") && reqObj.authorIin === appState.iin) userInbox.push(reqObj); else if (reqObj.status === "pending_user" && reqObj.targetIin === appState.iin) userInbox.push(reqObj); else if (reqObj.status === "rejected_notify_user" && reqObj.authorIin === appState.iin) userInbox.push(reqObj); else if (reqObj.status === "pending_user_reply" && reqObj.targetIin === appState.iin) userInbox.push(reqObj); else if (reqObj.type === "Замечание" && (reqObj.status === "pending_user_reply" || reqObj.status === "pending_admin_view_remark") && reqObj.targetIin !== appState.iin && reqObj.authorIin !== appState.iin && !isDismissedByMe) userInbox.push(reqObj); else if (reqObj.status === "notify_user_fine" && reqObj.targetIin === appState.iin && !isDismissedByMe) userInbox.push(reqObj); if (["approved", "rejected", "viewed", "rejected_by_user", "rejected_notify_user", "approved_notify_zav", "rejected_notify_zav", "viewed_fine"].includes(reqObj.status) || isDismissedByMe) { if (adminHistory.length < 200) adminHistory.push(reqObj); } }
@@ -3169,7 +3177,6 @@ window.onFineSummaryMonthPickerChange = function(value) {
     window.renderAdminFinesSummaryData();
 };
 
-// ИСПРАВЛЕНО: Возвращена отрисовка модального окна заявки в отпуск для интерфейса руководителя
 window.openAdminVacationForm = function() {
     let existingModal = document.getElementById("admin-vacation-modal-overlay");
     if (existingModal) existingModal.remove();
@@ -3177,14 +3184,10 @@ window.openAdminVacationForm = function() {
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
     let activeEmps = emps.filter(e => {
         if (!e || !e.name) return false;
-        // 1. Исключаем заблокированных (оставляем строго статус TRUE/true)
         let isStatusTrue = String(e.login_status).toUpperCase() === 'TRUE' || e.login_status === true;
         if (!isStatusTrue) return false;
-        
-        // 2. Исключаем Промоутеров
         let rLow = String(e.role || "").toLowerCase();
         if (rLow.includes("промоутер")) return false;
-        
         return true;
     });
     activeEmps.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
@@ -3209,7 +3212,7 @@ window.openAdminVacationForm = function() {
                 </select>
             </div>
 
-            <div style="display:flex; gap:8px; margin-bottom:12px;">
+            <div style="display:flex; gap:8px; margin-bottom:10px;">
               <div style="flex:1;">
                  <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Начало:</div>
                  <input type="date" id="adm-vac-start" style="width:100%; height:36px; line-height:34px; padding:0; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-family:inherit; text-align:center; -webkit-appearance:none; appearance:none;">
@@ -3219,6 +3222,12 @@ window.openAdminVacationForm = function() {
                  <input type="date" id="adm-vac-end" style="width:100%; height:36px; line-height:34px; padding:0; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-family:inherit; text-align:center; -webkit-appearance:none; appearance:none;">
               </div>
             </div>
+
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:14px; padding:4px 0; cursor:pointer;" onclick="let cb = document.getElementById('adm-vac-is-bs'); cb.checked = !cb.checked;">
+                <input type="checkbox" id="adm-vac-is-bs" style="width:18px; height:18px; cursor:pointer; accent-color:#f39c12;" onclick="event.stopPropagation();">
+                <label for="adm-vac-is-bs" style="font-size:13px; font-weight:bold; color:var(--text-color); cursor:pointer;">Без содержания (БС)</label>
+            </div>
+
             <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px;">
                 <button class="btn-gray" onclick="document.getElementById('admin-vacation-modal-overlay').remove();" style="margin:0; padding:10px; font-size:13px; height:38px;">Отмена</button>
                 <button class="btn-green" onclick="window.submitAdminVacation();" style="margin:0; padding:10px; font-size:13px; height:38px;">Отправить</button>
@@ -3234,19 +3243,21 @@ window.submitAdminVacation = function() {
     let targetIin = document.getElementById("adm-vac-emp") ? document.getElementById("adm-vac-emp").value : appState.iin;
     let start = document.getElementById("adm-vac-start").value; 
     let end = document.getElementById("adm-vac-end").value; 
+    let isBs = document.getElementById("adm-vac-is-bs") ? document.getElementById("adm-vac-is-bs").checked : false;
     
     if (!start || !end) return showToast("Выберите даты начала и конца отпуска!", true); 
     if (new Date(start) > new Date(end)) return showToast("Дата конца не может быть раньше начала!", true); 
     
     let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
     let details = `С ${formatD(start)} по ${formatD(end)}`; 
-    let meta = JSON.stringify({ startDate: start, endDate: end, target_iin: targetIin, date: `${formatD(start)} - ${formatD(end)}` }); 
+    
+    let requestType = isBs ? "Отпуск без содержания" : "Трудовой отпуск";
+    let meta = JSON.stringify({ startDate: start, endDate: end, target_iin: targetIin, is_bs: isBs, date: `${formatD(start)} - ${formatD(end)}` }); 
     
     let modal = document.getElementById("admin-vacation-modal-overlay");
     if (modal) modal.remove();
     
-    // ИСПРАВЛЕНО: Передаем targetIin, чтобы заявка привязывалась к выбранному сотруднику
-    executeSubmit("Трудовой отпуск", details, targetIin, meta, "Заявка на отпуск отправлена!"); 
+    executeSubmit(requestType, details, targetIin, meta, "Заявка на отпуск отправлена!"); 
 };
 
 // ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с ФИО сначала и отделами в скобках (исключены заблокированные FALSE)
@@ -3533,12 +3544,18 @@ function renderAdminOuts() {
 function submitVacation() { 
     let start = document.getElementById("vac-start").value; 
     let end = document.getElementById("vac-end").value; 
+    let isBs = document.getElementById("vac-is-bs") ? document.getElementById("vac-is-bs").checked : false;
+    
     if (!start || !end) return showToast("Выберите даты начала и конца отпуска!", true); 
     if (new Date(start) > new Date(end)) return showToast("Дата конца не может быть раньше начала!", true); 
+    
     let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
     let details = `С ${formatD(start)} по ${formatD(end)}`; 
-    let meta = JSON.stringify({ startDate: start, endDate: end }); 
-    executeSubmit("Трудовой отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
+    
+    let requestType = isBs ? "Отпуск без содержания" : "Трудовой отпуск";
+    let meta = JSON.stringify({ startDate: start, endDate: end, is_bs: isBs }); 
+    
+    executeSubmit(requestType, details, null, meta, "Заявка на отпуск отправлена!"); 
 }
 
 function renderAdminEmps(dept, btnElement) {
