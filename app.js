@@ -356,7 +356,7 @@ async function callBackend(actionName, payloadData = {}) {
                       newStatus = "approved"; isHandled = true; responseMsg = "Одобрено";
                   }
                   
-                  // ИСПРАВЛЕНО: Поддержка как Трудового, так и Отпуска Без Содержания (БС)
+                  // ИСПРАВЛЕНО: Поддержка однодневных и периодов для Трудового и Отпуска Без Содержания (БС)
                   else if (reqType === "Трудовой отпуск" || reqType === "Отпуск" || reqType === "Отпуск без содержания" || reqType === "БС") {
                       let empName = req.author_iin;
                       try {
@@ -364,16 +364,43 @@ async function callBackend(actionName, payloadData = {}) {
                           if (uData && uData.full_name) empName = uData.full_name;
                       } catch(e){}
                       
-                      let periodStr = String(req.details || "").replace(/^С /, "с ");
-                      
-                      // Проверяем статус БС (по типу запроса или метаданным)
                       let isBsVacation = (reqType === "Отпуск без содержания" || reqType === "БС" || metaObj.is_bs === true);
-                      
                       let tgMessage = "";
-                      if (isBsVacation) {
-                          tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📜 в период ${periodStr}.`;
+
+                      // Проверяем совпадение дат (если отпуск берется строго на 1 день)
+                      let isSingleDay = false;
+                      let singleDateStr = "";
+                      
+                      if (metaObj.startDate && metaObj.endDate) {
+                          let startD = metaObj.startDate.includes('-') ? metaObj.startDate.split('-').reverse().join('.') : metaObj.startDate;
+                          let endD = metaObj.endDate.includes('-') ? metaObj.endDate.split('-').reverse().join('.') : metaObj.endDate;
+                          if (startD === endD) {
+                              isSingleDay = true;
+                              singleDateStr = startD;
+                          }
                       } else {
-                          tgMessage = `*${empName}* будет находиться на *трудовом отпуске*🌴 в период ${periodStr}.`;
+                          // Резервная проверка, если даты лежат текстом внутри req.details
+                          let matchDates = String(req.details || "").match(/(\d{2}\.\d{2}\.\d{4})/g);
+                          if (matchDates && matchDates.length >= 2 && matchDates[0] === matchDates[1]) {
+                              isSingleDay = true;
+                              singleDateStr = matchDates[0];
+                          }
+                      }
+
+                      if (isBsVacation) {
+                          if (isSingleDay) {
+                              tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📜 в ${singleDateStr}.`;
+                          } else {
+                              let periodStr = String(req.details || "").replace(/^С /, "с ");
+                              tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📜 в период ${periodStr}.`;
+                          }
+                      } else {
+                          if (isSingleDay) {
+                              tgMessage = `*${empName}* будет находиться на *трудовом отпуске*🌴 в ${singleDateStr}.`;
+                          } else {
+                              let periodStr = String(req.details || "").replace(/^С /, "с ");
+                              tgMessage = `*${empName}* будет находиться на *трудовом отпуске*🌴 в период ${periodStr}.`;
+                          }
                       }
                       
                       fetch(GAS_URL, { 
