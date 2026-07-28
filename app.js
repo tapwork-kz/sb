@@ -2794,6 +2794,27 @@ window.openAdminOvertimeForm = function() {
     let existingModal = document.getElementById("admin-overtime-modal-overlay");
     if (existingModal) existingModal.remove();
     
+    let roleStr = String(appState.role || "").toLowerCase();
+    let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
+
+    let empSelectBlockHtml = "";
+    if (isDir) {
+        let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
+        let activeEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+        activeEmps.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
+
+        let empOptionsHtml = `<option value="${appState.iin}">На себя (${appState.firstName || 'Я'})</option>` + 
+            activeEmps.map(e => `<option value="${e.iin}">${e.name} ${e.dept ? '(' + e.dept + ')' : ''}</option>`).join('');
+
+        empSelectBlockHtml = `
+            <div style="margin-bottom:10px; width:100%; box-sizing:border-box;">
+                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Сотрудник</label>
+                <select id="ov-emp-target" style="width:100%; height:34px; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-size:12px; padding:0 8px;">
+                    ${empOptionsHtml}
+                </select>
+            </div>`;
+    }
+
     let modal = document.createElement("div");
     modal.id = "admin-overtime-modal-overlay";
     modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
@@ -2803,6 +2824,7 @@ window.openAdminOvertimeForm = function() {
               <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
               Заявка на переработку
             </h3>
+            ${empSelectBlockHtml}
             
             <div style="display:flex; background:var(--bg-color); padding:2px; border-radius:8px; margin-bottom:14px; border:1px solid var(--border-color); box-sizing:border-box; width:100%;">
                 <button id="tab-ov-hours" style="flex:1; border:none; padding:7px; font-size:12px; font-weight:bold; border-radius:6px; cursor:pointer; background:var(--card-bg); color:var(--text-color); box-shadow:0 1px 3px rgba(0,0,0,0.1); -webkit-tap-highlight-color:transparent;" onclick="window.switchOvertimeTab('hours')">По часам</button>
@@ -2888,7 +2910,8 @@ window.submitAdminOvertimeForm = async function() {
     
     if (!typeInput || !commentInput) return;
     
-    let targetIin = appState.iin; // ИСПРАВЛЕНО: Принудительно берется ИИН текущего пользователя
+    let empSelectEl = document.getElementById("ov-emp-target");
+    let targetIin = empSelectEl ? empSelectEl.value : appState.iin; // ИСПРАВЛЕНО: Берем выбранный ИИН
     let type = typeInput.value;
     let comment = commentInput.value.trim();
     
@@ -3125,6 +3148,13 @@ window.openAdminVacationForm = function() {
     let existingModal = document.getElementById("admin-vacation-modal-overlay");
     if (existingModal) existingModal.remove();
     
+    let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
+    let activeEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+    activeEmps.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
+
+    let empOptionsHtml = `<option value="${appState.iin}">На себя (${appState.firstName || 'Я'})</option>` + 
+        activeEmps.map(e => `<option value="${e.iin}">${e.name} ${e.dept ? '(' + e.dept + ')' : ''}</option>`).join('');
+
     let modal = document.createElement("div");
     modal.id = "admin-vacation-modal-overlay";
     modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
@@ -3134,6 +3164,14 @@ window.openAdminVacationForm = function() {
               <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
               Заявка в отпуск
             </h3>
+
+            <div style="margin-bottom:10px;">
+                <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Сотрудник:</div>
+                <select id="adm-vac-emp" style="width:100%; height:38px; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-size:13px; padding:0 8px;">
+                    ${empOptionsHtml}
+                </select>
+            </div>
+
             <div style="display:flex; gap:8px; margin-bottom:12px;">
               <div style="flex:1;">
                  <div style="font-size:11px; color:gray; margin-bottom:4px; text-align:left;">Начало:</div>
@@ -3156,20 +3194,23 @@ window.openAdminVacationForm = function() {
 
 // ИСПРАВЛЕНО: Возвращена валидация и отправка данных отпуска из окна администратора
 window.submitAdminVacation = function() {
+    let targetIin = document.getElementById("adm-vac-emp") ? document.getElementById("adm-vac-emp").value : appState.iin;
     let start = document.getElementById("adm-vac-start").value; 
     let end = document.getElementById("adm-vac-end").value; 
+    
     if (!start || !end) return showToast("Выберите даты начала и конца отпуска!", true); 
     if (new Date(start) > new Date(end)) return showToast("Дата конца не может быть раньше начала!", true); 
+    
     let formatD = (dStr) => { let p = dStr.split('-'); return `${p[2]}.${p[1]}.${p[0]}`; }; 
     let details = `С ${formatD(start)} по ${formatD(end)}`; 
-    let meta = JSON.stringify({ startDate: start, endDate: end }); 
+    let meta = JSON.stringify({ startDate: start, endDate: end, target_iin: targetIin, date: `${formatD(start)} - ${formatD(end)}` }); 
     
     let modal = document.getElementById("admin-vacation-modal-overlay");
-            if (modal) modal.remove();
-            
-            // ИСПРАВЛЕНО: Исправлен тип запроса на отправку "Трудовой отпуск"
-            executeSubmit("Трудовой отпуск", details, null, meta, "Заявка на отпуск отправлена!"); 
-        };
+    if (modal) modal.remove();
+    
+    // ИСПРАВЛЕНО: Передаем targetIin, чтобы заявка привязывалась к выбранному сотруднику
+    executeSubmit("Трудовой отпуск", details, targetIin, meta, "Заявка на отпуск отправлена!"); 
+};
 
 // ИСПРАВЛЕНО: Окно создания начислений мотивационных баллов с ФИО сначала и отделами в скобках (исключены заблокированные FALSE)
 window.openAdminPointsForm = function() {
