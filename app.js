@@ -389,10 +389,10 @@ async function callBackend(actionName, payloadData = {}) {
 
                       if (isBsVacation) {
                           if (isSingleDay) {
-                              tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📝 в ${singleDateStr}.`;
+                              tgMessage = `*${empName}* будет находиться на *безсодержательном отпуске*📝 ${singleDateStr}.`;
                           } else {
                               let periodStr = String(req.details || "").replace(/^С /, "с ");
-                              tgMessage = `*${empName}* будет находиться на *без содержательном отпуске*📝 в период ${periodStr}.`;
+                              tgMessage = `*${empName}* будет находиться на *безсодержательном отпуске*📝 в период ${periodStr}.`;
                           }
                       } else {
                           if (isSingleDay) {
@@ -1866,6 +1866,10 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
               let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12"; 
               let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
               
+              let metaObj = {}; try { metaObj = typeof v.meta === 'string' ? JSON.parse(v.meta) : (v.meta || {}); } catch(e){}
+              let isBs = v.type === "Отпуск без содержания" || v.type === "БС" || metaObj.is_bs === true;
+              let bsBadgeHtml = isBs ? `<span style="font-size:10px; font-weight:bold; color:#f39c12; background:rgba(243, 156, 18, 0.15); border:1px solid rgba(243, 156, 18, 0.3); padding:4px 6px; border-radius:6px; margin-right:4px;">БС</span>` : '';
+
               let lowRole = String(v.authorRole || "").toLowerCase().trim();
               let roleDeptStr = "";
               if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант") || lowRole.includes("грузчик")) {
@@ -1876,7 +1880,7 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
               }
               
               let detailsStr = String(v.details).toLowerCase();
-              return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div>`; 
+              return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="display:flex; align-items:center; gap:2px;">${bsBadgeHtml}<div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div></div>`; 
           }).join("");
       }
   }
@@ -3549,7 +3553,10 @@ function renderAdminOuts() {
           let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
           let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
           
-          // ИСПРАВЛЕНО: Выводим полную должность строчными для отпусков в панели руководителя
+          let metaObj = {}; try { metaObj = typeof v.meta === 'string' ? JSON.parse(v.meta) : (v.meta || {}); } catch(e){}
+          let isBs = v.type === "Отпуск без содержания" || v.type === "БС" || metaObj.is_bs === true;
+          let bsBadgeHtml = isBs ? `<span style="font-size:10px; font-weight:bold; color:#f39c12; background:rgba(243, 156, 18, 0.15); border:1px solid rgba(243, 156, 18, 0.3); padding:4px 6px; border-radius:6px; margin-right:4px;">БС</span>` : '';
+
           let lowRole = String(v.authorRole || "").toLowerCase().trim();
           let roleDeptStr = "";
           if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант") || lowRole.includes("грузчик")) {
@@ -3560,7 +3567,7 @@ function renderAdminOuts() {
           }
           
           let detailsStr = String(v.details).toLowerCase();
-          return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div>`; 
+          return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="display:flex; align-items:center; gap:2px;">${bsBadgeHtml}<div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div></div>`; 
       }).join("") + `</div>`;
       vacContainer.innerHTML = vHtml;
   } else if (vacContainer) {
