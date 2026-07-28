@@ -2800,7 +2800,18 @@ window.openAdminOvertimeForm = function() {
     let empSelectBlockHtml = "";
     if (isDir) {
         let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
-        let activeEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+        let activeEmps = emps.filter(e => {
+            if (!e || !e.name) return false;
+            // 1. Исключаем заблокированных (оставляем строго статус TRUE/true)
+            let isStatusTrue = String(e.login_status).toUpperCase() === 'TRUE' || e.login_status === true;
+            if (!isStatusTrue) return false;
+            
+            // 2. Исключаем Промоутеров
+            let rLow = String(e.role || "").toLowerCase();
+            if (rLow.includes("промоутер")) return false;
+            
+            return true;
+        });
         activeEmps.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
 
         let empOptionsHtml = `<option value="${appState.iin}">На себя (${appState.firstName || 'Я'})</option>` + 
@@ -3149,7 +3160,18 @@ window.openAdminVacationForm = function() {
     if (existingModal) existingModal.remove();
     
     let emps = (typeof allEmployeesData !== 'undefined' && allEmployeesData) ? allEmployeesData : (window.adminEmployeesGlobal || []);
-    let activeEmps = emps.filter(e => e && e.name && String(e.login_status).toUpperCase() !== 'FALSE');
+    let activeEmps = emps.filter(e => {
+        if (!e || !e.name) return false;
+        // 1. Исключаем заблокированных (оставляем строго статус TRUE/true)
+        let isStatusTrue = String(e.login_status).toUpperCase() === 'TRUE' || e.login_status === true;
+        if (!isStatusTrue) return false;
+        
+        // 2. Исключаем Промоутеров
+        let rLow = String(e.role || "").toLowerCase();
+        if (rLow.includes("промоутер")) return false;
+        
+        return true;
+    });
     activeEmps.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
 
     let empOptionsHtml = `<option value="${appState.iin}">На себя (${appState.firstName || 'Я'})</option>` + 
