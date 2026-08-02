@@ -3671,28 +3671,31 @@ function openForm(type) {
 function closeForm() { 
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
-  let isZavSklad = roleStr.includes("заведующий складом"); 
-  let isInfoConsultant = roleStr.includes("инфо-консультант");
-  let isSeniorCashier = roleStr.includes("старший кассир");
-  let isGruzchik = roleStr.includes("грузчик");
+  const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант"];
+  let isStaffRole = STAFF_ROLES.some(r => roleStr.includes(r));
   
   let dash = document.getElementById("info-dashboard"); 
   
-  // ИСПРАВЛЕНО: Не показываем дашборд продавца для всех менеджерских и технических ролей
-  if (!isUserPromoter && !isDir && !isZavSklad && !isInfoConsultant && !isSeniorCashier && !isGruzchik) { 
-      dash.classList.remove("hidden"); 
-      dash.classList.remove("fade-in", "slide-up-fade", "slide-down-fade"); 
-      dash.classList.add("slide-down-fade"); 
-  } 
+  // Дашборд продавца показываем только обычным продавцам
+  if (!isUserPromoter && !isDir && !isStaffRole) { 
+      if (dash) {
+          dash.classList.remove("hidden"); 
+          dash.classList.remove("fade-in", "slide-up-fade", "slide-down-fade"); 
+          dash.classList.add("slide-down-fade"); 
+      }
+  } else {
+      if (dash) dash.classList.add("hidden");
+  }
   
+  // Закрываем все всплывающие формы
   ["form-sc", "form-tradein", "form-points", "form-swap"].forEach(id => { 
       let el = document.getElementById(id); 
       if (el) { el.classList.add("hidden"); el.classList.remove("slide-up-fade"); }
   }); 
   
-  // ИСПРАВЛЕНО: Не открываем меню кнопок продавца для новых административных должностей
+  // ИСПРАВЛЕНО: Корректное возвращение к списку кнопок второй вкладки "Создать"
   let menu = document.getElementById("menu-list"); 
-  if (menu && !isDir && !isZavSklad && !isInfoConsultant && !isSeniorCashier && !isGruzchik) {
+  if (menu && !isDir) {
       menu.classList.remove("hidden"); 
       menu.style.animation = 'none'; 
       menu.offsetHeight; 
@@ -3700,6 +3703,9 @@ function closeForm() {
       menu.classList.add("fade-in"); 
   }
   
+  // Переключаем активный экран строго на текущую логическую вкладку
+  switchTab(lastActiveTab || 'create');
+
   let scroller = document.getElementById("scrollable-body"); 
   if (scroller) scroller.scrollTop = 0; 
 }
