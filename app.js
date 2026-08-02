@@ -990,9 +990,11 @@ function initSwipe() {
             let isSeniorCashier = roleStr.includes("старший кассир"); 
             let isGruzchik = roleStr.includes("грузчик"); // ДОБАВЛЕНО
             
+            const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант"];
+            let isStaffRole = STAFF_ROLES.some(r => roleStr.includes(r));
+
             let tabs = isDir ? 
                 ['adm-outs', 'adm-main', 'adm-inbox'] : 
-                (isZavSklad || isInfoConsultant || isSeniorCashier || isGruzchik) ? ['adm-outs', 'adm-main', 'inbox'] : 
                 ['time', 'create', 'inbox']; 
             
             let currentIdx = tabs.indexOf(lastActiveTab); 
@@ -1289,8 +1291,12 @@ function renderDashboardData(data, isSilent = false) {
   let admPlus = document.getElementById("nav-adm-plus-btn");
   let isOnlyDirOrSup = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("супервайзер");
   
-  // Включаем отображение кнопки "+" для всех без исключения
-  let isAllowedPlusMenu = true; 
+  // ИСПРАВЛЕНО: Единый список технического/кассового персонала для спец-интерфейса
+  const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант"];
+  let isStaffRole = STAFF_ROLES.some(r => roleStr.includes(r));
+
+  // Кнопку "+" скрываем для спец-персонала
+  let isAllowedPlusMenu = !isStaffRole; 
 
   if (isAllowedPlusMenu) {
       // ИСПРАВЛЕНО: Запрещаем блоку ФИО сжиматься или переноситься из-за давления margin-left: auto
@@ -1356,328 +1362,110 @@ function renderDashboardData(data, isSilent = false) {
       if (btnFormTradeIn) btnFormTradeIn.style.display = ""; 
   }
   
-  // ЦЕПОЧКА ИНТЕРФЕЙСОВ ДЛЯ КАЖДОЙ ДОЛЖНОСТИ (ОБЪЕДИНЕНА В ЕДИНУЮ СТРУКТУРУ)
-  if (isZavSklad) {
-      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
-      
-      let btnPlan = document.getElementById("btn-adm-plan"); 
-      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
-      
-      let adminPlanList = document.getElementById("admin-plan-list");
-      let formSwap = document.getElementById("form-swap");
-      if (adminPlanList && formSwap) {
-          if (!adminPlanList.contains(formSwap)) {
-              adminPlanList.innerHTML = ""; 
-              adminPlanList.appendChild(formSwap); 
-          }
-          formSwap.classList.remove("hidden", "card", "form-dark");
-          formSwap.style.padding = "0";
-          formSwap.style.background = "transparent";
-          formSwap.style.border = "none";
-          formSwap.style.boxShadow = "none";
-          
-          let gridBtns = formSwap.querySelector(".grid-btns");
-          if (gridBtns) gridBtns.style.display = "none";
-          formSwap.querySelectorAll(".inner-block.card").forEach(b => b.style.display = "");
+  // ИСПРАВЛЕНО: Единая чистая логика интерфейса для спец-персонала (Кассиры, Склад, Грузчики, Инфо)
+  if (isStaffRole) {
+      // 1. Настройка видимости табов нижней навигации
+      document.getElementById("nav-time-icon")?.classList.remove("hidden"); 
+      document.getElementById("nav-create-icon")?.classList.remove("hidden"); 
+      document.getElementById("inbox-icon")?.classList.remove("hidden"); 
+      document.getElementById("nav-adm-outs")?.classList.add("hidden"); 
+      document.getElementById("nav-adm-main")?.classList.add("hidden"); 
+      document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+
+      // 2. Скрываем продажные баннеры и горячие чеки
+      if (dash) dash.classList.add("hidden");
+      let hcCard = document.getElementById("hot-check-card");
+      if (hcCard) hcCard.classList.add("hidden");
+
+      // 3. Формируем 2-ю вкладку "Создать/Действия" с 3 кнопками
+      let menuList = document.getElementById("menu-list");
+      if (menuList) {
+          menuList.innerHTML = `
+              <div class="inner-block card" style="padding:14px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; display:flex; flex-direction:column; gap:10px;">
+                  <button class="btn-green" style="margin:0; padding:12px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="window.openDeliveryPricesModal()">
+                      <span class="material-symbols-rounded" style="font-size:20px;">local_shipping</span>
+                      <span>Прайс по доставкам</span>
+                  </button>
+                  <button class="btn-orange" style="margin:0; padding:12px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="window.openAdminOvertimeForm()">
+                      <span class="material-symbols-rounded" style="font-size:20px;">more_time</span>
+                      <span>Подать на переработку</span>
+                  </button>
+                  <button class="btn-blue" style="margin:0; padding:12px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="openForm('swap')">
+                      <span class="material-symbols-rounded" style="font-size:20px;">published_with_changes</span>
+                      <span>Рабочая смена</span>
+                  </button>
+              </div>
+          `;
+          menuList.classList.remove("hidden");
       }
 
-      let selectTarget = document.getElementById("fs-target");
-      if (selectTarget && selectTarget.children.length <= 1) {
-          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
-          
-          (async () => {
-              try {
-                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-                      let { data: dbUsers, error } = await supabaseClient
-                          .from('users')
-                          .select('iin, full_name, role, login_status')
-                          .ilike('role', '%Заведующий складом%')
-                          .neq('iin', appState.iin);
-
-                      if (error) throw error;
-
-                      let activeZavs = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
-
-                      if (activeZavs.length > 0) {
-                          activeZavs.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
-                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>` + 
-                              activeZavs.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
-                      } else {
-                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Заведующие не найдены</option>`;
-                      }
-                  }
-              } catch (err) {
-                  console.error(err);
-                  selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Ошибка загрузки</option>`;
-              }
-          })();
+      // 4. Обработка входящих уведомлений
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; 
+      const uBadge = document.getElementById("user-badge"); 
+      if (filteredUserInbox.length > 0) { 
+          if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } 
+          if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); 
+          appState.lastInboxCount = filteredUserInbox.length; 
+      } else { 
+          if(uBadge) uBadge.classList.add("hidden"); 
+          appState.lastInboxCount = 0; 
       }
-
-      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
-      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
       
-      let match = roleStr.match(/заведующий складом\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
-      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
-  }
-  else if (isInfoConsultant) {
-      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
-      
-      let btnPlan = document.getElementById("btn-adm-plan"); 
-      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
-      
-      let adminPlanList = document.getElementById("admin-plan-list");
-      let formSwap = document.getElementById("form-swap");
-      if (adminPlanList && formSwap) {
-          if (!adminPlanList.contains(formSwap)) {
-              adminPlanList.innerHTML = ""; 
-              adminPlanList.appendChild(formSwap); 
-          }
-          formSwap.classList.remove("hidden", "card", "form-dark");
-          formSwap.style.padding = "0";
-          formSwap.style.background = "transparent";
-          formSwap.style.border = "none";
-          formSwap.style.boxShadow = "none";
-          
-          let gridBtns = formSwap.querySelector(".grid-btns");
-          if (gridBtns) gridBtns.style.display = "none";
-
-          let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
-          innerBlocks.forEach(block => {
-              let h3 = block.querySelector("h3");
-              if (h3) {
-                  let txt = h3.innerText.toLowerCase();
-                  if (txt.includes("исправ") || txt.includes("обмен")) {
-                      block.style.display = "none"; 
-                  } else {
-                      block.style.display = ""; 
-                  }
-              }
-          });
-      }
-
-      let selectTarget = document.getElementById("fs-target");
-      if (selectTarget && selectTarget.children.length <= 1) {
-          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
-          
-          (async () => {
-              try {
-                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-                      let { data: dbUsers, error } = await supabaseClient
-                          .from('users')
-                          .select('iin, full_name, role, login_status')
-                          .ilike('role', '%Инфо-консультант%')
-                          .neq('iin', appState.iin);
-
-                      if (error) throw error;
-
-                      let activeConsultants = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
-
-                      if (activeConsultants.length > 0) {
-                          activeConsultants.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
-                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>` + 
-                              activeConsultants.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
-                      } else {
-                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Инфо-консультанты не найдены</option>`;
-                      }
-                  }
-              } catch (err) {
-                  console.error(err);
-                  selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Ошибка загрузки</option>`;
-              }
-          })();
-      }
-
-      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
-      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
-      
-      let match = roleStr.match(/инфо-консультант\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
-      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
-  }
-  else if (isSeniorCashier) {
-      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
-      
-      let btnPlan = document.getElementById("btn-adm-plan"); 
-      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
-      
-      let adminPlanList = document.getElementById("admin-plan-list");
-      let formSwap = document.getElementById("form-swap");
-      if (adminPlanList && formSwap) {
-          if (!adminPlanList.contains(formSwap)) {
-              adminPlanList.innerHTML = ""; 
-              adminPlanList.appendChild(formSwap); 
-          }
-          formSwap.classList.remove("hidden", "card", "form-dark");
-          formSwap.style.padding = "0";
-          formSwap.style.background = "transparent";
-          formSwap.style.border = "none";
-          formSwap.style.boxShadow = "none";
-          
-          let gridBtns = formSwap.querySelector(".grid-btns");
-          if (gridBtns) gridBtns.style.display = "none";
-
-          let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
-          innerBlocks.forEach(block => {
-              let h3 = block.querySelector("h3");
-              if (h3) {
-                  let txt = h3.innerText.toLowerCase();
-                  if (txt.includes("исправ") || txt.includes("обмен")) {
-                      block.style.display = "none"; 
-                  } else {
-                      block.style.display = ""; 
-                  }
-              }
-          });
-      }
-
-      let selectTarget = document.getElementById("fs-target");
-      if (selectTarget && selectTarget.children.length <= 1) {
-          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
-          
-          (async () => {
-              try {
-                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-                      let { data: dbUsers, error } = await supabaseClient
-                          .from('users')
-                          .select('iin, full_name, role, login_status')
-                          .ilike('role', '%Старший кассир%')
-                          .neq('iin', appState.iin);
-
-                      if (error) throw error;
-
-                      let activeConsultants = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
-
-                      if (activeConsultants.length > 0) {
-                          activeConsultants.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
-                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>` + 
-                              activeConsultants.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
-                      } else {
-                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Старшие кассиры не найдены</option>`;
-                      }
-                  }
-              } catch (err) {
-                  console.error(err);
-                  selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Ошибка загрузки</option>`;
-              }
-          })();
-      }
-
-      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
-      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
-      
-      let match = roleStr.match(/старший кассир\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
-      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
-  }
-  else if (isGruzchik) { 
-      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.remove("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
-      
-      let btnPlan = document.getElementById("btn-adm-plan"); 
-      if (btnPlan) { btnPlan.style.display = ""; btnPlan.innerText = "Смена"; }
-      
-      let adminPlanList = document.getElementById("admin-plan-list");
-      let formSwap = document.getElementById("form-swap");
-      if (adminPlanList && formSwap) {
-          if (!adminPlanList.contains(formSwap)) {
-              adminPlanList.innerHTML = ""; 
-              adminPlanList.appendChild(formSwap); 
-          }
-          formSwap.classList.remove("hidden", "card", "form-dark");
-          formSwap.style.padding = "0";
-          formSwap.style.background = "transparent";
-          formSwap.style.border = "none";
-          formSwap.style.boxShadow = "none";
-          
-          let gridBtns = formSwap.querySelector(".grid-btns");
-          if (gridBtns) gridBtns.style.display = "none";
-
-          let innerBlocks = formSwap.querySelectorAll(".inner-block.card");
-          innerBlocks.forEach(block => {
-              let h3 = block.querySelector("h3");
-              if (h3) {
-                  let txt = h3.innerText.toLowerCase();
-                  if (txt.includes("исправ") || txt.includes("обмен")) {
-                      block.style.display = "none"; 
-                  } else {
-                      block.style.display = ""; 
-                  }
-              }
-          });
-      }
-
-      let selectTarget = document.getElementById("fs-target");
-      if (selectTarget && selectTarget.children.length <= 1) {
-          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>`;
-          
-          (async () => {
-              try {
-                  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
-                      let { data: dbUsers, error } = await supabaseClient
-                          .from('users')
-                          .select('iin, full_name, role, login_status')
-                          .ilike('role', '%Грузчик%')
-                          .neq('iin', appState.iin);
-
-                      if (error) throw error;
-
-                      let activeLoaders = (dbUsers || []).filter(u => u && String(u.login_status).toUpperCase() !== 'FALSE');
-
-                      if (activeLoaders.length > 0) {
-                          activeLoaders.sort((a, b) => String(a.full_name).localeCompare(String(b.full_name)));
-                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Выберите сменщика</option>` + 
-                              activeLoaders.map(e => `<option value="${e.iin}">${e.full_name}</option>`).join("");
-                      } else {
-                          selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Грузчики не найдены</option>`;
-                      }
-                  }
-              } catch (err) {
-                  console.error(err);
-                  selectTarget.innerHTML = `<option value="" disabled selected style="color: gray;">Ошибка загрузки</option>`;
-              }
-          })();
-      }
-
-      let inboxTitle = document.querySelector("#content-inbox h3"); if (inboxTitle) inboxTitle.innerText = "Входящие";
-      if (window.currentAdminMainView === 'emps' || !window.currentAdminMainView) { window.currentAdminMainView = 'plan'; }
-      
-      let match = roleStr.match(/грузчик\s+(цифра|мбт|кбт)/i); if (match && !window.zavScDeptSet) { let extracted = match[1].charAt(0).toUpperCase() + match[1].slice(1).toLowerCase(); appState.dept = extracted; currentAdminScDept = extracted; currentEmpDept = extracted; window.zavScDeptSet = true; }
-      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "У вас новое уведомление"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain(window.currentAdminMainView); }
-  }
+      if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) switchTab('time');
+  } 
   else if (isDir) {
-      document.getElementById("nav-time-icon")?.classList.add("hidden"); document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); document.getElementById("nav-adm-outs")?.classList.remove("hidden"); document.getElementById("nav-adm-main")?.classList.remove("hidden"); document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
+      // Ветка Руководства (Директор / Управляющий / Админ / Супервайзер)
+      document.getElementById("nav-time-icon")?.classList.add("hidden"); 
+      document.getElementById("nav-create-icon")?.classList.add("hidden"); 
+      document.getElementById("inbox-icon")?.classList.add("hidden"); 
+      document.getElementById("nav-adm-outs")?.classList.remove("hidden"); 
+      document.getElementById("nav-adm-main")?.classList.remove("hidden"); 
+      document.getElementById("nav-adm-inbox")?.classList.remove("hidden");
+      
       let btnPlan = document.getElementById("btn-adm-plan"); if (btnPlan) btnPlan.style.display = "";
-      let filteredAdminInbox = data.adminInbox ? data.adminInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const aBadge = document.getElementById("admin-badge"); if (filteredAdminInbox.length > 0) { if(aBadge) { aBadge.innerText = filteredAdminInbox.length; aBadge.classList.remove("hidden"); } if (filteredAdminInbox.length > appState.lastInboxCount); appState.lastInboxCount = filteredAdminInbox.length; } else { if(aBadge) aBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
-      let adminPlanList = document.getElementById("admin-plan-list"); if (adminPlanList) { let planFiltersExist = document.getElementById("plan-filter-start"); if (!planFiltersExist) { let d = new Date(); let defStart = formatDateLocal(new Date(d.getFullYear(), d.getMonth(), 1)); let defEnd = formatDateLocal(new Date(d.getFullYear(), d.getMonth() + 1, 0)); adminPlanList.innerHTML = `<style>.hide-scrollbar::-webkit-scrollbar { display: none; }</style><div class="inner-block card" style="padding:12px; margin-bottom:12px; background:var(--card-bg); border:1px solid var(--border-color);"><div class="hide-scrollbar no-swipe" style="display:flex; gap:6px; overflow-x:auto; padding-bottom:8px; margin-bottom:10px;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('today')">Сегодня</button><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('yesterday')">Вчера</button><div style="position:relative; display:inline-block; min-width:max-content; overflow:hidden;"><input type="month" id="plan-month-picker" onclick="this.value=''" onchange="setPlanDates('month', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="admin-flt" style="margin:0; padding:6px 12px; border-radius:8px; pointer-events:none; position:relative; z-index:1;">Месяц</button></div><button class="admin-flt" style="margin:0; padding:6px 12px; min-width:max-content; border-radius:8px;" onclick="setPlanDates('all')">За весь период</button></div><div class="no-swipe" style="display:flex; gap:6px; align-items:center;" ontouchstart="event.stopPropagation();" ontouchmove="event.stopPropagation();"><input type="date" id="plan-filter-start" value="${defStart}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><span style="color:gray; font-weight:bold;">-</span><input type="date" id="plan-filter-end" value="${defEnd}" onchange="loadPlanHistory(false)" style="flex:1; background:var(--card-bg); border:1px solid var(--border-color); color:var(--text-color); border-radius:8px; padding:0; height:36px; line-height:34px; text-align:center; box-sizing:border-box; margin:0; font-family:inherit; font-size:12px; letter-spacing:-0.5px;"><div style="position:relative; width:44px; height:36px; flex-shrink:0; overflow:hidden;"><input type="date" id="plan-single-picker2" onchange="setPlanDates('single', this.value)" style="position:absolute; top:0; left:0; width:100%; height:100%; opacity:0; cursor:pointer; z-index:5;"><button class="btn-gray" style="margin:0; width:100%; height:100%; border-radius:8px; padding:0; display:flex; justify-content:center; align-items:center; background:var(--card-bg); border: 1px solid var(--border-color); color:var(--text-color); font-size:16px; pointer-events:none;"><span class="material-symbols-rounded" style="font-size:18px;">calendar_today</span></button></div></div></div><div id="plan-render-area"></div>`; setTimeout(() => loadPlanHistory(true), 100); } else { if (!isSensitiveState()) { loadPlanHistory(true); } } }
+      let filteredAdminInbox = data.adminInbox ? data.adminInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; 
+      const aBadge = document.getElementById("admin-badge"); 
+      if (filteredAdminInbox.length > 0) { 
+          if(aBadge) { aBadge.innerText = filteredAdminInbox.length; aBadge.classList.remove("hidden"); } 
+          appState.lastInboxCount = filteredAdminInbox.length; 
+      } else { 
+          if(aBadge) aBadge.classList.add("hidden"); 
+          appState.lastInboxCount = 0; 
+      }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) { switchTab('adm-main'); toggleAdminMain('plan'); }
   } else {
-      if (isUserPromoter) { 
-          document.getElementById("nav-create-icon")?.classList.add("hidden"); document.getElementById("inbox-icon")?.classList.add("hidden"); 
-          let db = document.getElementById("desc-break"); if(db) db.innerText = "15 мин"; 
-          let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "1 час"; 
-          let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; 
-          if(dash) dash.classList.add("hidden"); 
-      } else { 
-          document.getElementById("nav-time-icon")?.classList.remove("hidden"); 
-          document.getElementById("nav-create-icon")?.classList.remove("hidden"); 
-          document.getElementById("inbox-icon")?.classList.remove("hidden"); 
-          let db = document.getElementById("desc-break"); if(db) db.innerText = "10 мин"; 
-          let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "40 мин"; 
-          let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; 
-          
-          if ((isSeller || isCashier) && document.querySelectorAll("#content-adm-main:not(.hidden)").length === 0 && document.querySelectorAll("#content-details:not(.hidden)").length === 0 && !isAnyFormActive) { 
-              if (dash && dash.classList.contains("hidden")) { 
-                  dash.classList.remove("hidden"); 
-                  dash.classList.remove("fade-in", "slide-up-fade"); 
-                  dash.classList.add("slide-down-fade"); 
-              } 
-          } else { 
-              if(dash) dash.classList.add("hidden"); 
+      // Ветка Обычных Продавцов
+      document.getElementById("nav-time-icon")?.classList.remove("hidden"); 
+      document.getElementById("nav-create-icon")?.classList.remove("hidden"); 
+      document.getElementById("inbox-icon")?.classList.remove("hidden"); 
+      document.getElementById("nav-adm-outs")?.classList.add("hidden"); 
+      document.getElementById("nav-adm-main")?.classList.add("hidden"); 
+      document.getElementById("nav-adm-inbox")?.classList.add("hidden");
+      
+      let db = document.getElementById("desc-break"); if(db) db.innerText = "10 мин"; 
+      let dl = document.getElementById("desc-lunch"); if(dl) dl.innerText = "40 мин"; 
+      let ds = document.getElementById("desc-snack"); if(ds) ds.innerText = "30 мин"; 
+      
+      if (document.querySelectorAll("#content-adm-main:not(.hidden)").length === 0 && document.querySelectorAll("#content-details:not(.hidden)").length === 0 && !isAnyFormActive) { 
+          if (dash && dash.classList.contains("hidden")) { 
+              dash.classList.remove("hidden"); 
+              dash.classList.remove("fade-in", "slide-up-fade"); 
+              dash.classList.add("slide-down-fade"); 
           } 
+      } else { 
+          if(dash) dash.classList.add("hidden"); 
       }
-      document.getElementById("nav-adm-outs")?.classList.add("hidden"); document.getElementById("nav-adm-main")?.classList.add("hidden"); document.getElementById("nav-adm-inbox")?.classList.add("hidden");
-      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; const uBadge = document.getElementById("user-badge"); if (filteredUserInbox.length > 0) { if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "Непрочитанные сообщения"); appState.lastInboxCount = filteredUserInbox.length; } else { if(uBadge) uBadge.classList.add("hidden"); appState.lastInboxCount = 0; }
+      
+      let filteredUserInbox = data.userInbox ? data.userInbox.filter(r => r && r.id && !processedReqIds.has(String(r.id))) : []; 
+      const uBadge = document.getElementById("user-badge"); 
+      if (filteredUserInbox.length > 0) { 
+          if(uBadge) { uBadge.innerText = filteredUserInbox.length; uBadge.classList.remove("hidden"); } 
+          if (filteredUserInbox.length > appState.lastInboxCount) showPushNotification("Уведомление!", "Непрочитанные сообщения"); 
+          appState.lastInboxCount = filteredUserInbox.length; 
+      } else { 
+          if(uBadge) uBadge.classList.add("hidden"); 
+          appState.lastInboxCount = 0; 
+      }
       if(document.querySelectorAll("#scrollable-body > div:not(.hidden)").length === 0) switchTab('time');
   }
 
