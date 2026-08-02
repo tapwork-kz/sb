@@ -1859,26 +1859,18 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
   // ИСПРАВЛЕНО: Синхронизируем массив отпусков глобально
   window.adminVacationsGlobal = data.vacations || [];
 
-  // 1. Отрисовка отпусков в стандартном контейнере админки
-  let vacContainer = document.getElementById("vacation-list-container");
-  if (vacContainer) {
+  // Синхронизация глобального массива
+  window.adminVacationsGlobal = data.vacations || [];
+
+  // Отрисовка одинакового блока отпусков во всех предназначенных контейнерах
+  if (document.getElementById("vacation-list-container")) {
       renderActiveVacationsCard("vacation-list-container", "Отпуска:");
   }
-
-  // 2. ИСПРАВЛЕНО: Автоматическое создание точно такой же карточки на первой вкладке Продавцов/Кассиров (#content-time)
-  let sellerTimeTab = document.getElementById("content-time");
-  if (sellerTimeTab) {
-      let sellerVacCard = document.getElementById("seller-vacations-card");
-      if (!sellerVacCard) {
-          sellerVacCard = document.createElement("div");
-          sellerVacCard.id = "seller-vacations-card";
-          sellerVacCard.className = "inner-block card";
-          sellerVacCard.style = "margin-top:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;";
-          sellerTimeTab.appendChild(sellerVacCard);
-      }
-      
-      // Исполняем ту же самую функцию отрисовки с точной фильтрацией по времёнам возвращения
-      renderActiveVacationsCard("seller-vacations-card", "Отпуска коллег:");
+  if (document.getElementById("seller-vac-container")) {
+      renderActiveVacationsCard("seller-vac-container", "Отпуска:");
+  }
+  if (document.getElementById("admin-vac-container")) {
+      renderActiveVacationsCard("admin-vac-container", "Отпуска:");
   }
 }
 
@@ -3572,7 +3564,7 @@ function renderAdminOuts() {
   if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
   document.getElementById('admin-outs-list').innerHTML = outsHtml;
 
-  // 2. Блок отпусков у администратора
+  // 2. Блок отпусков (Одинаково для Администраторов и Продавцов)
   let vacContainer = document.getElementById('admin-vac-container');
   if (!vacContainer) {
       vacContainer = document.createElement('div');
@@ -3584,6 +3576,7 @@ function renderAdminOuts() {
   }
   
   renderActiveVacationsCard('admin-vac-container', "Отпуска:");
+  renderActiveVacationsCard('seller-vac-container', "Отпуска:");
 }
 
 function submitVacation() { 
