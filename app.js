@@ -1856,33 +1856,29 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
   adminScItemsGlobal = data.adminScItems || []; globalSellers = data.sellers || []; globalScItems = data.scItems || []; allEmployeesData = data.adminEmployees || []; tradeInModelsGlobal = data.tradeInModels || []; window.adminVacationsGlobal = data.vacations || [];
   if ((isDir || isZavSklad) && typeof renderAdminEmps === "function") renderAdminEmps(currentEmpDept, null);
 
+  // ИСПРАВЛЕНО: Синхронизируем массив отпусков глобально
+  window.adminVacationsGlobal = data.vacations || [];
+
+  // 1. Отрисовка отпусков в стандартном контейнере админки
   let vacContainer = document.getElementById("vacation-list-container");
   if (vacContainer) {
-      let vList = data.vacations || [];
-      if (vList.length === 0) { vacContainer.innerHTML = "<div style='color:gray; font-size:12px; text-align:center;'>Нет активных заявок</div>"; } 
-      else { 
-          vacContainer.innerHTML = vList.map(v => { 
-              let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
-              let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12"; 
-              let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
-              
-              let metaObj = {}; try { metaObj = typeof v.meta === 'string' ? JSON.parse(v.meta) : (v.meta || {}); } catch(e){}
-              let isBs = v.type === "Отпуск без содержания" || v.type === "БС" || metaObj.is_bs === true;
-              let bsBadgeHtml = isBs ? `<span style="font-size:10px; font-weight:bold; color:#f39c12; background:rgba(243, 156, 18, 0.15); border:1px solid rgba(243, 156, 18, 0.3); padding:4px 6px; border-radius:6px; margin-right:4px;">БС</span>` : '';
+      renderActiveVacationsCard("vacation-list-container", "Отпуска:");
+  }
 
-              let lowRole = String(v.authorRole || "").toLowerCase().trim();
-              let roleDeptStr = "";
-              if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант") || lowRole.includes("грузчик")) {
-                  roleDeptStr = ` — ${lowRole}`;
-              } else {
-                  let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
-                  roleDeptStr = v.authorDept ? ` — ${roleWord} ${v.authorDept}` : ` — ${roleWord}`;
-              }
-              
-              let detailsStr = String(v.details).toLowerCase();
-              return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="display:flex; align-items:center; gap:2px;">${bsBadgeHtml}<div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div></div>`; 
-          }).join("");
+  // 2. ИСПРАВЛЕНО: Автоматическое создание точно такой же карточки на первой вкладке Продавцов/Кассиров (#content-time)
+  let sellerTimeTab = document.getElementById("content-time");
+  if (sellerTimeTab) {
+      let sellerVacCard = document.getElementById("seller-vacations-card");
+      if (!sellerVacCard) {
+          sellerVacCard = document.createElement("div");
+          sellerVacCard.id = "seller-vacations-card";
+          sellerVacCard.className = "inner-block card";
+          sellerVacCard.style = "margin-top:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;";
+          sellerTimeTab.appendChild(sellerVacCard);
       }
+      
+      // Исполняем ту же самую функцию отрисовки с точной фильтрацией по времёнам возвращения
+      renderActiveVacationsCard("seller-vacations-card", "Отпуска коллег:");
   }
 }
 
@@ -3498,62 +3494,39 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
   });
 }
 
-function renderAdminOuts() {
-  let list = globalActiveOuts || []; const now = Date.now();
-  
-  // 1. Обычные отсутствия (перерывы, обеды)
-  let outsHtml = list.map(out => { 
-      let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
-      if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
-      if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
-      let actionTitle = out.action; 
-      
-      // ИСПРАВЛЕНО: Выводим полную должность строчными, если это Старший кассир, Инфо-консультант или Грузчик
-      let roleLabel = "";
-      if (rRole.includes("старший кассир") || rRole.includes("инфо-консультант") || rRole.includes("грузчик")) {
-          roleLabel = rRole;
-      } else {
-          let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
-          roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`;
-      }
-      
-      return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
-  }).join("");
-  
-  if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
-  document.getElementById('admin-outs-list').innerHTML = outsHtml;
+// ИСПРАВЛЕНО: Единая универсальная функция генерации карточки отпусков с фильтрацией по завершенным датам
+function renderActiveVacationsCard(targetContainerId, titleText = "Отпуска:") {
+  let container = document.getElementById(targetContainerId);
+  if (!container) return;
 
-  // 2. Блок отпусков
+  const now = Date.now();
   let activeVacations = [];
+
+  // Фильтруем только те отпуска, чья дата окончания еще не прошла
   (window.adminVacationsGlobal || []).forEach(v => {
-      let metaObj = {}; try { metaObj = JSON.parse(v.meta); } catch(e){}
+      let metaObj = {}; 
+      try { metaObj = typeof v.meta === 'string' ? JSON.parse(v.meta) : (v.meta || {}); } catch(e){}
+      
       if (metaObj.endDate) {
-          let endTime = new Date(metaObj.endDate).getTime() + 86400000;
-          if (now <= endTime) { activeVacations.push({ ...v, metaObj }); }
+          let endTime = new Date(metaObj.endDate).getTime() + 86400000; // Добавляем 24 часа к концу дня
+          if (now <= endTime) { 
+              activeVacations.push({ ...v, metaObj }); 
+          }
+      } else {
+          // Запасной случай, если дата хранится в другом формате
+          activeVacations.push({ ...v, metaObj });
       }
   });
-  
-  // Динамически создаем контейнер, если его нет в HTML
-  let vacContainer = document.getElementById('admin-vac-container');
-  if (!vacContainer) {
-      vacContainer = document.createElement('div');
-      vacContainer.id = 'admin-vac-container';
-      vacContainer.className = 'inner-block';
-      vacContainer.style = 'background:var(--card-bg); margin-top:12px; padding:12px; border:1px solid var(--border-color); border-radius:12px;';
-      let parent = document.getElementById('content-adm-outs');
-      if (parent) parent.appendChild(vacContainer);
-  }
-  
-  // Отрисовка списка отпусков
-  if (activeVacations.length > 0 && vacContainer) {
-      vacContainer.style.display = 'block';
-      let vHtml = `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:10px; display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> Отпуска:</div>`;
-      vHtml += `<div id="admin-vac-list">` + activeVacations.map(v => {
+
+  if (activeVacations.length > 0) {
+      container.style.display = 'block';
+      let vHtml = `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:10px; display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> ${titleText}</div>`;
+      vHtml += `<div id="${targetContainerId}-list">` + activeVacations.map(v => {
           let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
           let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
           let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
           
-          let metaObj = {}; try { metaObj = typeof v.meta === 'string' ? JSON.parse(v.meta) : (v.meta || {}); } catch(e){}
+          let metaObj = v.metaObj || {};
           let isBs = v.type === "Отпуск без содержания" || v.type === "БС" || metaObj.is_bs === true;
           let bsBadgeHtml = isBs ? `<span style="font-size:10px; font-weight:bold; color:#f39c12; background:rgba(243, 156, 18, 0.15); border:1px solid rgba(243, 156, 18, 0.3); padding:4px 6px; border-radius:6px; margin-right:4px;">БС</span>` : '';
 
@@ -3569,10 +3542,48 @@ function renderAdminOuts() {
           let detailsStr = String(v.details).toLowerCase();
           return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="display:flex; align-items:center; gap:2px;">${bsBadgeHtml}<div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div></div>`; 
       }).join("") + `</div>`;
-      vacContainer.innerHTML = vHtml;
-  } else if (vacContainer) {
-      vacContainer.style.display = 'none';
+      container.innerHTML = vHtml;
+  } else {
+      container.style.display = 'none';
   }
+}
+
+function renderAdminOuts() {
+  let list = globalActiveOuts || []; const now = Date.now();
+  
+  // 1. Обычные отсутствия (перерывы, обеды)
+  let outsHtml = list.map(out => { 
+      let elapsedMin = Math.floor((now - out.leftAt) / 60000); let diffMin = out.limit - elapsedMin; let timeClass = ""; let timeText = ""; let rRole = String(out.role || "").toLowerCase(); let isProm = rRole.includes('промоутер');
+      if (diffMin <= 0 && !isProm) { triggerUniversalAutoReturn(out.iin, out.action, out.role); return ""; }
+      if (diffMin > 0) { timeText = `${diffMin} мин`; } else { timeClass = "late"; timeText = `<span style="color:#e74c3c; font-size:9px; text-transform:uppercase;">Опаздывает</span><br>${Math.abs(diffMin)} мин!`; } 
+      let actionTitle = out.action; 
+      
+      let roleLabel = "";
+      if (rRole.includes("старший кассир") || rRole.includes("инфо-консультант") || rRole.includes("грузчик")) {
+          roleLabel = rRole;
+      } else {
+          let roleName = out.role ? (out.role.charAt(0).toUpperCase() + out.role.slice(1)) : 'Продавец';
+          roleLabel = isProm ? out.role : `${roleName} — ${out.dept || 'Сотрудник'}`;
+      }
+      
+      return `<div class="active-out-item" style="display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid rgba(150,150,150,0.1);"><div style="flex: 1; min-width: 0; display: flex; flex-direction: column;"><span class="active-out-name" style="font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${out.name}</span><span style="font-size: 10px; color: gray; margin-top: 2px;">${roleLabel}</span></div><div style="width: 80px; text-align: center; font-size: 12px; font-weight: bold; color: var(--btn-color);">${actionTitle}</div><div class="active-out-time ${timeClass}" style="width: 70px; text-align: right; font-size: 13px; font-weight: bold; line-height: 1.1;">${timeText}</div></div>`; 
+  }).join("");
+  
+  if(!outsHtml) outsHtml = "<p style='color:gray; font-size:13px; text-align:center;'>Все на местах</p>";
+  document.getElementById('admin-outs-list').innerHTML = outsHtml;
+
+  // 2. Блок отпусков у администратора
+  let vacContainer = document.getElementById('admin-vac-container');
+  if (!vacContainer) {
+      vacContainer = document.createElement('div');
+      vacContainer.id = 'admin-vac-container';
+      vacContainer.className = 'inner-block';
+      vacContainer.style = 'background:var(--card-bg); margin-top:12px; padding:12px; border:1px solid var(--border-color); border-radius:12px;';
+      let parent = document.getElementById('content-adm-outs');
+      if (parent) parent.appendChild(vacContainer);
+  }
+  
+  renderActiveVacationsCard('admin-vac-container', "Отпуска:");
 }
 
 function submitVacation() { 
