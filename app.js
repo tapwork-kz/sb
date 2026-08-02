@@ -1865,7 +1865,7 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
       renderActiveVacationsCard("vacation-list-container", "Отпуска:");
   }
 
-  // 2. ИСПРАВЛЕНО: Автоматическое создание точно такой же карточки на первой вкладке Продавцов/Кассиров (#content-time)
+  // 2. ИСПРАВЛЕНО: Создание карточки на главной вкладке Продавцов с выравниванием влево
   let sellerTimeTab = document.getElementById("content-time");
   if (sellerTimeTab) {
       let sellerVacCard = document.getElementById("seller-vacations-card");
@@ -1873,12 +1873,14 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
           sellerVacCard = document.createElement("div");
           sellerVacCard.id = "seller-vacations-card";
           sellerVacCard.className = "inner-block card";
-          sellerVacCard.style = "margin-top:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px;";
+          sellerVacCard.style = "margin-top:12px; padding:12px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; text-align:left;";
           sellerTimeTab.appendChild(sellerVacCard);
+      } else {
+          sellerVacCard.style.textAlign = "left";
       }
       
-      // Исполняем ту же самую функцию отрисовки с точной фильтрацией по времёнам возвращения
-      renderActiveVacationsCard("seller-vacations-card", "Отпуска:");
+      // Вызываем отрисовку с выравниванием по левому краю
+      renderActiveVacationsCard("seller-vacations-card", "Отпуска коллег:");
   }
 }
 
@@ -3494,7 +3496,7 @@ let authorStr = r.type === "Замечание" || r.type === "Запрос на
   });
 }
 
-// ИСПРАВЛЕНО: Единая универсальная функция генерации карточки отпусков с фильтрацией по завершенным датам
+// ИСПРАВЛЕНО: Единая универсальная функция генерации карточки отпусков с выравниванием текста ПО ЛЕВОМУ КРАЮ
 function renderActiveVacationsCard(targetContainerId, titleText = "Отпуска:") {
   let container = document.getElementById(targetContainerId);
   if (!container) return;
@@ -3513,15 +3515,17 @@ function renderActiveVacationsCard(targetContainerId, titleText = "Отпуск�
               activeVacations.push({ ...v, metaObj }); 
           }
       } else {
-          // Запасной случай, если дата хранится в другом формате
           activeVacations.push({ ...v, metaObj });
       }
   });
 
   if (activeVacations.length > 0) {
       container.style.display = 'block';
-      let vHtml = `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:10px; display:flex; align-items:center; gap:4px;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> ${titleText}</div>`;
-      vHtml += `<div id="${targetContainerId}-list">` + activeVacations.map(v => {
+      // ИСПРАВЛЕНО: Явно задаем text-align: left для всего контейнера
+      container.style.textAlign = 'left';
+
+      let vHtml = `<div style="font-size:14px; font-weight:bold; color:var(--text-color); margin-bottom:10px; display:flex; align-items:center; gap:4px; text-align:left;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> ${titleText}</div>`;
+      vHtml += `<div id="${targetContainerId}-list" style="text-align:left;">` + activeVacations.map(v => {
           let stText = (v.status.includes("pending")) ? "На рассмотрении" : "Утвержден"; 
           let stColor = stText === "Утвержден" ? "#27ae60" : "#f39c12";
           let stBg = stText === "Утвержден" ? "rgba(39, 174, 96, 0.1)" : "rgba(243, 156, 18, 0.1)";
@@ -3540,7 +3544,8 @@ function renderActiveVacationsCard(targetContainerId, titleText = "Отпуск�
           }
           
           let detailsStr = String(v.details).toLowerCase();
-          return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1);"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color);"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center;"><div style="font-size:12px; color:var(--text-color);">${detailsStr}</div><div style="display:flex; align-items:center; gap:2px;">${bsBadgeHtml}<div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div></div>`; 
+          // ИСПРАВЛЕНО: Принудительный text-align: left для блоков ФИО и периода
+          return `<div style="padding:10px 0; border-bottom:1px solid rgba(150,150,150,0.1); text-align:left;"><div style="font-size:13px; margin-bottom:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; color:var(--text-color); text-align:left;"><b>${v.authorName}</b> <span style="color:gray;">${roleDeptStr}</span></div><div style="display:flex; justify-content:space-between; align-items:center; text-align:left;"><div style="font-size:12px; color:var(--text-color); text-align:left;">${detailsStr}</div><div style="display:flex; align-items:center; gap:2px; flex-shrink:0;">${bsBadgeHtml}<div style="font-size:10px; font-weight:bold; color:${stColor}; background:${stBg}; padding:4px 8px; border-radius:6px;">${stText}</div></div></div></div>`; 
       }).join("") + `</div>`;
       container.innerHTML = vHtml;
   } else {
