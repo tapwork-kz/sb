@@ -216,15 +216,14 @@ async function loadPlanHistory(isSilent = false) {
 
 async function callBackend(actionName, payloadData = {}) { 
   try { 
-    // ИСПРАВЛЕНО: Полное сопоставление всех ролей с таблицей time_limits для мгновенной отдачи лимитов
-    const getRoleGroup = (roleText) => { 
+    const getRoleGroup = (roleText) => { 
         const r = (roleText || appState.role || "").toLowerCase(); 
         if (r.includes("промоутер")) return "Промоутер"; 
         if (r.includes("старший кассир")) return "Старший кассир";
         if (r.includes("кассир")) return "Кассир";
-        if (r.includes("заведующий")) return "Заведующий складом";
+        if (r.includes("заведующий складом")) return "Заведующий складом";
         if (r.includes("грузчик")) return "Грузчик";
-        if (r.includes("инфо-консультант") || r.includes("инфо")) return "Инфо-консультант";
+        if (r.includes("инфо-консультант")) return "Инфо-консультант";
         if (r.includes("продавец")) return "Продавец"; 
         return "Продавец"; 
     };
@@ -1173,30 +1172,7 @@ function renderActiveOuts() {
 
 async function triggerAutoReturn(actionToReturnFrom) { if (!appState.currentAction) return; appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Очередь заполнена или лимит исчерпан"; await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isAutoReturn: true }); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); applyLimits(state); }
 async function triggerAction(actionType) { vibrate(50); let prevAction = appState.currentAction; appState.currentAction = actionType; saveMemory("currentAction", actionType); renderTimeUI(); let res = await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionType, isReturn: false, isSilentAutoReturn: false }); if (res.success && res.savedAction) { appState.currentAction = res.savedAction; saveMemory("currentAction", res.savedAction); renderTimeUI(); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin, tgUserId: null }); applyLimits(state); } else { appState.currentAction = prevAction; saveMemory("currentAction", prevAction || ""); renderTimeUI(); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin, tgUserId: null }); applyLimits(state); showToast("Ошибка: " + res.error, true); } }
-async function triggerReturn() { 
-    vibrate(50); 
-    const actionToReturnFrom = appState.currentAction; 
-    appState.currentAction = null; 
-    saveMemory("currentAction", ""); 
-    renderTimeUI(); 
-    document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); 
-    document.getElementById("action-hint").innerText = "Фиксируем возвращение..."; 
-    
-    let res = await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isAutoReturn: false }); 
-    
-    if (res.success) { 
-        let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); 
-        document.getElementById("action-hint").innerText = "Выберите действие:"; 
-        applyLimits(state); 
-    } else { 
-        appState.currentAction = actionToReturnFrom; 
-        saveMemory("currentAction", actionToReturnFrom); 
-        renderTimeUI(); 
-        showToast("Ошибка возврата: " + (res.error || "Сбой"), true); 
-        let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); 
-        applyLimits(state); 
-    } 
-}
+async function triggerReturn() { vibrate(50); const actionToReturnFrom = appState.currentAction; appState.currentAction = null; saveMemory("currentAction", ""); renderTimeUI(); document.querySelectorAll("#standard-buttons button").forEach(b => b.disabled = true); document.getElementById("btn-break").disabled = false; document.getElementById("action-hint").innerText = "Фиксируем возвращение..."; let res = await callBackend('recordAction', { token: appState.token, iin: appState.iin, actionType: actionToReturnFrom, isReturn: true, isAutoReturn: false }); if (res.success) { document.getElementById("action-hint").innerText = "Обновление лимитов..."; let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); document.getElementById("action-hint").innerText = "Выберите действие:"; applyLimits(state); } else { appState.currentAction = actionToReturnFrom; saveMemory("currentAction", actionToReturnFrom); renderTimeUI(); showToast("Ошибка возврата: " + res.error, true); let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin }); applyLimits(state); } }
 
 function getDeclension(action) { if (!action) return ""; if (action.startsWith("Перерыв")) return "Перерыва"; if (action === "Обед") return "Обеда"; if (action === "Полдник") return "Полдника"; return action.toLowerCase(); }
 function renderTimeUI() { const standardBtns = document.getElementById("standard-buttons"); const returnContainer = document.getElementById("return-button-container"); let actStr = String(appState.currentAction); if (appState.currentAction && actStr !== "null" && actStr !== "undefined" && actStr !== "") { document.getElementById("btn-return").disabled = false; standardBtns.classList.add("hidden"); returnContainer.classList.remove("hidden"); const declension = getDeclension(appState.currentAction); document.getElementById("return-text").innerText = "Вернуться с " + declension; document.getElementById("action-hint").innerText = "Ожидаем возвращения:"; } else { standardBtns.classList.remove("hidden"); returnContainer.classList.add("hidden"); } }
@@ -1421,11 +1397,11 @@ function renderDashboardData(data, isSilent = false) {
                       <span>Прайс по доставкам</span>
                   </button>
                   <button class="btn-orange" style="margin:0; padding:12px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="window.openAdminOvertimeForm()">
-                      <span class="material-symbols-rounded" style="font-size:20px;">more_time</span>
+                      <span class="material-symbols-rounded" style="font-size:18px;">more_time</span>
                       <span>Подать на переработку</span>
                   </button>
-                  <button class="btn-blue" style="margin:0; padding:12px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="openForm('swap')">
-                      <span class="material-symbols-rounded" style="font-size:20px;">published_with_changes</span>
+                  <button class="btn-blue" style="margin:0; padding:12px; font-size:13px; display:flex; align-items:center; justify-content:center; gap:8px;" onclick="window.openStaffSwapForm()">
+                      <span class="material-symbols-rounded" style="font-size:18px;">published_with_changes</span>
                       <span>Рабочая смена</span>
                   </button>
               </div>
@@ -3678,22 +3654,26 @@ function openForm(type) {
   }
   if(type === 'swap') { 
       const select = document.getElementById("fs-target"); 
-      if (select) {
-          select.innerHTML = '<option value="" disabled selected>Выберите сменщика</option>' + globalSellers.map(s => `<option value="${s.iin}">${s.name}</option>`).join(""); 
+      select.innerHTML = '<option value="" disabled selected>Выберите сменщика</option>' + globalSellers.map(s => `<option value="${s.iin}">${s.name}</option>`).join(""); 
+      document.getElementById("fs-extra").classList.add("hidden"); 
+      
+      // ИСПРАВЛЕНО: Проверяем, если зашел Кассир — показываем ему встроенный блок переработок и выставляем сегодняшнюю дату
+      let roleLow = String(appState.role || "").toLowerCase();
+      let isCashier = roleLow.includes("кассир") && !roleLow.includes("старший кассир");
+      let coBlock = document.getElementById("cashier-overtime-block");
+      if (coBlock) {
+          if (isCashier) {
+              coBlock.classList.remove("hidden");
+              let todayIso = new Date().toISOString().split('T')[0];
+              if(document.getElementById("co-hours-date")) document.getElementById("co-hours-date").value = todayIso;
+              if(document.getElementById("co-days-date")) document.getElementById("co-days-date").value = todayIso;
+          } else {
+              coBlock.classList.add("hidden");
+          }
       }
       
-      let fsExtra = document.getElementById("fs-extra");
-      if (fsExtra) fsExtra.classList.add("hidden"); 
-      
-      let formSwap = document.getElementById("form-swap");
-      if (formSwap) {
-          // Восстанавливаем оригинальные стили всплывающей карточки без переносов в другие контейнеры
-          formSwap.className = "inner-block card form-dark slide-up-fade";
-          formSwap.style.padding = "14px";
-          formSwap.style.background = "var(--card-bg)";
-          formSwap.style.border = "1px solid var(--border-color)";
-          formSwap.classList.remove("hidden");
-      }
+      document.getElementById("form-swap").classList.remove("hidden"); 
+      document.getElementById("form-swap").classList.add("slide-up-fade"); 
   }
   let scroller = document.getElementById("scrollable-body"); if (scroller) scroller.scrollTop = 0;
 }
@@ -5152,4 +5132,41 @@ window.selectAdminHistEmp = function(iin, name) {
     
     // Перезапуск отрисовки истории с новыми фильтрами
     renderAdminHistory(currentHistFilter);
+};
+
+// ИСПРАВЛЕНО: Стабильное открытие формы смены для кассиров, складов, грузчиков и инфо
+window.openStaffSwapForm = function() {
+    let formSwap = document.getElementById("form-swap");
+    let menuList = document.getElementById("menu-list");
+    if (!formSwap) return;
+    
+    if (menuList) menuList.classList.add("hidden");
+    
+    // Показываем стандартные блоки формы обмена сменами, скрывая лишнее для продавцов если нужно
+    formSwap.classList.remove("hidden");
+    formSwap.classList.add("slide-up-fade");
+    
+    // Заполняем список сменщиков (коллег по должности)
+    const select = document.getElementById("fs-target");
+    if (select) {
+        let roleKey = String(appState.role || "").toLowerCase();
+        let peers = (typeof adminEmployeesGlobal !== 'undefined' && adminEmployeesGlobal) ? adminEmployeesGlobal.filter(e => {
+            if (!e || e.iin === appState.iin || String(e.login_status).toUpperCase() === 'FALSE') return false;
+            let eRole = String(e.role || "").toLowerCase();
+            if (roleKey.includes("кассир") && eRole.includes("кассир")) return true;
+            if (roleKey.includes("склад") && eRole.includes("склад")) return true;
+            if (roleKey.includes("грузчик") && eRole.includes("грузчик")) return true;
+            if (roleKey.includes("инфо") && eRole.includes("инфо")) return true;
+            return false;
+        }) : [];
+        
+        select.innerHTML = '<option value="" disabled selected>Выберите сменщика</option>' + 
+            peers.map(s => `<option value="${s.iin}">${s.name}</option>`).join("");
+    }
+    
+    let extra = document.getElementById("fs-extra");
+    if (extra) extra.classList.add("hidden");
+    
+    let scroller = document.getElementById("scrollable-body"); 
+    if (scroller) scroller.scrollTop = 0;
 };
