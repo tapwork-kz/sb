@@ -1184,22 +1184,27 @@ let scroller = document.getElementById("scrollable-body");
   let sections = document.querySelectorAll('#scrollable-body > div'); let animClass = 'slide-up-fade'; if (direction === 'right') animClass = 'slide-in-right'; else if (direction === 'left') animClass = 'slide-in-left';
   sections.forEach(s => { s.classList.remove('fade-in', 'slide-up-fade', 'slide-in-right', 'slide-in-left'); s.style.animation = 'none'; s.offsetHeight; s.style.animation = null; });
   
-  // 3. СИСТЕМНОЕ РАЗДЕЛЕНИЕ РОЛЕЙ И ОТОБРАЖЕНИЕ ИНТЕРФЕЙСА
+  // 3. СИСТЕМНОЕ РАЗДЕЛЕНИЕ РОЛЕЙ И ОТОБРАЖЕНИЕ ИНТЕРФЕЙСА (ИСПРАВЛЕНО)
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
-  let isZavSklad = roleStr.includes("заведующий складом"); 
-  let isInfoConsultant = roleStr.includes("инфо-консультант");
-  let isSeniorCashier = roleStr.includes("старший кассир"); 
-  let isGruzchik = roleStr.includes("грузчик"); 
-  let isCashier = roleStr.includes("кассир") && !isSeniorCashier; 
   
-  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier && !isGruzchik;
+  const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант", "менеджер пвз", "пвз"];
+  let isStaffRole = STAFF_ROLES.some(r => roleStr.includes(r));
+  let isSeller = !isUserPromoter && !isDir && !isStaffRole;
   
-  let isCreateTabActive = (tab === 'create'); let isAnyFormActive = isCreateTabActive && document.getElementById("menu-list").classList.contains("hidden"); let dash = document.getElementById("info-dashboard"); 
-  if ((isSeller || isCashier) && tab !== 'details' && !tab.startsWith('adm') && !isAnyFormActive) { 
-      if (dash && dash.classList.contains("hidden")) { dash.classList.remove("hidden"); dash.classList.remove("fade-in", "slide-up-fade"); dash.classList.add("slide-down-fade"); } 
+  let isCreateTabActive = (tab === 'create'); 
+  let isAnyFormActive = isCreateTabActive && document.getElementById("menu-list") && document.getElementById("menu-list").classList.contains("hidden"); 
+  let dash = document.getElementById("info-dashboard"); 
+  
+  // Баннер показывается СТРОГО продавцам и скрыт для всех ролей STAFF_ROLES, Директоров и Промоутеров
+  if (isSeller && tab !== 'details' && !tab.startsWith('adm') && !isAnyFormActive) { 
+      if (dash && dash.classList.contains("hidden")) { 
+          dash.classList.remove("hidden"); 
+          dash.classList.remove("fade-in", "slide-up-fade"); 
+          dash.classList.add("slide-down-fade"); 
+      } 
   } else { 
-      if(dash) dash.classList.add("hidden"); 
+      if (dash) dash.classList.add("hidden"); 
   }
   
   let targetEl = document.getElementById("content-" + tab); if(targetEl) { targetEl.classList.remove("hidden"); targetEl.classList.add(animClass); }
@@ -1385,11 +1390,11 @@ function renderDashboardData(data, isSilent = false) {
   let isOnlyDirOrSup = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("супервайзер");
   
   // ИСПРАВЛЕНО: Единый список технического/кассового персонала для спец-интерфейса
-  const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант"];
+  const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант", "менеджер пвз", "пвз"];
   let isStaffRole = STAFF_ROLES.some(r => roleStr.includes(r));
 
   // Кнопку "+" скрываем для спец-персонала
-  let isAllowedPlusMenu = !isStaffRole; 
+  let isAllowedPlusMenu = !isStaffRole;
 
   if (isAllowedPlusMenu) {
       // ИСПРАВЛЕНО: Запрещаем блоку ФИО сжиматься или переноситься из-за давления margin-left: auto
@@ -1431,8 +1436,8 @@ function renderDashboardData(data, isSilent = false) {
       if (admPlus) admPlus.style.display = "none";
   } 
   
-  // НАДЕЖНОЕ ИСКЛЮЧЕНИЕ: Менеджеры и технический персонал больше не пересекаются с интерфейсом продавцов
-  let isSeller = !isUserPromoter && !isDir && !isZavSklad && !isCashier && !isInfoConsultant && !isSeniorCashier && !isGruzchik; 
+  // ИСПРАВЛЕНО: Строгое определение продавца без накладок на Менеджера ПВЗ и Кассиров
+  let isSeller = !isUserPromoter && !isDir && !isStaffRole;
   
   let elContentCreate = document.getElementById("content-create"); let isCreateTabActive = elContentCreate && !elContentCreate.classList.contains("hidden"); let elMenuList = document.getElementById("menu-list"); let isAnyFormActive = isCreateTabActive && elMenuList && elMenuList.classList.contains("hidden"); let dash = document.getElementById("info-dashboard");
   
