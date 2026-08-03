@@ -104,11 +104,18 @@
         <div id="active-outs-container" class="active-outs-box hidden inner-block" style="background:var(--card-bg);"><div class="active-outs-title">В отсутствии:</div><div id="active-outs-list"></div></div>
         <div id="seller-vac-container" class="inner-block card hidden" style="background:var(--card-bg); margin-top:12px; padding:12px; border:1px solid var(--border-color); border-radius:12px; text-align:left;"></div>
       </div>
-      <div id="content-create" class="hidden">
-        <div id="menu-list">
-          <button onclick="openForm('sc')">Продажа СЦ / Дефект</button><button onclick="openForm('tradein')">Продажа Trade-In</button><button onclick="openForm('points')">Баллы мотивации</button><button onclick="openForm('swap')" class="btn-orange">Рабочая смена</button>
-          <div id="hot-check-card" class="card hidden" style="margin-top: 15px;"></div>
-          <div id="cashier-metrics-card" class="card hidden" style="margin-top: 15px; padding: 12px; text-align: left;">
+      <!-- ===== НАЧАЛО БЛОКА: СОЗДАТЬ И ДЕЙСТВИЯ ===== -->
+      <div id="content-create" class="hidden" style="max-width: 400px; margin: 0 auto; width: 100%; box-sizing: border-box;">
+        
+        <!-- Главное меню кнопок -->
+        <div id="menu-list" style="display: flex; flex-direction: column; gap: 10px; width: 100%; box-sizing: border-box;">
+          <button onclick="openForm('sc')">Продажа СЦ / Дефект</button>
+          <button onclick="openForm('tradein')">Продажа Trade-In</button>
+          <button onclick="openForm('points')">Баллы мотивации</button>
+          <button onclick="openForm('swap')" class="btn-orange">Рабочая смена</button>
+          
+          <div id="hot-check-card" class="card hidden" style="margin-top: 10px;"></div>
+          <div id="cashier-metrics-card" class="card hidden" style="margin-top: 10px; padding: 12px; text-align: left;">
               <h3 style="margin: 0 0 12px 0; font-size: 15px; color: var(--text-color); display: flex; align-items: center; gap: 6px;">
                   <span class="material-symbols-rounded" style="color: #9b59b6; font-size: 20px;">point_of_sale</span>
                   Кассовые показатели
@@ -116,6 +123,7 @@
               <div id="cashier-metrics-dynamic-area"></div>
           </div>
         </div>
+      <!-- ===== КОНЕЦ БЛОКА: МЕНЮ КНОПОК ===== -->
         <div id="form-sc" class="card form-dark hidden" style="padding: 0; background: transparent; border: none; box-shadow: none;">
            <div class="sticky-header glass" style="margin-top:0; padding-bottom: 10px;">
              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom: 12px;">
@@ -136,8 +144,10 @@
         </div>
         <div id="form-tradein" class="card form-dark hidden"><div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;"><h3 style="margin:0; font-size:15px;">Продажа Trade-In</h3><input type="text" id="ft-date" class="smart-date" data-realdate="" style="height:30px; width:115px; margin:0; transition: all 0.3s ease; font-size:13px; background:var(--card-bg); border:1px solid var(--btn-color); color:var(--btn-color) !important; border-radius:8px;"></div><div style="font-size:13px; margin-bottom:8px; color:gray;">Выберите модель из списка:</div><div class="sc-list-container" id="tradein-list" style="max-height:300px;"></div><div class="grid-btns" style="margin-top: 15px;"><button class="btn-gray" onclick="closeForm()">Отмена</button><button onclick="submitTradeIn()">Отправить</button></div></div>
         <div id="form-points" class="card form-dark hidden"><h3 style="font-size:15px;">Баллы мотивации</h3><div id="fp-balance-notice"></div><select id="fp-action"><option value="Придти позже">Придти позже</option><option value="Уйти раньше">Уйти раньше</option></select><select id="fp-time"><option value="30 мин">30 мин</option><option value="1 час">1 час</option><option value="2 часа">2 часа</option><option value="3 часа">3 часа</option></select><p id="fp-date-label" style="margin: 12px 0 6px; font-size: 13px; color:gray;">Укажите дату:</p><input type="text" id="fp-date" class="smart-date" data-realdate=""><div class="grid-btns" style="margin-top: 15px;"><button class="btn-gray" onclick="closeForm()">Отмена</button><button id="fp-submit-btn" onclick="submitPoints()">Отправить</button></div></div>
-        <div id="form-swap" class="card form-dark hidden" style="padding: 0; background: transparent; border: none; box-shadow: none; width: 100%; box-sizing: border-box;">
+        <!-- ===== НАЧАЛО БЛОКА: ФОРМА РАБОЧАЯ СМЕНА ===== -->
+        <div id="form-swap" class="hidden" style="width: 100%; box-sizing: border-box; margin-top: 5px;">
           
+          <!-- 1. Исправление смены за сегодня -->
           <div class="card" style="margin-bottom:12px; padding:12px; border:1px dashed var(--btn-color); background:var(--card-bg); box-shadow:none; width:100%; box-sizing:border-box; text-align:left;">
             <h3 style="margin:0 0 10px 0; font-size:14px; display:flex; align-items:center; gap:6px; color:var(--text-color);">
               <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">edit_calendar</span>
@@ -151,6 +161,7 @@
             <button class="btn-green" onclick="submitFixShift()" style="margin-top:10px; font-size:13px; padding:10px; width:100%; box-sizing:border-box; font-weight:bold;">Отправить исправление</button>
           </div>
           
+          <!-- 2. Обмен сменами -->
           <div class="card" style="margin-bottom:12px; padding:12px; border:1px solid var(--border-color); background:var(--card-bg); box-shadow:none; width:100%; box-sizing:border-box; text-align:left;">
             <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; gap:8px; width:100%;">
                <div style="display:flex; align-items:center; gap:6px; min-width:0;">
@@ -173,71 +184,12 @@
             </div>
           </div>
 
-          <div class="card" style="margin-bottom:12px; padding:12px; border:1px solid var(--border-color); background:var(--card-bg); box-shadow:none; width:100%; box-sizing:border-box; text-align:left;">
-            <h3 style="margin:0 0 10px 0; font-size:14px; display:flex; align-items:center; gap:6px; color:var(--text-color);">
-              <span class="material-symbols-rounded" style="color:#27ae60; font-size:18px;">flight_takeoff</span>
-              Заявка в отпуск
-            </h3>
-            <div style="display:flex; gap:8px; margin-bottom:12px; width:100%; box-sizing:border-box;">
-              <div style="flex:1; min-width:0;">
-                 <div style="font-size:11px; color:gray; margin-bottom:4px;">Начало:</div>
-                 <input type="date" id="vac-start" style="width:100%; height:36px; line-height:34px; padding:0; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-family:inherit; text-align:center; -webkit-appearance:none; appearance:none;">
-              </div>
-              <div style="flex:1; min-width:0;">
-                 <div style="font-size:11px; color:gray; margin-bottom:4px;">Конец:</div>
-                 <input type="date" id="vac-end" style="width:100%; height:36px; line-height:34px; padding:0; box-sizing:border-box; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-family:inherit; text-align:center; -webkit-appearance:none; appearance:none;">
-              </div>
-            </div>
-            <button class="btn-green" onclick="submitVacation()" style="margin-bottom:15px; width:100%; font-size:13px; padding:10px; box-sizing:border-box; font-weight:bold;">Отправить заявку</button>
-            
-            <div style="font-size:14px; font-weight:bold; margin-bottom:8px; color:var(--text-color); border-bottom:1px solid rgba(150,150,150,0.1); padding-bottom:6px; display:flex; align-items:center; gap:6px;"><span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">flight_takeoff</span> График отпусков:</div>
-            <div id="vacation-list-container" style="max-height:150px; overflow-y:auto; padding:4px; width:100%; box-sizing:border-box;"></div>
-          </div>
-
-          <div id="cashier-overtime-block" class="card hidden" style="margin-bottom:12px; padding:12px; border:1px solid var(--border-color); background:var(--card-bg); box-shadow:none; width:100%; box-sizing:border-box; text-align:left;">
-            <h3 style="margin:0 0 10px 0; font-size:14px; display:flex; align-items:center; gap:6px; color:var(--text-color);">
-              <span class="material-symbols-rounded" style="color:#f39c12; font-size:18px;">more_time</span>
-              Подать на переработку
-            </h3>
-
-            <div style="display:flex; background:var(--bg-color); padding:2px; border-radius:8px; margin-bottom:10px; border:1px solid var(--border-color); box-sizing:border-box; width:100%;">
-                <button id="tab-co-hours" type="button" style="flex:1; border:none; padding:6px; font-size:11px; font-weight:bold; border-radius:6px; cursor:pointer; background:var(--card-bg); color:var(--text-color); box-shadow:0 1px 3px rgba(0,0,0,0.1); -webkit-tap-highlight-color:transparent;" onclick="window.switchCashierOvertimeTab('hours')">По часам</button>
-                <button id="tab-co-days" type="button" style="flex:1; border:none; padding:6px; font-size:11px; font-weight:bold; border-radius:6px; cursor:pointer; background:none; color:gray; -webkit-tap-highlight-color:transparent;" onclick="window.switchCashierOvertimeTab('days')">По дням</button>
-            </div>
-
-            <input type="hidden" id="co-current-type" value="hours">
-
-            <div id="block-co-hours" style="width:100%; box-sizing:border-box; display:block;">
-                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Дата переработки</label>
-                <input type="date" id="co-hours-date" style="width:100% !important; max-width:100% !important; min-width:0 !important; height:34px; padding:0; margin:0 0 10px 0; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1px solid var(--border-color); font-size:11px; box-sizing:border-box; display:block; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
-                
-                <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; width:100%; box-sizing:border-box;">
-                    <div style="min-width:0; width:100%;">
-                        <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время с</label>
-                        <input type="time" id="co-hours-from" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:block; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
-                    </div>
-                    <div style="min-width:0; width:100%;">
-                        <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время до</label>
-                        <input type="time" id="co-hours-to" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:block; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
-                    </div>
-                </div>
-            </div>
-
-            <div id="block-co-days" style="width:100%; box-sizing:border-box; display:none;">
-                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">День переработки</label>
-                <input type="date" id="co-days-date" style="width:100% !important; max-width:100% !important; min-width:0 !important; height:34px; padding:0; margin:0 0 10px 0; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1px solid var(--border-color); font-size:11px; box-sizing:border-box; display:block; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
-            </div>
-
-            <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Причина переработки</label>
-            <textarea id="co-comment" placeholder="Опишите причину..." style="width:100%; height:54px; padding:8px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1px solid var(--border-color); font-size:12px; margin-bottom:12px; resize:none; font-family:inherit; box-sizing:border-box; display:block; max-width:100%;"></textarea>
-            
-            <button class="btn-primary" type="button" onclick="window.submitCashierOvertimeForm();" style="width:100%; margin:0; padding:10px; font-size:13px; height:38px; background:#f39c12; border-color:#f39c12; box-sizing:border-box; font-weight:bold;">Отправить заявку</button>
-          </div>
-
-          <div class="grid-btns" style="width:100%; box-sizing:border-box; margin-top:4px;">
-            <button class="btn-gray" type="button" onclick="closeForm()" style="grid-column: 1 / -1; width:100%; margin:0;">Закрыть окно</button>
+          <!-- 3. Кнопка «Закрыть окно» -->
+          <div style="width:100%; box-sizing:border-box; margin-top:10px; margin-bottom:20px;">
+            <button class="btn-gray" type="button" onclick="closeForm()" style="width:100%; margin:0; height:42px; font-weight:bold;">Закрыть окно</button>
           </div>
         </div>
+        <!-- ===== КОНЕЦ БЛОКА: ФОРМА РАБОЧАЯ СМЕНА ===== -->
   
       </div>
       <div id="content-inbox" class="hidden">
