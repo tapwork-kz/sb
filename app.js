@@ -224,6 +224,7 @@ async function callBackend(actionName, payloadData = {}) {
         if (r.includes("заведующий складом")) return "Заведующий складом";
         if (r.includes("грузчик")) return "Грузчик";
         if (r.includes("инфо-консультант")) return "Инфо-консультант";
+        if (r.includes("менеджер пвз") || r.includes("пвз")) return "Менеджер ПВЗ";
         if (r.includes("продавец")) return "Продавец"; 
         return "Продавец"; 
     };
@@ -1078,7 +1079,7 @@ function initSwipe() {
             let isSeniorCashier = roleStr.includes("старший кассир"); 
             let isGruzchik = roleStr.includes("грузчик"); // ДОБАВЛЕНО
             
-            const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант"];
+            const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант", "менеджер пвз", "пвз"];
             let isStaffRole = STAFF_ROLES.some(r => roleStr.includes(r));
 
             let tabs = isDir ? 
@@ -3436,7 +3437,7 @@ function renderActiveVacationsCard(targetContainerId, titleText = "Отпуск�
 
           let lowRole = String(v.authorRole || "").toLowerCase().trim();
           let roleDeptStr = "";
-          if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант") || lowRole.includes("грузчик")) {
+          if (lowRole.includes("старший кассир") || lowRole.includes("инфо-консультант") || lowRole.includes("грузчик") || lowRole.includes("менеджер пвз") || lowRole.includes("пвз")) {
               roleDeptStr = ` — ${lowRole}`;
           } else {
               let roleWord = (v.authorRole || "Продавец").split(/[\s-]/)[0].toLowerCase();
@@ -3584,7 +3585,7 @@ function renderAdminEmps(dept, btnElement) {
        listContent.innerHTML = sellersHtml || "<p style='color:gray; font-size:12px; text-align:center;'>Продавцов нет</p>";
    } else {
        // ПОДРАЗДЕЛ 2: АУП / Персонал со строгой ручной сортировкой должностей
-       const aupRolesOrder = ["Директор", "Супервайзер", "Старший кассир", "Кассир", "Заведующий складом", "Инфо-консультант", "Грузчик"];
+       const aupRolesOrder = ["Директор", "Супервайзер", "Старший кассир", "Кассир", "Заведующий складом", "Инфо-консультант", "Менеджер ПВЗ", "Грузчик"];
        let groups = {};
        aupRolesOrder.forEach(r => groups[r] = []);
        groups["Другой персонал"] = [];
@@ -4694,7 +4695,8 @@ window.renderAdminTabelSummaryData = async function() {
         if (r.includes("заведующий")) return 5;
         if (r.includes("инфо-консультант")) return 6;
         if (r.includes("грузчик")) return 7;
-        return 8; // Резервный шаг для неучтенных позиций
+        if (r.includes("пвз") || r.includes("менеджер пвз")) return 8;
+        return 9;
     }
     
     // ИСПРАВЛЕНО: Разделение потоков с жесткой фильтрацией должностей
@@ -5274,6 +5276,7 @@ window.openStaffSwapForm = function() {
             if (roleKey.includes("склад") && eRole.includes("склад")) return true;
             if (roleKey.includes("грузчик") && eRole.includes("грузчик")) return true;
             if (roleKey.includes("инфо") && eRole.includes("инфо")) return true;
+            if ((roleKey.includes("пвз") || roleKey.includes("менеджер пвз")) && (eRole.includes("пвз") || eRole.includes("менеджер пвз"))) return true;
             return false;
         }) : [];
         
