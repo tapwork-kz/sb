@@ -273,7 +273,7 @@ async function callBackend(actionName, payloadData = {}) {
       const todayStart = new Date(); todayStart.setHours(0,0,0,0); 
       const currentHour = new Date().getHours();
 
-      // ИСПРАВЛЕНО: Регистронезависимый поиск роли (ilike)
+      // Запрашиваем лимиты из БД
       const [ limitRes, logsRes ] = await Promise.all([ 
           supabaseClient.from('time_limits').select('*').ilike('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(), 
           supabaseClient.from('time_tracking').select('*, users(full_name, role, dept)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true }) 
@@ -282,7 +282,7 @@ async function callBackend(actionName, payloadData = {}) {
       const limitData = limitRes.data;
       const todayLogs = logsRes.data || [];
 
-      // Задаем гарантированные безопасные значения по умолчанию, если записи в таблице time_limits нет
+      // Гарантированные безопасные лимиты по умолчанию
       const breakLimit = limitData?.break_limit ?? 1;
       const lunchLimit = limitData?.lunch_limit ?? 1;
       const snackLimit = limitData?.snack_limit ?? 1;
@@ -294,7 +294,15 @@ async function callBackend(actionName, payloadData = {}) {
       todayLogs.forEach(log => { 
           if (log.iin === payloadData.iin) myLogs.push(log); 
           if (log.direction === 'Уход') { 
-              activeOutsMap[log.iin] = { iin: log.iin, action: log.action_type, leftAt: new Date(log.created_at).getTime(), name: log.users ? log.users.full_name : 'Сотрудник', role: log.users ? log.users.role : log.role_group, dept: log.users ? log.users.dept : 'Цифра' }; 
+              let exactRole = log.users ? log.users.role : log.role_group;
+              activeOutsMap[log.iin] = { 
+                  iin: log.iin, 
+                  action: log.action_type, 
+                  leftAt: new Date(log.created_at).getTime(), 
+                  name: log.users ? log.users.full_name : 'Сотрудник', 
+                  role: exactRole, 
+                  dept: log.users ? log.users.dept : 'Цифра' 
+              }; 
           } else { 
               delete activeOutsMap[log.iin]; 
           } 
@@ -304,9 +312,12 @@ async function callBackend(actionName, payloadData = {}) {
       let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; 
       let totalOut = 0;
 
+      // ИСПРАВЛЕНО: Безопасное сопоставление группы ролей без падения на спец-персонале
       for (let key in activeOutsMap) { 
-          let activeRole = String(activeOutsMap[key].role || "").toLowerCase();
-          if (activeRole.includes(roleGroup.toLowerCase())) { 
+          let activeUserRole = String(activeOutsMap[key].role || "").toLowerCase();
+          let targetGroup = roleGroup.toLowerCase();
+          
+          if (activeUserRole.includes(targetGroup) || targetGroup.includes(activeUserRole)) { 
               let act = activeOutsMap[key].action; 
               if (act && act.startsWith('Перерыв')) outByAction['Перерыв']++; 
               else if (outByAction[act] !== undefined) outByAction[act]++; 
@@ -1334,8 +1345,12 @@ async function loadDashboard(isSilent = false) {
   let state = await callBackend('startupCheck', { token: appState.token, iin: appState.iin, tgUserId: null }); 
   if(state && state.authorized !== false) { 
       globalActiveOuts = state.activeOuts || []; 
-      // ИСПРАВЛЕНО: Лимиты времени и кнопки перерывов применяются только к продавцам/кассирам
-      if (!isDir && !isZavSklad && !isInfoConsultant && !isSeniorCashier && !isGruzchik) { 
+      
+      let roleStr = String(appState.role).toLowerCase();
+      let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер");
+
+      // ИСПРАВЛЕНО: Применяем лимиты и состояние кнопок перерывов для ВСЕХ сотрудников (включая Кассиров, Склад, Грузчиков, Инфо)
+      if (!isDir) { 
           appState.currentAction = state.myActiveAction || ""; 
           saveMemory("currentAction", appState.currentAction); 
           renderTimeUI(); 
