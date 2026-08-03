@@ -2783,15 +2783,11 @@ window.openAdminOvertimeForm = function() {
                 <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:10px; width:100%; box-sizing:border-box;">
                     <div style="min-width:0; width:100%;">
                         <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время с</label>
-                        <select id="ov-hours-from" style="width:100%; height:34px; padding:0 8px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:12px; font-weight:bold; box-sizing:border-box;">
-                            <option value="08:00">08:00</option><option value="09:00">09:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option><option value="12:00">12:00</option><option value="13:00">13:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option><option value="17:00">17:00</option><option value="18:00" selected>18:00</option><option value="19:00">19:00</option><option value="20:00">20:00</option><option value="21:00">21:00</option><option value="22:00">22:00</option><option value="23:00">23:00</option>
-                        </select>
+                        <input type="time" id="ov-hours-from" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:flex; align-items:center; justify-content:center; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
                     </div>
                     <div style="min-width:0; width:100%;">
                         <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Время до</label>
-                        <select id="ov-hours-to" style="width:100%; height:34px; padding:0 8px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:12px; font-weight:bold; box-sizing:border-box;">
-                            <option value="09:00">09:00</option><option value="10:00">10:00</option><option value="11:00">11:00</option><option value="12:00">12:00</option><option value="13:00">13:00</option><option value="14:00">14:00</option><option value="15:00">15:00</option><option value="16:00">16:00</option><option value="17:00">17:00</option><option value="18:00">18:00</option><option value="19:00" selected>19:00</option><option value="20:00">20:00</option><option value="21:00">21:00</option><option value="22:00">22:00</option><option value="23:00">23:00</option><option value="00:00">00:00</option>
-                        </select>
+                        <input type="time" id="ov-hours-to" style="width:100%; height:34px; padding:0 2px; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1.5px solid #f39c12; font-size:11px; font-weight:bold; box-sizing:border-box; display:flex; align-items:center; justify-content:center; text-align:center; text-align-last:center; -webkit-appearance:none; appearance:none;">
                     </div>
                 </div>
             </div>
@@ -5221,86 +5217,39 @@ window.selectAdminHistEmp = function(iin, name) {
     renderAdminHistory(currentHistFilter);
 };
 
-// ИСПРАВЛЕНО: Стабильное модальное окно рабочей смены без дерганья верстки
+// ИСПРАВЛЕНО: Стабильное открытие формы смены для кассиров, складов, грузчиков и инфо
 window.openStaffSwapForm = function() {
-    let existingModal = document.getElementById("staff-swap-modal-overlay");
-    if (existingModal) existingModal.remove();
-
-    let roleKey = String(appState.role || "").toLowerCase();
-    let peers = (typeof adminEmployeesGlobal !== 'undefined' && adminEmployeesGlobal) ? adminEmployeesGlobal.filter(e => {
-        if (!e || e.iin === appState.iin || String(e.login_status).toUpperCase() === 'FALSE') return false;
-        let eRole = String(e.role || "").toLowerCase();
-        if (roleKey.includes("кассир") && eRole.includes("кассир")) return true;
-        if (roleKey.includes("склад") && eRole.includes("склад")) return true;
-        if (roleKey.includes("грузчик") && eRole.includes("грузчик")) return true;
-        if (roleKey.includes("инфо") && eRole.includes("инфо")) return true;
-        return false;
-    }) : [];
-
-    let peerOptionsHtml = '<option value="" disabled selected>Выберите сменщика</option>' + 
-        peers.map(s => `<option value="${s.iin}">${s.name} (${s.role || ''})</option>`).join("");
-
-    let modal = document.createElement("div");
-    modal.id = "staff-swap-modal-overlay";
-    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
-    modal.innerHTML = `
-        <div class="card" style="width:100%; max-width:340px; background:var(--card-bg); padding:16px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; box-sizing:border-box; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
-            <h3 style="margin:0 0 14px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
-              <span class="material-symbols-rounded" style="color:#3498db; font-size:18px;">published_with_changes</span>
-              Обмен сменами
-            </h3>
-
-            <div style="margin-bottom:10px;">
-                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Выберите сменщика:</label>
-                <select id="modal-fs-target" style="width:100%; height:38px; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-size:13px; padding:0 8px;">
-                    ${peerOptionsHtml}
-                </select>
-            </div>
-
-            <div style="margin-bottom:10px;">
-                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Дата смены:</label>
-                <input type="date" id="modal-fs-date" style="width:100%; height:36px; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-size:12px; text-align:center;">
-            </div>
-
-            <div style="margin-bottom:16px;">
-                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block;">Ваша смена:</label>
-                <select id="modal-fs-shift" style="width:100%; height:38px; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-size:13px; padding:0 8px;">
-                    <option value="Полная смена">Полная смена</option>
-                    <option value="1 смена">1 смена (утро)</option>
-                    <option value="2 смена">2 смена (вечер)</option>
-                </select>
-            </div>
-
-            <div style="display:flex; gap:10px; width:100%; box-sizing:border-box;">
-                <button class="btn-gray" onclick="document.getElementById('staff-swap-modal-overlay').remove();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px;">Отмена</button>
-                <button class="btn-blue" onclick="window.submitModalStaffSwap();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px;">Отправить</button>
-            </div>
-        </div>
-    `;
-    modal.onclick = () => modal.remove();
-    document.body.appendChild(modal);
-
-    let todayIso = new Date().toISOString().split('T')[0];
-    document.getElementById("modal-fs-date").value = todayIso;
-};
-
-// Функция отправки заявки обмена из модального окна
-window.submitModalStaffSwap = function() {
-    const select = document.getElementById("modal-fs-target");
-    const targetIin = select ? select.value : "";
-    if (!targetIin) return showToast("Выберите сменщика из списка!", true);
-
-    const dateVal = document.getElementById("modal-fs-date").value;
-    if (!dateVal) return showToast("Укажите дату смены!", true);
-
-    let p = dateVal.split('-');
-    let formattedDate = `${p[2]}.${p[1]}.${p[0]}`;
-    const shiftStr = document.getElementById("modal-fs-shift").value;
-    const targetName = select.options[select.selectedIndex].text;
-    const details = `Дата: ${formattedDate}, Смена: ${shiftStr}`;
-
-    let overlay = document.getElementById("staff-swap-modal-overlay");
-    if (overlay) overlay.remove();
-
-    executeSubmit("Обмен сменами", details, targetIin, "", "Запрос отправлен: " + targetName);
+    let formSwap = document.getElementById("form-swap");
+    let menuList = document.getElementById("menu-list");
+    if (!formSwap) return;
+    
+    if (menuList) menuList.classList.add("hidden");
+    
+    // Показываем стандартные блоки формы обмена сменами, скрывая лишнее для продавцов если нужно
+    formSwap.classList.remove("hidden");
+    formSwap.classList.add("slide-up-fade");
+    
+    // Заполняем список сменщиков (коллег по должности)
+    const select = document.getElementById("fs-target");
+    if (select) {
+        let roleKey = String(appState.role || "").toLowerCase();
+        let peers = (typeof adminEmployeesGlobal !== 'undefined' && adminEmployeesGlobal) ? adminEmployeesGlobal.filter(e => {
+            if (!e || e.iin === appState.iin || String(e.login_status).toUpperCase() === 'FALSE') return false;
+            let eRole = String(e.role || "").toLowerCase();
+            if (roleKey.includes("кассир") && eRole.includes("кассир")) return true;
+            if (roleKey.includes("склад") && eRole.includes("склад")) return true;
+            if (roleKey.includes("грузчик") && eRole.includes("грузчик")) return true;
+            if (roleKey.includes("инфо") && eRole.includes("инфо")) return true;
+            return false;
+        }) : [];
+        
+        select.innerHTML = '<option value="" disabled selected>Выберите сменщика</option>' + 
+            peers.map(s => `<option value="${s.iin}">${s.name}</option>`).join("");
+    }
+    
+    let extra = document.getElementById("fs-extra");
+    if (extra) extra.classList.add("hidden");
+    
+    let scroller = document.getElementById("scrollable-body"); 
+    if (scroller) scroller.scrollTop = 0;
 };
