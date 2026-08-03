@@ -4188,7 +4188,7 @@ window.openAdminOvertimeSummary = function() {
     window.renderAdminOvertimeSummaryData();
 };
 
-// ИСПРАВЛЕНО: Сводный подсчет поданных переработок из таблицы requests (дни и часы) с калькулятором разницы времени
+// ИСПРАВЛЕНО: Учитываются СТРОГО ОДОБРЕННЫЕ переработки + обновлен цвет текста (черный/желтый)
 window.renderAdminOvertimeSummaryData = async function() {
     let navContainer = document.getElementById("admin-overtime-nav-container");
     let scrollArea = document.getElementById("admin-overtime-scroll-area");
@@ -4240,7 +4240,7 @@ window.renderAdminOvertimeSummaryData = async function() {
     }
 
     try {
-        // ИСПРАВЛЕНО: Тянем данные напрямую из таблицы requests по нужным типам переработок
+        // Тянем данные из таблицы requests
         let { data: reqList, error } = await supabaseClient
             .from('requests')
             .select('*')
@@ -4248,6 +4248,11 @@ window.renderAdminOvertimeSummaryData = async function() {
             
         if (!error && reqList) {
             reqList.forEach(row => {
+                // ИСПРАВЛЕНО: Пропускаем все неодобренные заявки (status !== approved)
+                let st = String(row.status || "").toLowerCase();
+                let isApproved = st === 'approved' || st === 'approved_notify_zav' || st === 'система';
+                if (!isApproved) return;
+
                 let meta = {};
                 try {
                     meta = typeof row.metadata === 'string' ? JSON.parse(row.metadata) : (row.metadata || {});
@@ -4257,7 +4262,7 @@ window.renderAdminOvertimeSummaryData = async function() {
                 
                 // Проверяем, относится ли заявка к выбранному в календаре месяцу и году
                 if (dateStr.includes(targetMonthSuffix)) {
-                    let iin = row.target_iin || meta.target_iin;
+                    let iin = row.target_iin || meta.target_iin || row.author_iin;
                     if (!iin) return;
                     
                     if (!ovMap[iin]) {
@@ -4294,24 +4299,27 @@ window.renderAdminOvertimeSummaryData = async function() {
         let ovData = ovMap[e.iin];
         if (ovData && (ovData.days > 0 || ovData.totalHours > 0)) {
             totalOvertimesCount++;
-            // ИСПРАВЛЕНО: Выводим должность сотрудника (e.role) вместо отдела
             let roleStr = e.role ? ` <span style="color:gray; font-size:11px;">(${e.role})</span>` : '';
             
+            // ИСПРАВЛЕНО: Цвет становится желтым/оранжевым (#f39c12) ТОЛЬКО при наличии переработки
+            let daysColor = ovData.days > 0 ? "#f39c12" : "var(--text-color)";
+            let hoursColor = ovData.totalHours > 0 ? "#f39c12" : "var(--text-color)";
+
             listHtml += `
             <div style="padding:10px 4px; border-bottom:1px solid var(--border-color); display:flex; flex-direction:column; justify-content:center; gap:4px;">
                 <div style="font-size:13px; font-weight:bold; color:var(--text-color); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
                     ${e.name}${roleStr}
                 </div>
                 <div style="font-size:11px; color:gray; display:flex; gap:12px; align-items:center;">
-                    <span>По дням: <b style="color:var(--text-color);">${ovData.days} дн.</b></span>
-                    <span>По часам: <b style="color:#f39c12;">${formatHoursResult(ovData.totalHours)}</b></span>
+                    <span>По дням: <b style="color:${daysColor};">${ovData.days} дн.</b></span>
+                    <span>По часам: <b style="color:${hoursColor};">${formatHoursResult(ovData.totalHours)}</b></span>
                 </div>
             </div>`;
         }
     });
     
     if (totalOvertimesCount === 0) {
-        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Переработок за этот месяц не найдено</p>`;
+        listHtml = `<p style="text-align:center; color:gray; font-size:12px; padding:40px 0;">Одобренных переработок за этот месяц не найдено</p>`;
     }
     
     scrollArea.innerHTML = listHtml;
@@ -5237,95 +5245,39 @@ window.selectAdminHistEmp = function(iin, name) {
     renderAdminHistory(currentHistFilter);
 };
 
-// ИСПРАВЛЕНО: Стабильное модальное окно смены с затемнением и плавным открытием (без дёрганий)
+// ИСПРАВЛЕНО: Стабильное открытие формы смены для кассиров, складов, грузчиков и инфо
 window.openStaffSwapForm = function() {
-    let existingModal = document.getElementById("staff-swap-modal-overlay");
-    if (existingModal) existingModal.remove();
-
-    let roleKey = String(appState.role || "").toLowerCase();
-    let peers = (typeof adminEmployeesGlobal !== 'undefined' && adminEmployeesGlobal) ? adminEmployeesGlobal.filter(e => {
-        if (!e || e.iin === appState.iin || String(e.login_status).toUpperCase() === 'FALSE') return false;
-        let eRole = String(e.role || "").toLowerCase();
-        if (roleKey.includes("кассир") && eRole.includes("кассир")) return true;
-        if (roleKey.includes("склад") && eRole.includes("склад")) return true;
-        if (roleKey.includes("грузчик") && eRole.includes("грузчик")) return true;
-        if (roleKey.includes("инфо") && eRole.includes("инфо")) return true;
-        return false;
-    }) : [];
+    let formSwap = document.getElementById("form-swap");
+    let menuList = document.getElementById("menu-list");
+    if (!formSwap) return;
     
-    peers.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
-
-    let peerOptionsHtml = `<option value="" disabled selected>Выберите сменщика</option>` + 
-        peers.map(s => `<option value="${s.iin}">${s.name}</option>`).join("");
-
-    let modal = document.createElement("div");
-    modal.id = "staff-swap-modal-overlay";
-    modal.style = "position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.4); backdrop-filter:blur(3px); z-index:10000; display:flex; align-items:center; justify-content:center; padding:16px; box-sizing:border-box;";
+    if (menuList) menuList.classList.add("hidden");
     
-    modal.innerHTML = `
-        <div class="card" style="width:100%; max-width:340px; background:var(--card-bg); padding:16px; border-radius:16px; box-shadow:0 8px 24px rgba(0,0,0,0.2); border:1px solid var(--border-color); display:flex; flex-direction:column; box-sizing:border-box; animation:slide-up-fade 0.2s ease;" onclick="event.stopPropagation();">
-            <h3 style="margin:0 0 14px 0; font-size:14px; text-align:left; display:flex; align-items:center; gap:6px; color:var(--text-color);">
-              <span class="material-symbols-rounded" style="color:#3498db; font-size:18px;">published_with_changes</span>
-              Рабочая смена
-            </h3>
-
-            <div style="margin-bottom:10px;">
-                <label style="font-size:11px; color:gray; margin-bottom:4px; display:block; text-align:left;">Сменщик:</label>
-                <select id="modal-fs-target" style="width:100%; height:38px; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-size:12px; padding:0 8px;" onchange="let ex = document.getElementById('modal-fs-extra'); if(this.value) ex.classList.remove('hidden');">
-                    ${peerOptionsHtml}
-                </select>
-            </div>
-
-            <div id="modal-fs-extra" class="hidden">
-                <div style="margin-bottom:10px;">
-                    <label style="font-size:11px; color:gray; margin-bottom:4px; display:block; text-align:left;">Дата смены:</label>
-                    <input type="date" id="modal-fs-date" style="width:100%; height:36px; padding:0; border-radius:8px; background:var(--inner-bg); color:var(--text-color); border:1px solid var(--border-color); font-size:12px; text-align:center; -webkit-appearance:none; appearance:none;">
-                </div>
-
-                <div style="margin-bottom:14px;">
-                    <label style="font-size:11px; color:gray; margin-bottom:4px; display:block; text-align:left;">Время / Тип смены:</label>
-                    <select id="modal-fs-shift" style="width:100%; height:38px; border-radius:8px; border:1px solid var(--border-color); background:var(--inner-bg); color:var(--text-color); font-size:12px; padding:0 8px;">
-                        <option value="Полная смена">Полная смена</option>
-                        <option value="Дневная смена">Дневная смена</option>
-                        <option value="Вечерняя смена">Вечерняя смена</option>
-                    </select>
-                </div>
-            </div>
-
-            <div style="display:flex; gap:8px; margin-top:4px;">
-                <button class="btn-gray" onclick="document.getElementById('staff-swap-modal-overlay').remove();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px;">Отмена</button>
-                <button class="btn-blue" onclick="window.submitModalStaffSwap();" style="flex:1; margin:0; padding:10px; font-size:13px; height:38px;">Отправить</button>
-            </div>
-        </div>
-    `;
-
-    modal.onclick = () => modal.remove();
-    document.body.appendChild(modal);
-
-    let todayIso = new Date().toISOString().split('T')[0];
-    let dInput = document.getElementById("modal-fs-date");
-    if (dInput) dInput.value = todayIso;
-};
-
-// Функция отправки формы обмена сменами из модального окна
-window.submitModalStaffSwap = function() {
-    let select = document.getElementById("modal-fs-target");
-    if (!select || !select.value) return showToast("Выберите сменщика!", true);
-
-    let targetIin = select.value;
-    let targetName = select.options[select.selectedIndex].text;
-    let dateVal = document.getElementById("modal-fs-date").value;
+    // Показываем стандартные блоки формы обмена сменами, скрывая лишнее для продавцов если нужно
+    formSwap.classList.remove("hidden");
+    formSwap.classList.add("slide-up-fade");
     
-    if (!dateVal) return showToast("Выберите дату смены!", true);
-
-    let p = dateVal.split('-');
-    let formattedDate = `${p[2]}.${p[1]}.${p[0]}`;
-    let shiftStr = document.getElementById("modal-fs-shift").value;
-
-    let details = `Дата: ${formattedDate}, Смена: ${shiftStr}`;
+    // Заполняем список сменщиков (коллег по должности)
+    const select = document.getElementById("fs-target");
+    if (select) {
+        let roleKey = String(appState.role || "").toLowerCase();
+        let peers = (typeof adminEmployeesGlobal !== 'undefined' && adminEmployeesGlobal) ? adminEmployeesGlobal.filter(e => {
+            if (!e || e.iin === appState.iin || String(e.login_status).toUpperCase() === 'FALSE') return false;
+            let eRole = String(e.role || "").toLowerCase();
+            if (roleKey.includes("кассир") && eRole.includes("кассир")) return true;
+            if (roleKey.includes("склад") && eRole.includes("склад")) return true;
+            if (roleKey.includes("грузчик") && eRole.includes("грузчик")) return true;
+            if (roleKey.includes("инфо") && eRole.includes("инфо")) return true;
+            return false;
+        }) : [];
+        
+        select.innerHTML = '<option value="" disabled selected>Выберите сменщика</option>' + 
+            peers.map(s => `<option value="${s.iin}">${s.name}</option>`).join("");
+    }
     
-    let modal = document.getElementById("staff-swap-modal-overlay");
-    if (modal) modal.remove();
-
-    executeSubmit("Обмен сменами", details, targetIin, "", "Запрос отправлен: " + targetName);
+    let extra = document.getElementById("fs-extra");
+    if (extra) extra.classList.add("hidden");
+    
+    let scroller = document.getElementById("scrollable-body"); 
+    if (scroller) scroller.scrollTop = 0;
 };
