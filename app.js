@@ -3780,6 +3780,7 @@ function openForm(type) {
   let scroller = document.getElementById("scrollable-body"); if (scroller) scroller.scrollTop = 0;
 }
 
+// ИСПРАВЛЕНО: Четкий возврат на вкладку и восстановление списка кнопок
 function closeForm() { 
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
@@ -3788,7 +3789,7 @@ function closeForm() {
   
   let dash = document.getElementById("info-dashboard"); 
   
-  // Дашборд продавца показываем только обычным продавцам
+  // Показываем верхний баннер только рядовым продавцам
   if (!isUserPromoter && !isDir && !isStaffRole) { 
       if (dash) {
           dash.classList.remove("hidden"); 
@@ -3799,13 +3800,16 @@ function closeForm() {
       if (dash) dash.classList.add("hidden");
   }
   
-  // Закрываем все всплывающие формы
+  // Прячем все открытые формы
   ["form-sc", "form-tradein", "form-points", "form-swap"].forEach(id => { 
       let el = document.getElementById(id); 
-      if (el) { el.classList.add("hidden"); el.classList.remove("slide-up-fade"); }
+      if (el) { 
+          el.classList.add("hidden"); 
+          el.classList.remove("slide-up-fade"); 
+      }
   }); 
   
-  // ИСПРАВЛЕНО: Корректное возвращение к списку кнопок второй вкладки "Создать"
+  // Восстанавливаем список кнопок меню
   let menu = document.getElementById("menu-list"); 
   if (menu && !isDir) {
       menu.classList.remove("hidden"); 
@@ -3815,9 +3819,7 @@ function closeForm() {
       menu.classList.add("fade-in"); 
   }
   
-  // Переключаем активный экран строго на текущую логическую вкладку
-  switchTab(lastActiveTab || 'create');
-
+  // Переключаем скролл наверх
   let scroller = document.getElementById("scrollable-body"); 
   if (scroller) scroller.scrollTop = 0; 
 }
@@ -5245,15 +5247,19 @@ window.selectAdminHistEmp = function(iin, name) {
     renderAdminHistory(currentHistFilter);
 };
 
-// ИСПРАВЛЕНО: Стабильное открытие формы смены для кассиров, складов, грузчиков и инфо
+// ИСПРАВЛЕНО: Стабильное открытие формы смены без ухода вниз и срыва CSS
 window.openStaffSwapForm = function() {
     let formSwap = document.getElementById("form-swap");
     let menuList = document.getElementById("menu-list");
+    let dash = document.getElementById("info-dashboard");
+
     if (!formSwap) return;
     
+    // Скрываем главное меню и дашборд продавца
     if (menuList) menuList.classList.add("hidden");
-    
-    // Показываем стандартные блоки формы обмена сменами, скрывая лишнее для продавцов если нужно
+    if (dash) dash.classList.add("hidden");
+
+    // Показываем форму смены в изолированном блоке
     formSwap.classList.remove("hidden");
     formSwap.classList.add("slide-up-fade");
     
