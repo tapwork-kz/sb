@@ -1513,6 +1513,9 @@ function renderDashboardData(data, isSilent = false) {
 
       // 3. Формируем 2-ю вкладку "Создать/Действия" с 3 кнопками
       let menuList = document.getElementById("menu-list");
+      let formSwap = document.getElementById("form-swap");
+      let isSwapOpen = formSwap && !formSwap.classList.contains("hidden");
+
       if (menuList) {
           menuList.innerHTML = `
               <div class="inner-block card" style="padding:14px; background:var(--card-bg); border:1px solid var(--border-color); border-radius:12px; display:flex; flex-direction:column; gap:10px;">
@@ -1530,7 +1533,12 @@ function renderDashboardData(data, isSilent = false) {
                   </button>
               </div>
           `;
-          menuList.classList.remove("hidden");
+          // ИСПРАВЛЕНО: Если форма "Рабочая смена" открыта, не показываем кнопочное меню поверх нее при обновлении данных
+          if (isSwapOpen) {
+              menuList.classList.add("hidden");
+          } else {
+              menuList.classList.remove("hidden");
+          }
       }
 
       // 4. Обработка входящих уведомлений
@@ -3598,7 +3606,7 @@ function renderAdminEmps(dept, btnElement) {
        allEmployeesData.forEach(e => {
            if (String(e.login_status).toUpperCase() === 'FALSE') return;
            let rLow = String(e.role || "").toLowerCase();
-           let isAup = rLow.includes("директор") || rLow.includes("управляющий") || rLow.includes("админ") || rLow.includes("супервайзер") || rLow.includes("заведующий") || rLow.includes("инфо-консультант") || rLow.includes("старший кассир") || rLow.includes("грузчик") || rLow.includes("кассир");
+           let isAup = rLow.includes("директор") || rLow.includes("управляющий") || rLow.includes("админ") || rLow.includes("супервайзер") || rLow.includes("заведующий") || rLow.includes("инфо-консультант") || rLow.includes("старший кассир") || rLow.includes("грузчик") || rLow.includes("кассир") || rLow.includes("пвз") || rLow.includes("менеджер пвз");
            
            if (isAup) {
                let matched = false;
@@ -3790,7 +3798,7 @@ function openForm(type) {
 function closeForm() { 
   let roleStr = String(appState.role).toLowerCase(); 
   let isDir = roleStr.includes("директор") || roleStr.includes("управляющий") || roleStr.includes("админ") || roleStr.includes("супервайзер"); 
-  const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант"];
+  const STAFF_ROLES = ["старший кассир", "кассир", "заведующий складом", "грузчик", "инфо-консультант", "менеджер пвз", "пвз"];
   let isStaffRole = STAFF_ROLES.some(r => roleStr.includes(r));
   
   let dash = document.getElementById("info-dashboard"); 
