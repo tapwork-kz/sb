@@ -268,16 +268,83 @@ async function callBackend(actionName, payloadData = {}) {
     }
 
     if (actionName === "startupCheck") {
-      const roleGroup = getRoleGroup(); const dayOfWeek = new Date().getDay() || 7; const todayStart = new Date(); todayStart.setHours(0,0,0,0); const currentHour = new Date().getHours();
-      const [ { data: limitData }, { data: todayLogs } ] = await Promise.all([ supabaseClient.from('time_limits').select('*').eq('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(), supabaseClient.from('time_tracking').select('*, users(full_name, role, dept)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true }) ]);
-      let activeOutsMap = {}; let myLogs = [];
-      (todayLogs || []).forEach(log => { if (log.iin === payloadData.iin) myLogs.push(log); if (log.direction === 'Уход') { activeOutsMap[log.iin] = { iin: log.iin, action: log.action_type, leftAt: new Date(log.created_at).getTime(), name: log.users ? log.users.full_name : 'Сотрудник', role: log.users ? log.users.role : log.role_group, dept: log.users ? log.users.dept : 'Цифра' }; } else { delete activeOutsMap[log.iin]; } });
-      let myActiveAction = activeOutsMap[payloadData.iin] ? activeOutsMap[payloadData.iin].action : null; let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; let totalOut = 0;
-      for (let key in activeOutsMap) { if (activeOutsMap[key].role.toLowerCase().includes(roleGroup.toLowerCase())) { let act = activeOutsMap[key].action; if (act && act.startsWith('Перерыв')) outByAction['Перерыв']++; else if (outByAction[act] !== undefined) outByAction[act]++; totalOut++; } }
-      const tookLunch = myLogs.some(l => l.action_type === 'Обед' && l.direction === 'Уход'); const tookSnack = myLogs.some(l => l.action_type === 'Полдник' && l.direction === 'Уход');
-      const isLunchTime = currentHour >= 12 && currentHour < 17; const isSnackTime = currentHour >= 16 && currentHour < 20;
-      const hasLunchSlot = (outByAction['Обед'] < (limitData?.lunch_limit || 1)) && (totalOut < (limitData?.total_limit || 2)); const hasSnackSlot = (outByAction['Полдник'] < (limitData?.snack_limit || 1)) && (totalOut < (limitData?.total_limit || 2)); const hasBreakSlot = (outByAction['Перерыв'] < (limitData?.break_limit || 1)) && (totalOut < (limitData?.total_limit || 2));
-      return { authorized: true, activeOuts: Object.values(activeOutsMap).map(o => { let timerLimit = 10; let rRole = String(o.role || "").toLowerCase(); if (rRole.includes('промоутер')) { if (o.action === 'Обед') timerLimit = 60; else if (o.action === 'Полдник') timerLimit = 30; else timerLimit = 15; } else { if (o.action === 'Обед') timerLimit = 40; else if (o.action === 'Полдник') timerLimit = 30; else timerLimit = 10; } return { ...o, limit: timerLimit }; }), myActiveAction: myActiveAction, canBreak: hasBreakSlot, canLunch: hasLunchSlot && isLunchTime && !tookLunch, canSnack: hasSnackSlot && isSnackTime && !tookSnack };
+      const roleGroup = getRoleGroup(); 
+      const dayOfWeek = new Date().getDay() || 7; 
+      const todayStart = new Date(); todayStart.setHours(0,0,0,0); 
+      const currentHour = new Date().getHours();
+
+      // ИСПРАВЛЕНО: Регистронезависимый поиск роли (ilike)
+      const [ limitRes, logsRes ] = await Promise.all([ 
+          supabaseClient.from('time_limits').select('*').ilike('role_group', roleGroup).eq('day_of_week', dayOfWeek).maybeSingle(), 
+          supabaseClient.from('time_tracking').select('*, users(full_name, role, dept)').gte('created_at', todayStart.toISOString()).order('created_at', { ascending: true }) 
+      ]);
+
+      const limitData = limitRes.data;
+      const todayLogs = logsRes.data || [];
+
+      // Задаем гарантированные безопасные значения по умолчанию, если записи в таблице time_limits нет
+      const breakLimit = limitData?.break_limit ?? 1;
+      const lunchLimit = limitData?.lunch_limit ?? 1;
+      const snackLimit = limitData?.snack_limit ?? 1;
+      const totalLimit = limitData?.total_limit ?? 2;
+
+      let activeOutsMap = {}; 
+      let myLogs = [];
+
+      todayLogs.forEach(log => { 
+          if (log.iin === payloadData.iin) myLogs.push(log); 
+          if (log.direction === 'Уход') { 
+              activeOutsMap[log.iin] = { iin: log.iin, action: log.action_type, leftAt: new Date(log.created_at).getTime(), name: log.users ? log.users.full_name : 'Сотрудник', role: log.users ? log.users.role : log.role_group, dept: log.users ? log.users.dept : 'Цифра' }; 
+          } else { 
+              delete activeOutsMap[log.iin]; 
+          } 
+      });
+
+      let myActiveAction = activeOutsMap[payloadData.iin] ? activeOutsMap[payloadData.iin].action : null; 
+      let outByAction = { 'Перерыв': 0, 'Обед': 0, 'Полдник': 0 }; 
+      let totalOut = 0;
+
+      for (let key in activeOutsMap) { 
+          let activeRole = String(activeOutsMap[key].role || "").toLowerCase();
+          if (activeRole.includes(roleGroup.toLowerCase())) { 
+              let act = activeOutsMap[key].action; 
+              if (act && act.startsWith('Перерыв')) outByAction['Перерыв']++; 
+              else if (outByAction[act] !== undefined) outByAction[act]++; 
+              totalOut++; 
+          } 
+      }
+
+      const tookLunch = myLogs.some(l => l.action_type === 'Обед' && l.direction === 'Уход'); 
+      const tookSnack = myLogs.some(l => l.action_type === 'Полдник' && l.direction === 'Уход');
+
+      const isLunchTime = currentHour >= 12 && currentHour < 17; 
+      const isSnackTime = currentHour >= 16 && currentHour < 20;
+
+      const hasLunchSlot = (outByAction['Обед'] < lunchLimit) && (totalOut < totalLimit); 
+      const hasSnackSlot = (outByAction['Полдник'] < snackLimit) && (totalOut < totalLimit); 
+      const hasBreakSlot = (outByAction['Перерыв'] < breakLimit) && (totalOut < totalLimit);
+
+      return { 
+          authorized: true, 
+          activeOuts: Object.values(activeOutsMap).map(o => { 
+              let timerLimit = 10; 
+              let rRole = String(o.role || "").toLowerCase(); 
+              if (rRole.includes('промоутер')) { 
+                  if (o.action === 'Обед') timerLimit = 60; 
+                  else if (o.action === 'Полдник') timerLimit = 30; 
+                  else timerLimit = 15; 
+              } else { 
+                  if (o.action === 'Обед') timerLimit = 40; 
+                  else if (o.action === 'Полдник') timerLimit = 30; 
+                  else timerLimit = 10; 
+              } 
+              return { ...o, limit: timerLimit }; 
+          }), 
+          myActiveAction: myActiveAction, 
+          canBreak: hasBreakSlot, 
+          canLunch: hasLunchSlot && isLunchTime && !tookLunch, 
+          canSnack: hasSnackSlot && isSnackTime && !tookSnack 
+      };
     }
 
     if (actionName === "processRequest") {
