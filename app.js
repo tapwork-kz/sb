@@ -2747,7 +2747,7 @@ window.openAdminOvertimeForm = function() {
         activeEmps.sort((a, b) => String(a.name).localeCompare(String(b.name), "ru"));
 
         let empOptionsHtml = `<option value="${appState.iin}">На себя (${appState.firstName || 'Я'})</option>` + 
-            activeEmps.map(e => `<option value="${e.iin}">${e.name} ${e.role ? '(' + e.role + ')' : ''}</option>`).join('');
+            activeEmps.map(e => `<option value="${e.iin}">${e.name} ${e.dept ? '(' + e.dept + ')' : ''}</option>`).join('');
 
         empSelectBlockHtml = `
             <div style="margin-bottom:10px; width:100%; box-sizing:border-box;">
@@ -2908,7 +2908,6 @@ window.submitAdminOvertimeForm = async function() {
         type: reqType,
         details: details,
         targetIin: targetIin,
-        authorIin: targetIin, // ИСПРАВЛЕНО: Передаем targetIin в качестве authorIin
         metadata: JSON.stringify(meta)
     });
     
